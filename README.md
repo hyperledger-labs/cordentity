@@ -2,7 +2,7 @@
 Cordentity
 
 # Short Description
-The Cordentity app integrates [Hyperledger Indy] (https://github.com/hyperledger/indy-sdk) capabilities into the opensource [Corda platform] (https://github.com/corda/corda).
+The Cordentity app integrates [Hyperledger Indy](https://github.com/hyperledger/indy-sdk) capabilities into the opensource [Corda platform](https://github.com/corda/corda).
 
 While Corda is designed for developing decentralized applications to
 manage complex inter-organizational workflows, Indy is the leading
