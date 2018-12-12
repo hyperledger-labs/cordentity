@@ -1,0 +1,18 @@
+extraAdvertisedServiceIds={{ advertised_services | to_json}}
+myLegalName="{{ legal_name }}"
+{% if legal_name != map_service_legal_name %}
+networkMapService {
+    address="{{ map_service_host }}:{{ map_service_p2p_port }}"
+    legalName="{{ map_service_legal_name }}"
+}
+{% endif %}
+p2pAddress="{{ ansible_host }}:{{ p2p_port }}"
+rpcAddress="{{ ansible_host }}:{{ rpc_port }}"
+rpcUsers=[
+    {
+        user={{ rpc_user }}
+        password={{ rpc_password }}
+        permissions={{ rpc_permissions | to_json}}
+
+    }
+]

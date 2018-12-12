@@ -1,0 +1,16 @@
+[all:vars]
+ansible_connection=ssh
+ansible_user=ubuntu
+ansible_user_id=ubuntu
+ansible_ssh_private_key_file=~/.ssh/id_rsa_bc
+
+[hotels]
+HotelA          ansible_host=172.26.147.119 legal_name="O=HotelA,L=Mexico,C=ME" advertised_services="[]"
+HotelB          ansible_host=172.26.147.109 legal_name="O=HotelB,L=St.Petersburg,C=RU" advertised_services="[]"
+
+[corps]
+CorpA           ansible_host=172.26.147.107 legal_name="O=CorpA,L=London,C=GB" advertised_services="[]"
+CorpB           ansible_host=172.26.147.115 legal_name="O=CorpB,L=Paris,C=FR" advertised_services="[]"
+
+[controllers]
+Controller      ansible_host=172.26.147.118 legal_name="O=Controller,L=London,C=GB" advertised_services="[corda.notary.validating]" map_service=true

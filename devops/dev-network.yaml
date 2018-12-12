@@ -1,0 +1,24 @@
+---
+- hosts: all:!localhost
+  gather_facts: false
+  any_errors_fatal: true
+  roles:
+    - ubuntu-ansible-req
+    - ubuntu-add-luxoft-ca
+    - ubuntu-docker-engine
+
+- hosts: controllers
+  roles:
+    - node
+  vars:
+    advertised_services: ["corda.notary.validating"]
+    rpc_permissions: []
+
+- hosts: hotels
+  roles:
+    - node
+
+- hosts: corps
+  roles:
+    - node
+

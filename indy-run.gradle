@@ -1,0 +1,25 @@
+apply from: "$rootDir/docker.gradle"
+
+def indy_version = project.ext.has('indy_version') ? ext.indy_version : "1.6.4"
+def indy_pool_folder_name = '.indy_client/'
+def indy_pool_docker_name = 'indy-cordapp.indy-pool'
+
+def INDY_RUN_GROUP = "indy run"
+
+dockerRun {
+    name indy_pool_docker_name
+    image "teamblockchain/indy-pool:$indy_version"
+    ports '9701:9701', '9702:9702', '9703:9703', '9704:9704', '9705:9705', '9706:9706', '9707:9707', '9708:9708'
+    daemonize true
+    clean true
+}
+
+task cleanDefaultPool(type: Delete, group: INDY_RUN_GROUP) {
+    def home = System.getProperty("user.home")
+    delete("$home/$indy_pool_folder_name")
+}
+
+test.dependsOn(dockerCleanRun)
+test.dependsOn(cleanDefaultPool)
+
+clean.dependsOn(cleanDefaultPool)

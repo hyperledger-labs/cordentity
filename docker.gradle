@@ -1,0 +1,43 @@
+buildscript {
+    ext.docker_plugin_version = "0.19.2"
+
+    repositories {
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
+    }
+    dependencies {
+        classpath "gradle.plugin.com.palantir.gradle.docker:gradle-docker:$docker_plugin_version"
+    }
+}
+
+apply plugin: com.palantir.gradle.docker.DockerRunPlugin
+
+
+ext.dockerRunTask = tasks.find { it.name == "dockerRun" }
+
+def DOCKER_GROUP = dockerRunTask.group
+
+task dockerCleanRun(group: DOCKER_GROUP) {
+    doLast {
+        dockerStop.execute()
+        println("DOCKER $dockerRun.name has been STOPED")
+        dockerRemoveContainer.execute()
+        println("DOCKER $dockerRun.name has been REMOVED")
+        dockerRunTask.execute()
+        println("DOCKER $dockerRun.name has been STARTED")
+    }
+}
+
+static def dockerExists(String containerName) {
+    def result = "docker inspect $containerName".execute()
+    return result.waitFor() == 0
+}
+
+dockerRunTask.onlyIf { !dockerExists(dockerRun.name) }
+dockerStop.onlyIf { dockerExists(dockerRun.name) }
+dockerRemoveContainer.onlyIf { dockerExists(dockerRun.name) }
+
+dockerRunTask.outputs.upToDateWhen { dockerExists(dockerRun.name) }
+dockerRemoveContainer.outputs.upToDateWhen { !dockerExists(dockerRun.name) }
+

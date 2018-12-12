@@ -1,0 +1,12 @@
+---
+node_name: "{{inventory_hostname}}"
+corda_version: 1.0.0
+advertised_services: []
+map_service_host: "{{ hostvars[groups['controllers'][0]]['ansible_host'] }}"
+map_service_legal_name: "{{ hostvars[groups['controllers'][0]]['legal_name'] }}"
+map_service_p2p_port: 10002
+p2p_port: 10002
+rpc_port: 10003
+rpc_user: "user1"
+rpc_password: "test"
+rpc_permissions: []

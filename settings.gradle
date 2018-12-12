@@ -1,0 +1,4 @@
+include 'indy-utils'
+include 'cordapp'
+include 'cordapp-contracts-states'
+

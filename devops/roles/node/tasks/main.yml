@@ -1,0 +1,45 @@
+---
+
+- name: Copy dockernode
+  synchronize:
+    src: "{{ role_path }}/files/dockernode"
+    dest: "{{ ansible_env.HOME}}"
+    delete: yes
+
+- name: Generate node.conf
+  template:
+    src: "{{ role_path }}/templates/node.conf.j2"
+    dest: "{{ ansible_env.HOME}}/dockernode/node.conf"
+
+
+- name: Pull Corda node image
+  docker_image:
+    name: "teamblockchain/cordanode"
+    tag: "{{corda_version}}"
+
+
+- name: Build custom node image
+  docker_image:
+    path: "{{ ansible_env.HOME}}/dockernode"
+    state: present
+    force: yes
+    name: "teamblockchain/corda-node"
+
+- name: Create network
+  docker_network:
+    name: "{{node_name}}_net"
+
+
+- name: Start node
+  become: yes
+  docker_container:
+    name: "{{node_name}}"
+    image: "teamblockchain/cordanode"
+    state: started
+    restart: yes
+    recreate: yes
+    networks:
+      - name: "{{node_name}}_net"
+    ports:
+      - "10002:10002"
+      - "10003:10003"

@@ -1,0 +1,64 @@
+version: '3.3'
+services:
+
+  Issuer:
+    networks:
+      - corda
+#    build:
+#      context: .
+#      args:
+#        BUILDTIME_CORDA_VERSION: 3.1-corda
+    env_file:
+      - ./Issuer.env
+    ports:
+      - "2222:2222" #ssh
+      - "10001:10001"
+      - "10002:10002"
+      - "10003:10003"
+    image: teamblockchain/corda-node:3.1-corda
+    container_name: issuer
+    volumes:
+      - ../build/nodes/Issuer/:/opt/corda/
+
+  Prover:
+    networks:
+      - corda
+#    build:
+#      context: dockernode
+#      args:
+#        BUILDTIME_CORDA_VERSION: 3.1-corda
+    env_file:
+      - ./corda_docker.env
+    ports:
+      - "10101:10101"
+      - "10102:10102"
+      - "10103:10103"
+    image: teamblockchain/corda-node:3.1-corda
+    container_name: prover
+    volumes:
+      - ../build/nodes/Prover/:/opt/corda/
+    depends_on:
+      - Issuer
+
+  Verifier:
+    networks:
+      - corda
+#    build:
+#      context: dockernode
+#      args:
+#        BUILDTIME_CORDA_VERSION: 3.1-corda
+    env_file:
+      - ./corda_docker.env
+    ports:
+      - "10201:10201"
+      - "10202:10202"
+      - "10203:10203"
+    image: teamblockchain/corda-node:3.1-corda
+    container_name: verifier
+    volumes:
+      - ../build/nodes/Verifier/:/opt/corda/
+    depends_on:
+      - Issuer
+
+networks:
+  corda:
