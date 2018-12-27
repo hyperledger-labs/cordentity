@@ -43,7 +43,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         fun setUpTest() {
             // Create and Open Pool
             poolName = PoolManager.DEFAULT_POOL_NAME
-            pool = PoolManager.openIndyPool(PoolManager.defaultGenesisResource, poolName)
+            pool = PoolManager.openIndyPool(PoolManager.TEST_GENESIS_FILE, poolName)
         }
 
         @JvmStatic

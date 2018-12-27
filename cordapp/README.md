@@ -27,7 +27,7 @@ Each [IndyService](#Services) can be configured with its own `indy.properties`
 - indyuser.role - the role of the service
 - indyuser.did - a preconfigured DID of the node
 - indyuser.seed - a seed to generate private keys of the node
-- indyuser.genesisFile - absolute path to a Genesis file or relative to a resource folder. Must start with `/`
+- indyuser.genesisFile - path to a Genesis file
 - indyuser.wallet - deprecated
 
 Example `indy.properties` file:

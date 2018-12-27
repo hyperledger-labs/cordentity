@@ -64,7 +64,7 @@ class IndyService(services: AppServiceHub) : SingletonSerializeAsToken() {
 
         val wallet = Wallet.openWallet(walletConfig, credentials).get()
 
-        val genesisFile = File(javaClass.getResource(config[indyuser.genesisFile]).toURI())
+        val genesisFile = File(config[indyuser.genesisFile])
         val pool = PoolManager.openIndyPool(genesisFile)
 
         indyUser = if (config.getOrNull(indyuser.role)?.compareTo("trustee", true) == 0) {
