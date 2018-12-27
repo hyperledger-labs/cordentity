@@ -126,13 +126,13 @@ open class CordaTestBase {
                             "indyuser.role" to "trustee",
                             "indyuser.did" to "V4SGRU86Z58d6TV7PBUe6f",
                             "indyuser.seed" to "000000000000000000000000Trustee1",
-                            "indyuser.genesisFile" to PoolManager.DEFAULT_GENESIS_FILE
+                            "indyuser.genesisFile" to PoolManager.TEST_GENESIS_FILE_PATH
                         )
                     )
                 } else ConfigurationMap(
                     mapOf(
                         "indyuser.walletName" to name + random.nextLong().absoluteValue,
-                        "indyuser.genesisFile" to PoolManager.DEFAULT_GENESIS_FILE
+                        "indyuser.genesisFile" to PoolManager.TEST_GENESIS_FILE_PATH
                     )
                 )
             }

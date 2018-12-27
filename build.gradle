@@ -6,7 +6,6 @@ buildscript {
     ext.junit_version = '4.12'
     ext.kotlin_version = '1.2.30'
     ext.indy_version = "1.6.4"
-    ext.kotlin_coroutines_version = '0.25.0'
     ext.jackson_version = '2.9.5'
 
     repositories {
@@ -21,7 +20,7 @@ buildscript {
     }
 }
 
-allprojects {
+subprojects {
 
     repositories {
         mavenLocal()
@@ -36,11 +35,10 @@ allprojects {
     apply plugin: 'idea'
     apply plugin: 'net.corda.plugins.cordformation'
     apply plugin: 'net.corda.plugins.quasar-utils'
-
+    
     sourceSets {
         main.resources {
             srcDir "config/dev"
-            srcDir "$rootDir/genesis"
         }
         test.resources {
             srcDir "config/test"
@@ -52,7 +50,6 @@ allprojects {
     dependencies {
         compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:${kotlin_version}"
         compile "org.jetbrains.kotlin:kotlin-reflect:${kotlin_version}"
-        compile "org.jetbrains.kotlinx:kotlinx-coroutines-core:${kotlin_coroutines_version}"
 
         compile 'com.github.alexeykoren:konfig:2.0.4'
 
@@ -65,9 +62,7 @@ allprojects {
     compileKotlin.kotlinOptions.jvmTarget = "1.8"
     compileTestKotlin.kotlinOptions.jvmTarget = "1.8"
     sourceCompatibility = 1.8
-    kotlin.experimental.coroutines = 'enable'
 }
-
 
 task deployNodes(type: net.corda.plugins.Cordform, group: "corda") {
     directory "./build/nodes"

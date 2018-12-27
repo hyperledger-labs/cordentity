@@ -9,6 +9,12 @@ dependencies {
     compile group: 'org.slf4j', name: 'slf4j-api', version: '1.7.21'
 }
 
+sourceSets {
+    main.resources {
+        srcDir "$rootDir/genesis"
+    }
+}
+
 apply from: "$rootDir/indy-run.gradle"
 
 apply plugin: 'maven-publish'
