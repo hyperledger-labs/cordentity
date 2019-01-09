@@ -124,7 +124,7 @@ On all machines that are going to run [IndyService](cordapp/README.md#services) 
     sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 68DB5E88
     sudo add-apt-repository "deb https://repo.sovrin.org/sdk/deb xenial stable"
     sudo apt-get update
-    sudo apt-get install -y libindy=1.6.4
+    sudo apt-get install -y libindy=1.7.0
     
 Please follow to the official [indy-sdk repo](https://github.com/hyperledger/indy-sdk#installing-the-sdk) 
 for installation instructions for Windows, iOS, Android and MacOS.
@@ -140,7 +140,7 @@ for installation instructions for Windows, iOS, Android and MacOS.
 
 ## External dependancies
 
-Version cordapp 0.4.11 requires installation of indy-sdk version 1.6.4.
+Cordapp requires installation of indy-sdk version 1.7.0.
 
 ## Build
 
@@ -149,7 +149,7 @@ To run the tests you need to install the `libindy` package:
     sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 68DB5E88
     sudo add-apt-repository "deb https://repo.sovrin.org/sdk/deb xenial stable"
     sudo apt-get update
-    sudo apt-get install -y libindy=1.6.4
+    sudo apt-get install -y libindy=1.7.0
     
 Make sure that `Docker` is installed:
 
@@ -172,8 +172,8 @@ Also re-creating the `indypool` docker container is needed to get a clean system
 
 To manually start the `indy-pool` container on ports 9701-9708: 
 
-    docker pull teamblockchain/indy-pool:1.6.4
-    docker create -p 9701-9708:9701-9708 --name indypool --rm teamblockchain/indy-pool:1.6.4
+    docker pull teamblockchain/indy-pool:1.7.0
+    docker create -p 9701-9708:9701-9708 --name indypool --rm teamblockchain/indy-pool:1.7.0
     docker start indypool
     
 ## Contributors
