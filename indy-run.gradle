@@ -1,6 +1,6 @@
 apply from: "$rootDir/docker.gradle"
 
-def indy_version = project.ext.has('indy_version') ? ext.indy_version : "1.6.4"
+def indy_version = project.ext.has('indy_version') ? ext.indy_version : "1.7.0"
 def indy_pool_folder_name = '.indy_client/'
 def indy_pool_docker_name = 'indy-cordapp.indy-pool'
 
