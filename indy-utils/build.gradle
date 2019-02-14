@@ -1,5 +1,5 @@
 dependencies {
-    compile 'com.github.seniorjoinu:indy-sdk:v1.7.0-indy-android-compat-3'
+    compile 'com.github.seniorjoinu:indy-sdk:v1.7.0-indy-android-compat-4'
     implementation group: 'commons-io', name: 'commons-io', version: '2.6'
 
     implementation "com.fasterxml.jackson.core:jackson-databind:$jackson_version"
