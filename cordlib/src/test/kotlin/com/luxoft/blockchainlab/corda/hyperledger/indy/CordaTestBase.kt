@@ -1,9 +1,9 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy
 
-import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.AssignPermissionsFlow
-import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.CreatePairwiseFlow
-import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.IssueCredentialFlow
-import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.VerifyCredentialFlow
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.AssignPermissionsFlowB2B
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.CreatePairwiseFlowB2B
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.IssueCredentialFlowB2B
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.VerifyCredentialFlowB2B
 import com.luxoft.blockchainlab.corda.hyperledger.indy.service.IndyService
 import com.luxoft.blockchainlab.hyperledger.indy.utils.PoolManager
 import com.natpryce.konfig.Configuration
@@ -39,10 +39,10 @@ open class CordaTestBase {
      * List of all flows that may be initiated by a message
      * */
     val projectReciverFlows = listOf(
-        AssignPermissionsFlow.Authority::class,
-        CreatePairwiseFlow.Issuer::class,
-        IssueCredentialFlow.Prover::class,
-        VerifyCredentialFlow.Prover::class
+        AssignPermissionsFlowB2B.Authority::class,
+        CreatePairwiseFlowB2B.Issuer::class,
+        IssueCredentialFlowB2B.Prover::class,
+        VerifyCredentialFlowB2B.Prover::class
     )
 
     /**
@@ -64,7 +64,7 @@ open class CordaTestBase {
      */
     protected fun setPermissions(issuer: StartedNode<MockNode>, authority: StartedNode<MockNode>) {
         val permissionsFuture = issuer.services.startFlow(
-            AssignPermissionsFlow.Issuer(authority = authority.info.singleIdentity().name, role = "TRUSTEE")
+            AssignPermissionsFlowB2B.Issuer(authority = authority.info.singleIdentity().name, role = "TRUSTEE")
         ).resultFuture
 
         permissionsFuture.getOrThrow(Duration.ofSeconds(30))
@@ -99,7 +99,7 @@ open class CordaTestBase {
      *
      * Usage:
      *
-     *     val did = store.services.startFlow(GetDidFlow.Initiator(name)).resultFuture.get()
+     *     val did = store.services.startFlow(GetDidFlowB2B.Initiator(name)).resultFuture.get()
      */
     protected fun <T> StartedNodeServices.startFlow(logic: FlowLogic<T>): FlowStateMachine<T> {
         val machine = startFlow(logic, newContext()).getOrThrow()

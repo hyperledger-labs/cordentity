@@ -1,6 +1,8 @@
-package com.luxoft.blockchainlab.corda.hyperledger.indy.flow
+package com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b
 
 import co.paralleluniverse.fibers.Suspendable
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.indyUser
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.whoIs
 import com.luxoft.blockchainlab.hyperledger.indy.IdentityDetails
 import com.luxoft.blockchainlab.hyperledger.indy.roles.getIdentity
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
@@ -12,7 +14,7 @@ import net.corda.core.utilities.unwrap
 /**
  * Utility flows to initiate a bi-directional connection with a Corda node
  * */
-object CreatePairwiseFlow {
+object CreatePairwiseFlowB2B {
 
     /**
      * An utility flow to initiate a bi-directional connection with a Corda node
@@ -46,7 +48,7 @@ object CreatePairwiseFlow {
     }
 
 
-    @InitiatedBy(CreatePairwiseFlow.Prover::class)
+    @InitiatedBy(CreatePairwiseFlowB2B.Prover::class)
     open class Issuer(private val flowSession: FlowSession) : FlowLogic<Unit>() {
 
         @Suspendable

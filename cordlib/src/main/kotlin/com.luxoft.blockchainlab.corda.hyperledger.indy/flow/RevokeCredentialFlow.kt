@@ -2,6 +2,9 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy.flow
 
 import co.paralleluniverse.fibers.Suspendable
 import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialContract
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.getIndyCredentialState
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.indyUser
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.whoIsNotary
 import com.luxoft.blockchainlab.hyperledger.indy.getRevocationRegistryId
 import net.corda.core.contracts.Command
 import net.corda.core.flows.*

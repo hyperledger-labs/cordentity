@@ -1,6 +1,9 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy
 
-import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.*
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.CreateCredentialDefinitionFlow
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.CreateSchemaFlow
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.ProofPredicate
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.*
 import net.corda.core.identity.CordaX500Name
 import net.corda.node.internal.StartedNode
 import net.corda.testing.core.singleIdentity
@@ -43,7 +46,7 @@ class ReadmeExampleTest : CordaTestBase() {
         // And each Indy node has a DID, a.k.a Decentralized ID:
 
         val ministryDID = store.services.startFlow(
-            GetDidFlow.Initiator(ministryX500)
+            GetDidFlowB2B.Initiator(ministryX500)
         ).resultFuture.get()
 
         // To allow customers and shops to communicate, Ministry issues a shopping scheme:
@@ -72,7 +75,7 @@ class ReadmeExampleTest : CordaTestBase() {
         """
 
         ministry.services.startFlow(
-            IssueCredentialFlow.Issuer(
+            IssueCredentialFlowB2B.Issuer(
                 UUID.randomUUID().toString(),
                 credentialProposal,
                 credentialDefinitionId,
@@ -85,10 +88,10 @@ class ReadmeExampleTest : CordaTestBase() {
         // Alice.BORN >= currentYear - 18
         val eighteenYearsAgo = LocalDateTime.now().minusYears(18).year
         val legalAgePredicate =
-            VerifyCredentialFlow.ProofPredicate(schemaId, credentialDefinitionId, "BORN", eighteenYearsAgo)
+            ProofPredicate(schemaId, credentialDefinitionId, "BORN", eighteenYearsAgo)
 
         val verified = store.services.startFlow(
-            VerifyCredentialFlow.Verifier(
+            VerifyCredentialFlowB2B.Verifier(
                 UUID.randomUUID().toString(),
                 emptyList(),
                 listOf(legalAgePredicate),

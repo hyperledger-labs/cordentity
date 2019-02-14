@@ -1,6 +1,8 @@
-package com.luxoft.blockchainlab.corda.hyperledger.indy.flow
+package com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b
 
 import co.paralleluniverse.fibers.Suspendable
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.indyUser
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.whoIs
 import com.luxoft.blockchainlab.hyperledger.indy.IdentityDetails
 import com.luxoft.blockchainlab.hyperledger.indy.roles.getIdentity
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
@@ -13,7 +15,7 @@ import net.corda.core.utilities.unwrap
 /**
  * Flows to request the DID (Decentralized ID) of a Corda party
  **/
-object GetDidFlow {
+object GetDidFlowB2B {
 
     /**
      * A flow to request the DID (Decentralized ID) of another Corda party [authority]
@@ -43,7 +45,7 @@ object GetDidFlow {
         }
     }
 
-    @InitiatedBy(Initiator::class)
+    @InitiatedBy(GetDidFlowB2B.Initiator::class)
     open class Authority(private val flowSession: FlowSession) : FlowLogic<Unit>() {
 
         @Suspendable
