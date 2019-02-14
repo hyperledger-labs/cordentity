@@ -1,13 +1,13 @@
 dependencies {
     compile 'com.github.seniorjoinu:indy-sdk:v1.7.0-indy-android-compat-3'
+    implementation group: 'commons-io', name: 'commons-io', version: '2.6'
 
-    implementation 'net.java.dev.jna:jna:4.5.1'
     implementation "com.fasterxml.jackson.core:jackson-databind:$jackson_version"
     implementation "com.fasterxml.jackson.module:jackson-module-kotlin:$jackson_version"
 
-    implementation group: 'commons-io', name: 'commons-io', version: '2.6'
-
-    //implementation group: 'org.slf4j', name: 'slf4j-api', version: '1.7.21'
+    implementation group: 'org.slf4j', name: 'slf4j-api', version: '1.7.25'
+    
+    testImplementation 'net.java.dev.jna:jna:4.5.1'
 }
 
 sourceSets {
