@@ -29,9 +29,7 @@ subprojects {
         maven { url 'https://jitpack.io' }
         maven { url 'https://ci-artifactory.corda.r3cev.com/artifactory/corda-releases' }
         maven { url 'https://repo.evernym.com/artifactory/libindy-maven-local' }
-        flatDir {
-            dirs '../lib'
-        }
+        maven { url 'https://jitpack.io' }
     }
 
     apply plugin: 'kotlin'

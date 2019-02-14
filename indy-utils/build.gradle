@@ -1,6 +1,6 @@
 dependencies {
-    compile name: "indy-$indy_version"
-    
+    compile 'com.github.seniorjoinu:indy-sdk:v1.7.0-indy-android-compat-2'
+
     implementation 'net.java.dev.jna:jna:4.5.1'
     implementation "com.fasterxml.jackson.core:jackson-databind:$jackson_version"
     implementation "com.fasterxml.jackson.module:jackson-module-kotlin:$jackson_version"
