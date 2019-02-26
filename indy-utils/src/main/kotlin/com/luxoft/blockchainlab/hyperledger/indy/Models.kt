@@ -1,6 +1,7 @@
 package com.luxoft.blockchainlab.hyperledger.indy
 
 import com.fasterxml.jackson.annotation.JsonIgnore
+import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
 import org.hyperledger.indy.sdk.blob_storage.BlobStorageReader
 import org.hyperledger.indy.sdk.blob_storage.BlobStorageWriter
@@ -338,12 +339,12 @@ data class RequestedCredentials(
 data class RequestedAttributeInfo(
     @JsonProperty("cred_id") val credentialId: String,
     val revealed: Boolean = true,
-    val timestamp: Long?
+    @JsonInclude(JsonInclude.Include.NON_NULL) val timestamp: Long?
 )
 
 data class RequestedPredicateInfo(
     @JsonProperty("cred_id") val credentialId: String,
-    val timestamp: Long?
+    @JsonInclude(JsonInclude.Include.NON_NULL) val timestamp: Long?
 )
 
 /**
@@ -419,14 +420,14 @@ data class ProofRequest(
 
 data class CredentialAttributeReference(
     override val name: String,
-    @JsonIgnore override val schemaId: String
+    override val schemaId: String
 ) : AbstractCredentialReference(name, schemaId)
 
 data class CredentialPredicateReference(
     override val name: String,
     val p_type: String,
     val p_value: Int,
-    @JsonIgnore override val schemaId: String
+    override val schemaId: String
 ) : AbstractCredentialReference(name, schemaId)
 
 abstract class AbstractCredentialReference(
@@ -602,7 +603,7 @@ data class ParsedProof(
 )
 
 data class ProofInfo(
-    val proofData: ParsedProof
+    @JsonProperty("proof_data") val proofData: ParsedProof
 ) {
     @JsonIgnore
     fun isAttributeExists(value: String) = proofData.requestedProof.revealedAttrs.values.any { it.raw == value }

@@ -1,20 +1,22 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy
 
-import com.google.gson.Gson
-import com.google.gson.JsonObject
-import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection.MESSAGE_TYPES.Companion.CONNECT
-import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection.MESSAGE_TYPES.Companion.GENERATE_INVITE
-import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection.MESSAGE_TYPES.Companion.GET_MESSAGES
-import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection.MESSAGE_TYPES.Companion.INVITE_GENERATED
-import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection.MESSAGE_TYPES.Companion.INVITE_RECEIVED
-import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection.MESSAGE_TYPES.Companion.MESSAGE_RECEIVED
-import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection.MESSAGE_TYPES.Companion.RECEIVE_INVITE
-import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection.MESSAGE_TYPES.Companion.REQUEST_RECEIVED
-import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection.MESSAGE_TYPES.Companion.RESPONSE_RECEIVED
-import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection.MESSAGE_TYPES.Companion.SEND_MESSAGE
-import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection.MESSAGE_TYPES.Companion.SEND_REQUEST
-import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection.MESSAGE_TYPES.Companion.SEND_RESPONSE
+
+import com.fasterxml.jackson.annotation.JsonProperty
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection.MESSAGE_TYPES.CONNECT
+import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection.MESSAGE_TYPES.GENERATE_INVITE
+import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection.MESSAGE_TYPES.GET_MESSAGES
+import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection.MESSAGE_TYPES.INVITE_GENERATED
+import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection.MESSAGE_TYPES.INVITE_RECEIVED
+import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection.MESSAGE_TYPES.MESSAGE_RECEIVED
+import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection.MESSAGE_TYPES.RECEIVE_INVITE
+import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection.MESSAGE_TYPES.REQUEST_RECEIVED
+import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection.MESSAGE_TYPES.RESPONSE_RECEIVED
+import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection.MESSAGE_TYPES.SEND_MESSAGE
+import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection.MESSAGE_TYPES.SEND_REQUEST
+import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection.MESSAGE_TYPES.SEND_RESPONSE
 import com.luxoft.blockchainlab.hyperledger.indy.*
+import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import org.java_websocket.client.WebSocketClient
 import org.java_websocket.handshake.ServerHandshake
 import java.lang.Thread.sleep
@@ -22,6 +24,7 @@ import java.net.URI
 import java.util.*
 import java.util.logging.Level
 import java.util.logging.Logger
+
 
 data class IndyParty(val did: String, val endpoint: String, val verkey: String? = null)
 
@@ -40,47 +43,44 @@ interface Connection {
     fun sendProofRequest(request: ProofRequest)
     fun receiveProofRequest(): ProofRequest
 
-    fun sendProof(proof: Proof)
-    fun receiveProof(): Proof
+    fun sendProof(proof: ProofInfo)
+    fun receiveProof(): ProofInfo
 }
 
 class AgentConnection(val myAgentUrl: String, val invite: String? = null, val userName: String = "user1", val passphrase: String = "test") : Connection {
 
     private var counterParty: IndyParty? = null
 
-    class MESSAGE_TYPES {
-        companion object {
-            val CONN_BASE = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/connections/1.0/"
-            val ADMIN_CONNECTIONS_BASE = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin_connections/1.0/"
-            val ADMIN_BASE = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin/1.0/"
-            val ADMIN_WALLETCONNECTION_BASE = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin_walletconnection/1.0/"
-            val ADMIN_BASICMESSAGE_BASE = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin_basicmessage/1.0/"
+    object MESSAGE_TYPES {
+        val CONN_BASE = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/connections/1.0/"
+        val ADMIN_CONNECTIONS_BASE = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin_connections/1.0/"
+        val ADMIN_BASE = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin/1.0/"
+        val ADMIN_WALLETCONNECTION_BASE = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin_walletconnection/1.0/"
+        val ADMIN_BASICMESSAGE_BASE = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin_basicmessage/1.0/"
 
-            val CONNECT = ADMIN_WALLETCONNECTION_BASE + "connect"
-            val DISCONNECT = ADMIN_WALLETCONNECTION_BASE + "disconnect"
+        val CONNECT = ADMIN_WALLETCONNECTION_BASE + "connect"
+        val DISCONNECT = ADMIN_WALLETCONNECTION_BASE + "disconnect"
 
-            val SEND_MESSAGE = ADMIN_BASICMESSAGE_BASE + "send_message"
-            val MESSAGE_RECEIVED = ADMIN_BASICMESSAGE_BASE + "message_received"
-            val GET_MESSAGES = ADMIN_BASICMESSAGE_BASE + "get_messages"
-            val MESSAGES = ADMIN_BASICMESSAGE_BASE + "messages"
+        val SEND_MESSAGE = ADMIN_BASICMESSAGE_BASE + "send_message"
+        val MESSAGE_RECEIVED = ADMIN_BASICMESSAGE_BASE + "message_received"
+        val GET_MESSAGES = ADMIN_BASICMESSAGE_BASE + "get_messages"
+        val MESSAGES = ADMIN_BASICMESSAGE_BASE + "messages"
 
-            val GENERATE_INVITE = ADMIN_CONNECTIONS_BASE + "generate_invite"
-            val INVITE_GENERATED = ADMIN_CONNECTIONS_BASE + "invite_generated"
-            val INVITE_RECEIVED = ADMIN_CONNECTIONS_BASE + "invite_received"
-            val RECEIVE_INVITE = ADMIN_CONNECTIONS_BASE + "receive_invite"
+        val GENERATE_INVITE = ADMIN_CONNECTIONS_BASE + "generate_invite"
+        val INVITE_GENERATED = ADMIN_CONNECTIONS_BASE + "invite_generated"
+        val INVITE_RECEIVED = ADMIN_CONNECTIONS_BASE + "invite_received"
+        val RECEIVE_INVITE = ADMIN_CONNECTIONS_BASE + "receive_invite"
 
-            val SEND_REQUEST = ADMIN_CONNECTIONS_BASE + "send_request"
-            val REQUEST_RECEIVED = ADMIN_CONNECTIONS_BASE + "request_received"
+        val SEND_REQUEST = ADMIN_CONNECTIONS_BASE + "send_request"
+        val REQUEST_RECEIVED = ADMIN_CONNECTIONS_BASE + "request_received"
 
-            val SEND_RESPONSE = ADMIN_CONNECTIONS_BASE + "send_response"
-            val RESPONSE_RECEIVED = ADMIN_CONNECTIONS_BASE + "response_received"
+        val SEND_RESPONSE = ADMIN_CONNECTIONS_BASE + "send_response"
+        val RESPONSE_RECEIVED = ADMIN_CONNECTIONS_BASE + "response_received"
 
-            val STATE_REQUEST = ADMIN_BASE + "state_request"
-        }
+        val STATE_REQUEST = ADMIN_BASE + "state_request"
     }
 
-    val webSocket = AgentWebSocketClient(URI(myAgentUrl))
-    val gson = Gson()
+    private val webSocket = AgentWebSocketClient(URI(myAgentUrl))
 
     init {
         webSocket.apply {
@@ -96,116 +96,44 @@ class AgentConnection(val myAgentUrl: String, val invite: String? = null, val us
         }
     }
 
-    data class WalletConnect(val name: String, val passphrase: String, val `@type`: String = CONNECT)
-    data class ReceiveInviteMessage(val invite: String, val label: String = "", val `@type`: String = RECEIVE_INVITE)
-    data class InviteReceivedMessage(val key: String, val label: String, val endpoint: String, val `@type`: String)
-
-    data class SendRequestMessage(val key: String, val `@type`: String = SEND_REQUEST)
-    data class RequestReceivedMessage(val label: String, val did: String, val endpoint: String, val `@type`: String)
-    data class RequestSendResponseMessage(val did: String, val `@type`: String = SEND_RESPONSE)
-    data class RequestResponseReceivedMessage(val their_did: String, val history: JsonObject, val `@type`: String)
-
-    data class SendMessage(val to: String? = null, val message: TypedBodyMessage? = null, val `@type`: String = SEND_MESSAGE)
-    data class MessageReceivedMessage(val from: String, val timestamp: Number, val content: TypedBodyMessage)
-    data class MessageReceived(val id: String, val with: String?, val message: MessageReceivedMessage, val `@type`: String = SEND_MESSAGE)
-    data class LoadMessage(val with: String, val `@type`: String = GET_MESSAGES)
-    data class TypedBodyMessage(val message: Any, val `@class`: String, val correlationId: String = UUID.randomUUID().toString())
-
     fun sendJson(obj: Any) = webSocket.sendJson(obj)
 
-    fun WebSocketClient.sendJson(obj: Any) = send(gson.toJson(obj))
-
     fun genInvite(): ReceiveInviteMessage {
-        webSocket.sendJson(AgentConnection.SendMessage(`@type` = GENERATE_INVITE))
-        return waitForMessageOfType<AgentConnection.ReceiveInviteMessage>(INVITE_GENERATED)
+        webSocket.sendJson(SendMessage(type = GENERATE_INVITE))
+        return webSocket.waitForMessageOfType<ReceiveInviteMessage>(INVITE_GENERATED)
     }
 
     fun waitForCounterParty() {
-        waitForMessageOfType<AgentConnection.RequestReceivedMessage>(REQUEST_RECEIVED).also {
+        webSocket.waitForMessageOfType<RequestReceivedMessage>(REQUEST_RECEIVED).also {
             counterParty = IndyParty(it.did, it.endpoint)
-            sendJson(AgentConnection.RequestSendResponseMessage(it.did))
+            sendJson(RequestSendResponseMessage(it.did))
         }
     }
 
-    fun sendRequest(key: String) = webSocket.sendJson(AgentConnection.SendRequestMessage(key))
-
-    fun popMessageOfType(type: String): String? {
-        synchronized(webSocket.receivedMessages) {
-            val result = webSocket.receivedMessages.find {
-                gson.fromJson(it, JsonObject::class.java).get("@type").asString?.contentEquals(type) ?: false
-            }
-            if (result != null)
-                webSocket.receivedMessages.remove(result)
-            return result
-        }
-    }
-
-    inline fun <reified T> popMessageOfType(type: String): T {
-        return gson.fromJson(popMessageOfType(type), T::class.java)
-    }
-
-    fun waitForMessageOfType(type: String): String {
-        var messageOfType: String? = null
-        while (messageOfType == null) {
-            sleep(500)
-            messageOfType = popMessageOfType(type)
-        }
-        return messageOfType
-    }
-
-    inline fun <reified T> waitForMessageOfType(type: String): T {
-        return gson.fromJson(waitForMessageOfType(type), T::class.java)
-    }
-
-    fun sendTypedMessage(message: TypedBodyMessage) = webSocket.sendJson(SendMessage(counterParty!!.did, message))
-    inline fun <reified T : Any> sendTypedMessage(message: T) = webSocket.sendJson(sendTypedMessage(TypedBodyMessage(message, T::class.java.canonicalName)))
-    inline fun <reified T : Any> popTypedMessage(): T? {
-        synchronized(webSocket.receivedMessages) {
-            val message = webSocket.receivedMessages.filter {
-                gson.fromJson(it, JsonObject::class.java).get("@type").asString
-                        ?.contentEquals(MESSAGE_RECEIVED) ?: false
-            }.find { gson.fromJson(it, MessageReceived::class.java).message.content.`@class` == T::class.java.canonicalName }
-            if (message != null) {
-                val result = gson.fromJson(gson.toJsonTree(gson.fromJson(message, MessageReceived::class.java).message.content.message), T::class.java)
-                webSocket.receivedMessages.remove(message)
-                return result
-            }
-            return null
-        }
-    }
-
-    inline fun <reified T : Any> waitForTypedMessage(): T {
-        var messageOfType: T? = null
-        while (messageOfType == null) {
-            sleep(500)
-            messageOfType = popTypedMessage()
-        }
-        return messageOfType
-    }
-
+    fun sendRequest(key: String) = webSocket.sendJson(SendRequestMessage(key))
 
     override fun getCounterParty(): IndyParty? {
         return counterParty
     }
 
-    override fun sendCredentialOffer(offer: CredentialOffer) = sendTypedMessage(offer)
+    override fun sendCredentialOffer(offer: CredentialOffer) = webSocket.sendTypedMessage(offer, counterParty!!)
 
-    override fun receiveCredentialOffer(): CredentialOffer = waitForTypedMessage()
+    override fun receiveCredentialOffer(): CredentialOffer = webSocket.waitForTypedMessage()
 
-    override fun sendCredentialRequest(request: CredentialRequestInfo) = sendTypedMessage(request)
+    override fun sendCredentialRequest(request: CredentialRequestInfo) = webSocket.sendTypedMessage(request, counterParty!!)
 
-    override fun receiveCredentialRequest(): CredentialRequestInfo = waitForTypedMessage()
+    override fun receiveCredentialRequest(): CredentialRequestInfo = webSocket.waitForTypedMessage()
 
-    override fun sendCredential(credential: CredentialInfo) = sendTypedMessage(credential)
+    override fun sendCredential(credential: CredentialInfo) = webSocket.sendTypedMessage(credential, counterParty!!)
 
-    override fun receiveCredential(): CredentialInfo = waitForTypedMessage()
-    override fun sendProofRequest(request: ProofRequest) = sendTypedMessage(request)
+    override fun receiveCredential(): CredentialInfo = webSocket.waitForTypedMessage()
+    override fun sendProofRequest(request: ProofRequest) = webSocket.sendTypedMessage(request, counterParty!!)
 
-    override fun receiveProofRequest(): ProofRequest = waitForTypedMessage()
+    override fun receiveProofRequest(): ProofRequest = webSocket.waitForTypedMessage()
 
-    override fun sendProof(proof: Proof) = sendTypedMessage(proof)
+    override fun sendProof(proof: ProofInfo) = webSocket.sendTypedMessage(proof, counterParty!!)
 
-    override fun receiveProof(): Proof = waitForTypedMessage()
+    override fun receiveProof(): ProofInfo = webSocket.waitForTypedMessage()
 }
 
 class AgentWebSocketClient(serverUri: URI) : WebSocketClient(serverUri) {
@@ -231,4 +159,73 @@ class AgentWebSocketClient(serverUri: URI) : WebSocketClient(serverUri) {
         log.log(Level.WARNING, "Connection error", ex)
     }
 
+    fun sendJson(obj: Any) = send(SerializationUtils.anyToJSON(obj))
+
+    fun popMessageOfType(type: String): String? {
+        synchronized(receivedMessages) {
+            val result = receivedMessages.find { SerializationUtils.jSONToAny<Map<String, Any>>(it)["@type"].toString().contentEquals(type) }
+            if (result != null)
+                receivedMessages.remove(result)
+
+            return result
+        }
+    }
+
+    fun waitForMessageOfType(type: String): String {
+        var messageOfType: String? = null
+        while (messageOfType == null) {
+            sleep(500)
+            messageOfType = popMessageOfType(type)
+        }
+        return messageOfType
+    }
+
+    inline fun <reified T : Any> waitForMessageOfType(type: String): T {
+        return SerializationUtils.jSONToAny(waitForMessageOfType(type))
+    }
+
+    fun sendTypedMessage(message: TypedBodyMessage, counterParty: IndyParty) = sendJson(SendMessage(counterParty.did, message))
+    inline fun <reified T : Any> sendTypedMessage(message: T, counterParty: IndyParty) = sendJson(sendTypedMessage(TypedBodyMessage(message, T::class.java.canonicalName), counterParty))
+    inline fun <reified T : Any> popTypedMessage(): T? {
+        synchronized(receivedMessages) {
+            val message = receivedMessages
+                    .filter { SerializationUtils.jSONToAny<Map<String, Any>>(it)["@type"].toString().contentEquals(MESSAGE_RECEIVED) }
+                    .find { SerializationUtils.jSONToAny<MessageReceived>(it).message.content.clazz == T::class.java.canonicalName }
+
+            if (message != null) {
+                val result = SerializationUtils.jSONToAny<T>(
+                        SerializationUtils.anyToJSON(
+                                SerializationUtils.jSONToAny<MessageReceived>(message).message.content.message
+                        )
+                )
+                receivedMessages.remove(message)
+                return result
+            }
+            return null
+        }
+    }
+
+    inline fun <reified T : Any> waitForTypedMessage(): T {
+        var messageOfType: T? = null
+        while (messageOfType == null) {
+            sleep(500)
+            messageOfType = popTypedMessage()
+        }
+        return messageOfType
+    }
 }
+
+data class WalletConnect(val name: String, val passphrase: String, @JsonProperty("@type") val type: String = CONNECT)
+data class ReceiveInviteMessage(val invite: String, val label: String = "", @JsonProperty("@type") val type: String = RECEIVE_INVITE)
+data class InviteReceivedMessage(val key: String, val label: String, val endpoint: String, @JsonProperty("@type") val type: String)
+
+data class SendRequestMessage(val key: String, @JsonProperty("@type") val type: String = SEND_REQUEST)
+data class RequestReceivedMessage(val label: String, val did: String, val endpoint: String, @JsonProperty("@type") val type: String)
+data class RequestSendResponseMessage(val did: String, @JsonProperty("@type") val type: String = SEND_RESPONSE)
+data class RequestResponseReceivedMessage(val their_did: String, val history: ObjectNode, @JsonProperty("@type") val type: String)
+
+data class SendMessage(val to: String? = null, val message: TypedBodyMessage? = null, @JsonProperty("@type") val type: String = SEND_MESSAGE)
+data class MessageReceivedMessage(val from: String, val timestamp: Number, val content: TypedBodyMessage)
+data class MessageReceived(val id: String?, val with: String?, val message: MessageReceivedMessage, @JsonProperty("@type") val type: String = SEND_MESSAGE)
+data class LoadMessage(val with: String, @JsonProperty("@type") val type: String = GET_MESSAGES)
+data class TypedBodyMessage(val message: Any, @JsonProperty("@class") val clazz: String, val correlationId: String = UUID.randomUUID().toString())

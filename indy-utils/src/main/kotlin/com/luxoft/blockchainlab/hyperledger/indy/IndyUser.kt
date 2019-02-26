@@ -36,7 +36,7 @@ open class IndyUser : IndyIssuer, IndyProver, IndyTrustee {
         private const val ISSUANCE_ON_DEMAND = "ISSUANCE_ON_DEMAND"
         private const val EMPTY_OBJECT = "{}"
 
-        fun getTailsConfig() = """{"base_dir":"${getIndyHomePath("tails")}","uri_pattern":""}"""
+        fun getTailsConfig(tailsPath: String) = """{"base_dir":"$tailsPath","uri_pattern":""}"""
             .replace('\\', '/')
 
         fun getCredentialDefinitionConfig() = """{"support_revocation":true}"""
@@ -155,11 +155,13 @@ open class IndyUser : IndyIssuer, IndyProver, IndyTrustee {
 
     protected val wallet: Wallet
     protected val pool: Pool
+    val tailsPath: String
 
     private var ledgerService: LedgerService
 
-    constructor(pool: Pool, wallet: Wallet, did: String?, didConfig: String = EMPTY_OBJECT) {
+    constructor(pool: Pool, wallet: Wallet, did: String?, didConfig: String = EMPTY_OBJECT, tailsPath: String) {
 
+        this.tailsPath = tailsPath
         this.pool = pool
         this.wallet = wallet
 
@@ -667,7 +669,7 @@ open class IndyUser : IndyIssuer, IndyProver, IndyTrustee {
     private var cachedTailsHandler: BlobStorageHandler? = null
     private fun getTailsHandler(): BlobStorageHandler {
         if (cachedTailsHandler == null) {
-            val tailsConfig = getTailsConfig()
+            val tailsConfig = getTailsConfig(tailsPath)
 
             val reader = BlobStorageReader.openReader("default", tailsConfig).get()
             val writer = BlobStorageWriter.openWriter("default", tailsConfig).get()

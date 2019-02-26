@@ -82,9 +82,9 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         proverDidInfo = createDid(proverWallet)
         linkProverToIssuer(issuerDidInfo.did, issuerWallet, proverDidInfo)
 
-        issuer1 = IndyUser(pool, issuerWallet, issuerDidInfo.did)
-        issuer2 = IndyUser(pool, issuer2Wallet, issuer2DidInfo.did)
-        prover = IndyUser(pool, proverWallet, proverDidInfo.did)
+        issuer1 = IndyUser(pool, issuerWallet, issuerDidInfo.did, tailsPath = "tails")
+        issuer2 = IndyUser(pool, issuer2Wallet, issuer2DidInfo.did, tailsPath = "tails")
+        prover = IndyUser(pool, proverWallet, proverDidInfo.did, tailsPath = "tails")
     }
 
     @After

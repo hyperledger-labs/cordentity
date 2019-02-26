@@ -67,23 +67,28 @@ class IndyService(services: AppServiceHub) : SingletonSerializeAsToken() {
         val genesisFile = File(config[indyuser.genesisFile])
         val pool = PoolManager.openIndyPool(genesisFile)
 
+        val tailsPath = "tails"
+
         indyUser = if (config.getOrNull(indyuser.role)?.compareTo("trustee", true) == 0) {
             val didConfig = DidJSONParameters.CreateAndStoreMyDidJSONParameter(
                 config[indyuser.did], config[indyuser.seed], null, null
             ).toJson()
 
-            IndyUser(pool, wallet, config[indyuser.did], didConfig)
+            IndyUser(pool, wallet, config[indyuser.did], didConfig, tailsPath)
         } else {
-            IndyUser(pool, wallet, null)
+            IndyUser(pool, wallet, null, tailsPath = tailsPath)
         }
     }
+}
 
-    @Suppress("ClassName")
-    object indyuser : PropertyGroup() {
-        val role by stringType
-        val did by stringType
-        val seed by stringType
-        val walletName by stringType
-        val genesisFile by stringType
-    }
+@Suppress("ClassName")
+object indyuser : PropertyGroup() {
+    val role by stringType
+    val did by stringType
+    val seed by stringType
+    val walletName by stringType
+    val genesisFile by stringType
+    val agentWSEndpoint by stringType
+    val agentUser by stringType
+    val agentPassword by stringType
 }
