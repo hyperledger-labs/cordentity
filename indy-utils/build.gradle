@@ -4,8 +4,6 @@ dependencies {
 
     compile "com.fasterxml.jackson.core:jackson-databind:$jackson_version"
     compile "com.fasterxml.jackson.module:jackson-module-kotlin:$jackson_version"
-
-    implementation group: 'org.slf4j', name: 'slf4j-api', version: '1.7.25'
     
     testImplementation 'net.java.dev.jna:jna:4.5.1'
 }

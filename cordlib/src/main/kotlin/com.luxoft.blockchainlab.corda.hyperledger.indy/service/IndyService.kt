@@ -6,13 +6,13 @@ import com.luxoft.blockchainlab.hyperledger.indy.utils.PoolManager
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import com.luxoft.blockchainlab.hyperledger.indy.utils.getRootCause
 import com.natpryce.konfig.*
+import mu.KotlinLogging
 import net.corda.core.node.AppServiceHub
 import net.corda.core.node.services.CordaService
 import net.corda.core.serialization.SingletonSerializeAsToken
 import org.hyperledger.indy.sdk.did.DidJSONParameters
 import org.hyperledger.indy.sdk.wallet.Wallet
 import org.hyperledger.indy.sdk.wallet.WalletExistsException
-import org.slf4j.LoggerFactory
 import java.io.File
 
 /**
@@ -43,7 +43,7 @@ class IndyService(services: AppServiceHub) : SingletonSerializeAsToken() {
             )  //  file with node-specific name
             .ifNot(EnvironmentVariables(), indyuser) // Good for docker-compose, ansible-playbook or similar
 
-    private val logger = LoggerFactory.getLogger(IndyService::class.java.name)
+    private val logger = KotlinLogging.logger {}
 
     val indyUser: IndyUser
 

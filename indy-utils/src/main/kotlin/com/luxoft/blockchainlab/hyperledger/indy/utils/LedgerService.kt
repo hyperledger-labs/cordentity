@@ -1,10 +1,10 @@
 package com.luxoft.blockchainlab.hyperledger.indy.utils
 
 import com.luxoft.blockchainlab.hyperledger.indy.*
+import mu.KotlinLogging
 import org.hyperledger.indy.sdk.ledger.Ledger
 import org.hyperledger.indy.sdk.pool.Pool
 import org.hyperledger.indy.sdk.wallet.Wallet
-import org.slf4j.LoggerFactory
 import java.lang.Thread.sleep
 import java.util.*
 
@@ -104,7 +104,7 @@ class LedgerService(private val did: String, private val wallet: Wallet, private
     fun addNym(about: IdentityDetails) = LedgerService.addNym(did, pool, wallet, about)
 
     companion object {
-        val logger = LoggerFactory.getLogger(IndyUser::class.java.name)!!
+        val logger = KotlinLogging.logger {}
 
         private val delayMs = 100L
         private val retryTimes = 10

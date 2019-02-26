@@ -4,10 +4,10 @@ import com.luxoft.blockchainlab.hyperledger.indy.roles.IndyIssuer
 import com.luxoft.blockchainlab.hyperledger.indy.roles.IndyProver
 import com.luxoft.blockchainlab.hyperledger.indy.roles.IndyTrustee
 import com.luxoft.blockchainlab.hyperledger.indy.roles.IndyVerifier
-import com.luxoft.blockchainlab.hyperledger.indy.utils.EnvironmentUtils.getIndyHomePath
 import com.luxoft.blockchainlab.hyperledger.indy.utils.LedgerService
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import com.luxoft.blockchainlab.hyperledger.indy.utils.getRootCause
+import mu.KotlinLogging
 import org.hyperledger.indy.sdk.anoncreds.Anoncreds
 import org.hyperledger.indy.sdk.anoncreds.DuplicateMasterSecretNameException
 import org.hyperledger.indy.sdk.blob_storage.BlobStorageReader
@@ -17,7 +17,6 @@ import org.hyperledger.indy.sdk.pairwise.Pairwise
 import org.hyperledger.indy.sdk.pool.Pool
 import org.hyperledger.indy.sdk.wallet.Wallet
 import org.hyperledger.indy.sdk.wallet.WalletItemNotFoundException
-import org.slf4j.LoggerFactory
 import java.util.concurrent.ExecutionException
 
 
@@ -145,7 +144,7 @@ open class IndyUser : IndyIssuer, IndyProver, IndyTrustee {
         }
     }
 
-    private val logger = LoggerFactory.getLogger(IndyUser::class.java.name)
+    private val logger = KotlinLogging.logger {}
 
     @Deprecated("Was used in development purpose")
     val defaultMasterSecretId = "master"
@@ -216,6 +215,7 @@ open class IndyUser : IndyIssuer, IndyProver, IndyTrustee {
             if (getRootCause(e) !is DuplicateMasterSecretNameException) throw e
 
             logger.debug("MasterSecret already exists, who cares, continuing")
+            logger.info { "" }
         }
     }
 

@@ -17,13 +17,12 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection.MESSAGE_T
 import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection.MESSAGE_TYPES.SEND_RESPONSE
 import com.luxoft.blockchainlab.hyperledger.indy.*
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
+import mu.KotlinLogging
 import org.java_websocket.client.WebSocketClient
 import org.java_websocket.handshake.ServerHandshake
 import java.lang.Thread.sleep
 import java.net.URI
 import java.util.*
-import java.util.logging.Level
-import java.util.logging.Logger
 
 
 data class IndyParty(val did: String, val endpoint: String, val verkey: String? = null)
@@ -137,7 +136,7 @@ class AgentConnection(val myAgentUrl: String, val invite: String? = null, val us
 }
 
 class AgentWebSocketClient(serverUri: URI) : WebSocketClient(serverUri) {
-    private val log = Logger.getLogger(this::class.java.name)
+    private val log = KotlinLogging.logger {}
 
     override fun onOpen(handshakedata: ServerHandshake?) {
         log.info { "Connection opened: $handshakedata" }
@@ -156,7 +155,7 @@ class AgentWebSocketClient(serverUri: URI) : WebSocketClient(serverUri) {
     }
 
     override fun onError(ex: Exception?) {
-        log.log(Level.WARNING, "Connection error", ex)
+        log.warn(ex) { "Connection error" }
     }
 
     fun sendJson(obj: Any) = send(SerializationUtils.anyToJSON(obj))

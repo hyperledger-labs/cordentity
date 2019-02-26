@@ -51,7 +51,7 @@ subprojects {
 
         compile 'com.github.alexeykoren:konfig:2.0.4'
 
-        implementation group: 'org.slf4j', name: 'slf4j-api', version: '1.7.25'
+        implementation 'io.github.microutils:kotlin-logging:1.6.22'
 
         testImplementation "org.jetbrains.kotlin:kotlin-test:$kotlin_version"
         testImplementation "junit:junit:$junit_version"
