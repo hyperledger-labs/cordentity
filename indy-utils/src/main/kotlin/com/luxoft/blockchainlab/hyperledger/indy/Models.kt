@@ -905,3 +905,9 @@ data class RevocationRegistryDefinitionId(
 interface FromString<T : Any> {
     fun fromString(str: String): T
 }
+
+data class WalletPassword(val key: String)
+
+data class TailsConfig(val baseDir: String, val uriPattern: String = "")
+
+data class CredentialDefinitionConfig(val supportRevocation: Boolean = true)

@@ -2,6 +2,7 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy.service
 
 import com.luxoft.blockchainlab.hyperledger.indy.IndyUser
 import com.luxoft.blockchainlab.hyperledger.indy.WalletConfig
+import com.luxoft.blockchainlab.hyperledger.indy.WalletPassword
 import com.luxoft.blockchainlab.hyperledger.indy.utils.PoolManager
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import com.luxoft.blockchainlab.hyperledger.indy.utils.getRootCause
@@ -24,9 +25,6 @@ import java.io.File
 @CordaService
 class IndyService(services: AppServiceHub) : SingletonSerializeAsToken() {
 
-    private val poolName = "default_pool"
-    private val credentials = """{"key": "key"}"""
-
     private val config = TestConfigurationsProvider.config(services.myInfo.legalIdentities.first().name.organisation)
         ?: EmptyConfiguration
             .ifNot(
@@ -48,21 +46,19 @@ class IndyService(services: AppServiceHub) : SingletonSerializeAsToken() {
     val indyUser: IndyUser
 
     init {
-        val walletName = try {
-            config[indyuser.walletName]
-        } catch (e: Exception) {
-            services.myInfo.legalIdentities.first().name.organisation
-        }
-        val walletConfig = SerializationUtils.anyToJSON(WalletConfig(walletName))
+        val walletName = config.getOrElse(indyuser.walletName) { services.myInfo.legalIdentities.first().name.organisation }
+        val walletPassword = config.getOrElse(indyuser.walletPassword) { "key" }
+
+        val walletConfigJson = SerializationUtils.anyToJSON(WalletConfig(walletName))
+        val walletPasswordJson = SerializationUtils.anyToJSON(WalletPassword(walletPassword))
 
         try {
-
-            Wallet.createWallet(walletConfig, credentials).get()
+            Wallet.createWallet(walletConfigJson, walletPasswordJson).get()
         } catch (ex: Exception) {
             if (getRootCause(ex) !is WalletExistsException) throw ex else logger.debug("Wallet already exists")
         }
 
-        val wallet = Wallet.openWallet(walletConfig, credentials).get()
+        val wallet = Wallet.openWallet(walletConfigJson, walletPasswordJson).get()
 
         val genesisFile = File(config[indyuser.genesisFile])
         val pool = PoolManager.openIndyPool(genesisFile)
@@ -87,6 +83,7 @@ object indyuser : PropertyGroup() {
     val did by stringType
     val seed by stringType
     val walletName by stringType
+    val walletPassword by stringType
     val genesisFile by stringType
     val agentWSEndpoint by stringType
     val agentUser by stringType

@@ -35,11 +35,6 @@ open class IndyUser : IndyIssuer, IndyProver, IndyTrustee {
         private const val ISSUANCE_ON_DEMAND = "ISSUANCE_ON_DEMAND"
         private const val EMPTY_OBJECT = "{}"
 
-        fun getTailsConfig(tailsPath: String) = """{"base_dir":"$tailsPath","uri_pattern":""}"""
-            .replace('\\', '/')
-
-        fun getCredentialDefinitionConfig() = """{"support_revocation":true}"""
-
         override fun verifyProof(proofReq: ProofRequest, proof: ProofInfo, usedData: DataUsedInProofJson): Boolean {
             val proofRequestJson = SerializationUtils.anyToJSON(proofReq)
             val proofJson = SerializationUtils.anyToJSON(proof.proofData)
@@ -254,7 +249,7 @@ open class IndyUser : IndyIssuer, IndyProver, IndyTrustee {
             ?: throw IndySchemaNotFoundException(schemaId.toString(), "Create credential definition has been failed")
         val schemaJson = SerializationUtils.anyToJSON(schema)
 
-        val credDefConfigJson = if (enableRevocation) getCredentialDefinitionConfig() else EMPTY_OBJECT
+        val credDefConfigJson = SerializationUtils.anyToJSON(CredentialDefinitionConfig(enableRevocation))
 
         val credDefId = CredentialDefinitionId(did, schema.seqNo!!, TAG)
         val credDefFromLedger = ledgerService.retrieveCredentialDefinition(credDefId.toString())
@@ -669,7 +664,7 @@ open class IndyUser : IndyIssuer, IndyProver, IndyTrustee {
     private var cachedTailsHandler: BlobStorageHandler? = null
     private fun getTailsHandler(): BlobStorageHandler {
         if (cachedTailsHandler == null) {
-            val tailsConfig = getTailsConfig(tailsPath)
+            val tailsConfig = SerializationUtils.anyToJSON(TailsConfig(tailsPath))
 
             val reader = BlobStorageReader.openReader("default", tailsConfig).get()
             val writer = BlobStorageWriter.openWriter("default", tailsConfig).get()
