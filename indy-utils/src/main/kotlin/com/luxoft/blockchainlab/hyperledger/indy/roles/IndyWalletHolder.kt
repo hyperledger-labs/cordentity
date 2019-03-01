@@ -10,11 +10,6 @@ interface IndyWalletHolder {
     val did: String
 
     /**
-     * Closes wallet of this indy user
-     */
-    fun close()
-
-    /**
      * Gets identity details by did
      *
      * @param did           target did

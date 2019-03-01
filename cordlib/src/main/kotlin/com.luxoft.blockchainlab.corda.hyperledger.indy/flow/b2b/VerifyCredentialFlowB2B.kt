@@ -129,11 +129,8 @@ object VerifyCredentialFlowB2B {
         @Suspendable
         override fun call() {
             try {
-                flowSession.receive(ProofRequest::class.java).unwrap { indyProofReq ->
-                    // TODO: Master Secret should be received from the outside
-                    val masterSecretId = indyUser().defaultMasterSecretId
-                    flowSession.send(indyUser().createProof(indyProofReq, masterSecretId))
-                }
+                val indyProofRequest = flowSession.receive(ProofRequest::class.java).unwrap { it }
+                flowSession.send(indyUser().createProof(indyProofRequest))
 
                 val flow = object : SignTransactionFlow(flowSession) {
                     // TODO: Add some checks here.

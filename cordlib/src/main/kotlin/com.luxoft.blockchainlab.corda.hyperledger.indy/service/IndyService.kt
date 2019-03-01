@@ -1,20 +1,15 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy.service
 
+import com.luxoft.blockchainlab.hyperledger.indy.GenesisPathNotSpecifiedException
 import com.luxoft.blockchainlab.hyperledger.indy.IndyUser
 import com.luxoft.blockchainlab.hyperledger.indy.WalletConfig
 import com.luxoft.blockchainlab.hyperledger.indy.WalletPassword
-import com.luxoft.blockchainlab.hyperledger.indy.utils.PoolManager
-import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
-import com.luxoft.blockchainlab.hyperledger.indy.utils.getRootCause
-import com.natpryce.konfig.*
+import com.luxoft.blockchainlab.hyperledger.indy.helpers.*
 import mu.KotlinLogging
 import net.corda.core.node.AppServiceHub
 import net.corda.core.node.services.CordaService
 import net.corda.core.serialization.SingletonSerializeAsToken
 import org.hyperledger.indy.sdk.did.DidJSONParameters
-import org.hyperledger.indy.sdk.wallet.Wallet
-import org.hyperledger.indy.sdk.wallet.WalletExistsException
-import java.io.File
 
 /**
  * A Corda service for dealing with Indy Ledger infrastructure such as pools, credentials, wallets.
@@ -24,68 +19,44 @@ import java.io.File
  */
 @CordaService
 class IndyService(services: AppServiceHub) : SingletonSerializeAsToken() {
-
-    private val config = TestConfigurationsProvider.config(services.myInfo.legalIdentities.first().name.organisation)
-        ?: EmptyConfiguration
-            .ifNot(
-                ConfigurationProperties.fromFileOrNull(File("indyconfig", "indy.properties")),
-                indyuser
-            ) // file with common name if you go for file-based config
-            .ifNot(
-                ConfigurationProperties.fromFileOrNull(
-                    File(
-                        "indyconfig",
-                        "${services.myInfo.legalIdentities.first().name.organisation}.indy.properties"
-                    )
-                ), indyuser
-            )  //  file with node-specific name
-            .ifNot(EnvironmentVariables(), indyuser) // Good for docker-compose, ansible-playbook or similar
-
     private val logger = KotlinLogging.logger {}
 
     val indyUser: IndyUser
 
     init {
-        val walletName = config.getOrElse(indyuser.walletName) { services.myInfo.legalIdentities.first().name.organisation }
-        val walletPassword = config.getOrElse(indyuser.walletPassword) { "key" }
 
-        val walletConfigJson = SerializationUtils.anyToJSON(WalletConfig(walletName))
-        val walletPasswordJson = SerializationUtils.anyToJSON(WalletPassword(walletPassword))
+        val nodeName = services.myInfo.legalIdentities.first().name.organisation
+        val config = ConfigHelper.getConfig(nodeName)
 
-        try {
-            Wallet.createWallet(walletConfigJson, walletPasswordJson).get()
-        } catch (ex: Exception) {
-            if (getRootCause(ex) !is WalletExistsException) throw ex else logger.debug("Wallet already exists")
-        }
+        val walletName = config.getOrElse(indyuser.walletName) { nodeName }
+        val walletPassword = config.getOrElse(indyuser.walletPassword) { "password" }
 
-        val wallet = Wallet.openWallet(walletConfigJson, walletPasswordJson).get()
+        val wallet = WalletHelper.getWallet(WalletConfig(walletName), WalletPassword(walletPassword))
 
-        val genesisFile = File(config[indyuser.genesisFile])
-        val pool = PoolManager.openIndyPool(genesisFile)
+        logger.debug { "Wallet created for $nodeName" }
+
+        val genesisFilePath = config.getOrElse(indyuser.genesisFile) { throw GenesisPathNotSpecifiedException() }
+        val genesisFile = GenesisHelper.getGenesis(genesisFilePath)
+        val pool = PoolHelper.getPool(genesisFile)
+
+        logger.debug { "Pool opened for $nodeName" }
 
         val tailsPath = "tails"
 
-        indyUser = if (config.getOrNull(indyuser.role)?.compareTo("trustee", true) == 0) {
-            val didConfig = DidJSONParameters.CreateAndStoreMyDidJSONParameter(
-                config[indyuser.did], config[indyuser.seed], null, null
-            ).toJson()
+        val userRole = config.getOrNull(indyuser.role)
 
-            IndyUser(pool, wallet, config[indyuser.did], didConfig, tailsPath)
-        } else {
-            IndyUser(pool, wallet, null, tailsPath = tailsPath)
+        indyUser = when (userRole) {
+            "trustee" -> {
+                val didConfig = DidJSONParameters.CreateAndStoreMyDidJSONParameter(
+                    config[indyuser.did], config[indyuser.seed], null, null
+                ).toJson()
+
+                IndyUser(pool, wallet, config[indyuser.did], didConfig, tailsPath)
+            }
+            else -> IndyUser(pool, wallet, null, tailsPath = tailsPath)
         }
+
+        logger.debug { "IndyUser object created for $nodeName" }
     }
 }
 
-@Suppress("ClassName")
-object indyuser : PropertyGroup() {
-    val role by stringType
-    val did by stringType
-    val seed by stringType
-    val walletName by stringType
-    val walletPassword by stringType
-    val genesisFile by stringType
-    val agentWSEndpoint by stringType
-    val agentUser by stringType
-    val agentPassword by stringType
-}

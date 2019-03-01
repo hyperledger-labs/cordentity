@@ -67,7 +67,7 @@ object IssueCredentialFlowB2B {
                 // checking if cred def exists and can produce new credentials
                 val originalCredentialDefIn = getCredentialDefinitionById(credentialDefinitionId)
                     ?: throw IndyCredentialDefinitionNotFoundException(
-                        credentialDefinitionId.toString(),
+                        credentialDefinitionId,
                         "State doesn't exist in Corda vault"
                     )
                 val originalCredentialDef = originalCredentialDefIn.state.data
@@ -76,12 +76,11 @@ object IssueCredentialFlowB2B {
                     throw IndyCredentialMaximumReachedException(
                         originalCredentialDef.credentialDefinitionId.getRevocationRegistryDefinitionId(
                             IndyUser.REVOCATION_TAG
-                        ).toString()
+                        )
                     )
 
                 // issue credential
-                val offer =
-                    indyUser().createCredentialOffer(credentialDefinitionId)
+                val offer = indyUser().createCredentialOffer(credentialDefinitionId)
 
                 val signers = listOf(ourIdentity.owningKey, prover.owningKey)
                 val newCredentialOut =
@@ -147,8 +146,7 @@ object IssueCredentialFlowB2B {
                 val offer = flowSession.receive<CredentialOffer>().unwrap { offer -> offer }
                 val sessionDid = subFlow(CreatePairwiseFlowB2B.Prover(issuer))
 
-                val credentialRequestInfo =
-                    indyUser().createCredentialRequest(sessionDid, offer, indyUser().defaultMasterSecretId)
+                val credentialRequestInfo = indyUser().createCredentialRequest(sessionDid, offer)
                 flowSession.send(credentialRequestInfo)
 
                 val flow = object : SignTransactionFlow(flowSession) {

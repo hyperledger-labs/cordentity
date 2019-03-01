@@ -36,7 +36,7 @@ object CreateSchemaFlow {
         override fun call(): SchemaId {
             try {
                 // check if schema already exists
-                if (indyUser().isSchemaExist(schemaName, schemaVersion))
+                if (indyUser().ledgerService.isSchemaExist(schemaName, schemaVersion))
                     throw IndySchemaAlreadyExistsException(schemaName, schemaVersion)
 
                 // create schema

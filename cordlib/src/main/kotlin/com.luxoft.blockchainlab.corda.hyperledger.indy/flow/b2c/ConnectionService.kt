@@ -2,8 +2,8 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2c
 
 import com.luxoft.blockchainlab.corda.hyperledger.indy.PythonRefAgentConnection
 import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection
-import com.luxoft.blockchainlab.corda.hyperledger.indy.service.indyuser
 import com.luxoft.blockchainlab.hyperledger.indy.*
+import com.luxoft.blockchainlab.hyperledger.indy.helpers.indyuser
 import com.natpryce.konfig.*
 import net.corda.core.flows.FlowLogic
 import net.corda.core.node.AppServiceHub

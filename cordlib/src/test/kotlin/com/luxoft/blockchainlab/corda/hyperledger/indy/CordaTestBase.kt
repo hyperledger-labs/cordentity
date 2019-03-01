@@ -5,7 +5,7 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.CreatePairwiseFl
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.IssueCredentialFlowB2B
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.VerifyCredentialFlowB2B
 import com.luxoft.blockchainlab.corda.hyperledger.indy.service.IndyService
-import com.luxoft.blockchainlab.hyperledger.indy.utils.PoolManager
+import com.luxoft.blockchainlab.hyperledger.indy.helpers.PoolHelper
 import com.natpryce.konfig.Configuration
 import com.natpryce.konfig.ConfigurationMap
 import com.natpryce.konfig.TestConfigurationsProvider
@@ -51,7 +51,7 @@ open class CordaTestBase {
     protected lateinit var net: InternalMockNetwork
         private set
 
-    private val parties: MutableList<StartedNode<MockNode>> = mutableListOf()
+    protected val parties: MutableList<StartedNode<MockNode>> = mutableListOf()
 
     protected val random = Random()
 
@@ -122,17 +122,17 @@ open class CordaTestBase {
                 return if (name == "Trustee") {
                     ConfigurationMap(
                         mapOf(
-                            "indyuser.walletName" to name,
+                            "indyuser.walletName" to name + random.nextLong().absoluteValue,
                             "indyuser.role" to "trustee",
                             "indyuser.did" to "V4SGRU86Z58d6TV7PBUe6f",
                             "indyuser.seed" to "000000000000000000000000Trustee1",
-                            "indyuser.genesisFile" to PoolManager.TEST_GENESIS_FILE_PATH
+                            "indyuser.genesisFile" to PoolHelper.TEST_GENESIS_FILE_PATH
                         )
                     )
                 } else ConfigurationMap(
                     mapOf(
                         "indyuser.walletName" to name + random.nextLong().absoluteValue,
-                        "indyuser.genesisFile" to PoolManager.TEST_GENESIS_FILE_PATH
+                        "indyuser.genesisFile" to PoolHelper.TEST_GENESIS_FILE_PATH
                     )
                 )
             }
@@ -148,7 +148,9 @@ open class CordaTestBase {
     fun commonTearDown() {
         try {
             for (party in parties) {
-                party.services.cordaService(IndyService::class.java).indyUser.close()
+                val indyUser = party.services.cordaService(IndyService::class.java).indyUser
+                indyUser.wallet.closeWallet().get()
+                indyUser.pool.closePoolLedger().get()
             }
 
             parties.clear()

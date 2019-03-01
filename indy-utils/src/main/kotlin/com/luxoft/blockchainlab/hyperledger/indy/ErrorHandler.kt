@@ -20,7 +20,7 @@ fun handleIndyError(execResult: String) {
     val res = SerializationUtils.jSONToAny<IndyOpCode>(execResult)
     when (res.op) {
         Status.REJECT -> throw ArtifactRequestFailed("Request has been rejected: ${res.result}")
-        Status.REPLY -> logger.info("Request successfully completed: ${res.result}")
+        Status.REPLY -> logger.info { "Request successfully completed: ${res.result}" }
     }
 }
 
@@ -33,11 +33,11 @@ inline fun <reified T : Any> extractIndyResult(execResult: String, indyParser: I
         val payload = indyParser(execResult).get()
         val output = SerializationUtils.jSONToAny(payload.objectJson!!, T::class.java)
 
-        logger.info("Payload successfully parsed ${payload.id}:${payload.objectJson}")
+        logger.info { "Payload successfully parsed ${payload.id}:${payload.objectJson}" }
         return output
 
     } catch (e: Exception) {
-        logger.info("Indy parsing has failed", e)
+        logger.info { "Indy parsing has failed, $e" }
         if (e.cause is LedgerInvalidTransactionException) throw ArtifactDoesntExist()
         throw ArtifactRequestFailed("Can not parse the response: " + e.message)
     }

@@ -32,7 +32,7 @@ object IssueCredentialFlowB2C {
                 // checking if cred def exists and can produce new credentials
                 val originalCredentialDefIn = getCredentialDefinitionById(credentialDefinitionId)
                         ?: throw IndyCredentialDefinitionNotFoundException(
-                                credentialDefinitionId.toString(),
+                                credentialDefinitionId,
                                 "State doesn't exist in Corda vault"
                         )
                 val originalCredentialDef = originalCredentialDefIn.state.data
@@ -41,7 +41,7 @@ object IssueCredentialFlowB2C {
                     throw IndyCredentialMaximumReachedException(
                             originalCredentialDef.credentialDefinitionId.getRevocationRegistryDefinitionId(
                                     IndyUser.REVOCATION_TAG
-                            ).toString()
+                            )
                     )
 
                 // issue credential

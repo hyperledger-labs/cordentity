@@ -1,6 +1,7 @@
 package com.luxoft.blockchainlab.hyperledger.indy
 
-import com.luxoft.blockchainlab.hyperledger.indy.utils.PoolManager
+import com.luxoft.blockchainlab.hyperledger.indy.helpers.PoolHelper
+import com.luxoft.blockchainlab.hyperledger.indy.helpers.WalletHelper
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import com.luxoft.blockchainlab.hyperledger.indy.utils.getRootCause
 import org.hyperledger.indy.sdk.anoncreds.Anoncreds
@@ -20,18 +21,13 @@ class IndyUserTest {
     fun setup() {
         val walletName = "default-wallet"
         val poolName = "default-pool"
-        val credentials = """{"key": "key"}"""
 
-        val walletConfig = SerializationUtils.anyToJSON(WalletConfig(walletName))
+        val credentials = WalletPassword("key")
+        val walletConfig = WalletConfig(walletName)
 
-        try {
-            Wallet.createWallet(walletConfig, credentials).get()
-        } catch (ex: Exception) {
-            if (getRootCause(ex) !is WalletExistsException) throw ex else logger.debug("Wallet already exists")
-        }
+        wallet = WalletHelper.getWallet(walletConfig, credentials)
+        val pool = PoolHelper.getPool(PoolHelper.TEST_GENESIS_FILE, poolName)
 
-        wallet = Wallet.openWallet(walletConfig, credentials).get()
-        val pool = PoolManager.openIndyPool(PoolManager.TEST_GENESIS_FILE, poolName)
         indyUser = IndyUser(pool, wallet, null, tailsPath = "tails")
     }
 
