@@ -1,21 +1,15 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2c
 
+import com.luxoft.blockchainlab.corda.hyperledger.indy.PythonRefAgentConnection
 import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection
-import com.luxoft.blockchainlab.corda.hyperledger.indy.Connection
-import com.luxoft.blockchainlab.corda.hyperledger.indy.IndyParty
-import com.luxoft.blockchainlab.corda.hyperledger.indy.service.IndyService
 import com.luxoft.blockchainlab.corda.hyperledger.indy.service.indyuser
 import com.luxoft.blockchainlab.hyperledger.indy.*
 import com.natpryce.konfig.*
 import net.corda.core.flows.FlowLogic
 import net.corda.core.node.AppServiceHub
-import net.corda.core.node.ServiceHub
 import net.corda.core.node.services.CordaService
-import net.corda.core.serialization.CordaSerializable
 import net.corda.core.serialization.SingletonSerializeAsToken
 import java.io.File
-import java.lang.RuntimeException
-import java.util.*
 
 
 @CordaService
@@ -60,7 +54,7 @@ class ConnectionService(serviceHub: AppServiceHub) : SingletonSerializeAsToken()
     fun receiveProof() = connection!!.receiveProof()
 
     private val connection = if (config.getOrNull(indyuser.agentWSEndpoint) != null)
-        AgentConnection(config[indyuser.agentWSEndpoint], userName = config[indyuser.agentUser], passphrase = config[indyuser.agentPassword])
+        PythonRefAgentConnection().apply { connect(config[indyuser.agentWSEndpoint], login = config[indyuser.agentUser], password = config[indyuser.agentPassword]) }
     else
         null
 

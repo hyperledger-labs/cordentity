@@ -1,7 +1,6 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2c
 
 import co.paralleluniverse.fibers.Suspendable
-import com.luxoft.blockchainlab.corda.hyperledger.indy.Connection
 import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialContract
 import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialDefinitionContract
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredential
