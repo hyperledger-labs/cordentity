@@ -5,10 +5,10 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.CreatePairwiseFl
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.IssueCredentialFlowB2B
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.VerifyCredentialFlowB2B
 import com.luxoft.blockchainlab.corda.hyperledger.indy.service.IndyService
+import com.luxoft.blockchainlab.hyperledger.indy.helpers.ConfigHelper
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.PoolHelper
-import com.natpryce.konfig.Configuration
-import com.natpryce.konfig.ConfigurationMap
-import com.natpryce.konfig.TestConfigurationsProvider
+import io.mockk.every
+import io.mockk.mockkObject
 import net.corda.core.concurrent.CordaFuture
 import net.corda.core.flows.FlowLogic
 import net.corda.core.identity.CordaX500Name
@@ -20,6 +20,7 @@ import net.corda.testing.common.internal.testNetworkParameters
 import net.corda.testing.core.singleIdentity
 import net.corda.testing.node.internal.InternalMockNetwork
 import net.corda.testing.node.internal.InternalMockNetwork.MockNode
+import net.corda.testing.node.internal.MockNodeArgs
 import net.corda.testing.node.internal.newContext
 import org.junit.After
 import org.junit.Before
@@ -52,8 +53,6 @@ open class CordaTestBase {
         private set
 
     protected val parties: MutableList<StartedNode<MockNode>> = mutableListOf()
-
-    protected val random = Random()
 
     /**
      * Shares permissions from [authority] to [issuer]
@@ -115,33 +114,38 @@ open class CordaTestBase {
 
     @Before
     fun commonSetup() {
-        TestConfigurationsProvider.provider = object : TestConfigurationsProvider {
-            override fun getConfig(name: String): Configuration? {
-                // Watch carefully for these hard-coded values
-                // Now we assume that issuer(indy trustee) is the first created node from SomeNodes
-                return if (name == "Trustee") {
-                    ConfigurationMap(
-                        mapOf(
-                            "indyuser.walletName" to name + random.nextLong().absoluteValue,
-                            "indyuser.role" to "trustee",
-                            "indyuser.did" to "V4SGRU86Z58d6TV7PBUe6f",
-                            "indyuser.seed" to "000000000000000000000000Trustee1",
-                            "indyuser.genesisFile" to PoolHelper.TEST_GENESIS_FILE_PATH
-                        )
-                    )
-                } else ConfigurationMap(
-                    mapOf(
-                        "indyuser.walletName" to name + random.nextLong().absoluteValue,
-                        "indyuser.genesisFile" to PoolHelper.TEST_GENESIS_FILE_PATH
-                    )
-                )
-            }
-        }
-
         net = InternalMockNetwork(
             cordappPackages = listOf("com.luxoft.blockchainlab.corda.hyperledger.indy"),
-            networkParameters = testNetworkParameters(maxTransactionSize = 10485760 * 5)
+            networkParameters = testNetworkParameters(maxTransactionSize = 10485760 * 5),
+            defaultFactory = CordaTestBase::MockIndyNode
         )
+    }
+
+    open class MockIndyNode(args: MockNodeArgs) : InternalMockNetwork.MockNode(args) {
+
+        companion object {
+            private val sessionId = Random().nextLong().absoluteValue.toString()
+        }
+
+        private val organisation: String = args.config.myLegalName.organisation
+
+        override fun start(): StartedNode<MockNode> {
+
+            mockkObject(ConfigHelper)
+
+            every { ConfigHelper.getGenesisPath() } returns PoolHelper.TEST_GENESIS_FILE_PATH
+            every { ConfigHelper.getWalletName() } returns organisation + sessionId
+            every { ConfigHelper.getWalletPassword() } returns "password"
+            every { ConfigHelper.getRole() } returns ""
+
+            if (organisation == "Trustee") {
+                every { ConfigHelper.getDid() } returns "V4SGRU86Z58d6TV7PBUe6f"
+                every { ConfigHelper.getRole() } returns "trustee"
+                every { ConfigHelper.getSeed() } returns "000000000000000000000000Trustee1"
+            }
+
+            return super.start()
+        }
     }
 
     @After

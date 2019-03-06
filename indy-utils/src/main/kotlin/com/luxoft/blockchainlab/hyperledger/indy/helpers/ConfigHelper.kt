@@ -6,35 +6,47 @@ import java.io.File
 /**
  * Helps with config retrieving
  */
-object ConfigHelper {
+object ConfigHelper : IndyConfiguration {
+    private val CFG_PATH = "indyconfig"
+    private val CFG_NAME = "indy.properties"
+
     /**
      * Returns [indyuser] [Configuration]
      *
-     * If looks in test configuration of name [name], then it looks in file `indyconfig/indy.properties`,
-     * then it looks in file `indyconfig/[name].indy.properties` and finally it looks in environment variables.
+     * If looks in test configuration, then it looks in file `indyconfig/indy.properties`,
+     * then it looks in environment variables.
      * When using environment variables to pass config make sure you've named your vars correctly:
      * indy.genesisFile will become INDY_GENESISFILE and so on.
      *
-     * @param name: [String] - configuration name (corda node name, for example)
      * @return: [Configuration] [indyuser]
      * @throws: [KotlinNullPointerException] - if no configuration at all was found
      */
-    fun getConfig(name: String): Configuration {
+    fun getConfig(path: String = CFG_PATH, name: String = CFG_NAME): Configuration {
+        val cfgFile = File(path, name)
 
-        return TestConfigurationsProvider.config(name)
-            ?: EmptyConfiguration
-                .ifNot(
-                    ConfigurationProperties.fromFileOrNull(File("indyconfig", "indy.properties")),
-                    indyuser
-                ) // file with common name if you go for file-based config
-                .ifNot(
-                    ConfigurationProperties.fromFileOrNull(File("indyconfig", "$name.indy.properties")),
-                    indyuser
-                )  //  file with node-specific name
-                .ifNot(EnvironmentVariables(), indyuser) // Good for docker-compose, ansible-playbook or similar
+        return EmptyConfiguration
+            .ifNot(ConfigurationProperties.fromFileOrNull(cfgFile), indyuser)
+            .ifNot(EnvironmentVariables(), indyuser)
     }
-}
 
+    override fun getWalletName() = getConfig()[indyuser.walletName]
+
+    override fun getGenesisPath() = getConfig()[indyuser.genesisFile]
+
+    override fun getDid() = getConfig()[indyuser.did]
+
+    override fun getSeed() = getConfig()[indyuser.seed]
+
+    override fun getRole() = getConfig()[indyuser.role]
+
+    override fun getAgentWSEndpoint() = getConfig()[indyuser.agentWSEndpoint]
+
+    override fun getAgentUser() = getConfig()[indyuser.agentUser]
+
+    override fun getAgentPassword() = getConfig()[indyuser.agentPassword]
+
+    override fun getWalletPassword() = getConfig()[indyuser.walletPassword]
+}
 
 @Suppress("ClassName")
 object indyuser : PropertyGroup() {
@@ -47,4 +59,25 @@ object indyuser : PropertyGroup() {
     val agentWSEndpoint by stringType
     val agentUser by stringType
     val agentPassword by stringType
+}
+
+interface IndyConfiguration {
+
+    fun getWalletName(): String
+
+    fun getWalletPassword(): String
+
+    fun getGenesisPath(): String
+
+    fun getDid(): String
+
+    fun getSeed(): String
+
+    fun getRole(): String
+
+    fun getAgentWSEndpoint(): String
+
+    fun getAgentUser(): String
+
+    fun getAgentPassword(): String
 }

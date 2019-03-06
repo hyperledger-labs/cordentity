@@ -1,8 +1,9 @@
-package com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2c
+package com.luxoft.blockchainlab.corda.hyperledger.indy.service
 
 import com.luxoft.blockchainlab.corda.hyperledger.indy.PythonRefAgentConnection
 import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection
 import com.luxoft.blockchainlab.hyperledger.indy.*
+import com.luxoft.blockchainlab.hyperledger.indy.helpers.ConfigHelper
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.indyuser
 import com.natpryce.konfig.*
 import net.corda.core.flows.FlowLogic
@@ -14,22 +15,7 @@ import java.io.File
 
 @CordaService
 class ConnectionService(serviceHub: AppServiceHub) : SingletonSerializeAsToken() {
-    private val config = TestConfigurationsProvider.config(serviceHub.myInfo.legalIdentities.first().name.organisation)
-            ?: EmptyConfiguration
-                    .ifNot(
-                            ConfigurationProperties.fromFileOrNull(File("indyconfig", "indy.properties")),
-                            indyuser
-                    ) // file with common name if you go for file-based config
-                    .ifNot(
-                            ConfigurationProperties.fromFileOrNull(
-                                    File(
-                                            "indyconfig",
-                                            "${serviceHub.myInfo.legalIdentities.first().name.organisation}.indy.properties"
-                                    )
-                            ),
-                            indyuser
-                    )  //  file with node-specific name
-                    .ifNot(EnvironmentVariables(), indyuser) // Good for docker-compose, ansible-playbook or similar
+    private val config = ConfigHelper.getConfig(serviceHub.myInfo.legalIdentities.first().name.organisation)
 
     fun getCounterParty() = connection!!.getCounterParty()
 

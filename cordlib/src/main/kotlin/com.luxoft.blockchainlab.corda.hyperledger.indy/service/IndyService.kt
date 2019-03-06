@@ -24,18 +24,16 @@ class IndyService(services: AppServiceHub) : SingletonSerializeAsToken() {
     val indyUser: IndyUser
 
     init {
-
         val nodeName = services.myInfo.legalIdentities.first().name.organisation
-        val config = ConfigHelper.getConfig(nodeName)
 
-        val walletName = config.getOrElse(indyuser.walletName) { nodeName }
-        val walletPassword = config.getOrElse(indyuser.walletPassword) { "password" }
+        val walletName =  ConfigHelper.getWalletName()
+        val walletPassword = ConfigHelper.getWalletPassword()
 
         val wallet = WalletHelper.getWallet(WalletConfig(walletName), WalletPassword(walletPassword))
 
         logger.debug { "Wallet created for $nodeName" }
 
-        val genesisFilePath = config.getOrElse(indyuser.genesisFile) { throw GenesisPathNotSpecifiedException() }
+        val genesisFilePath = ConfigHelper.getGenesisPath()
         val genesisFile = GenesisHelper.getGenesis(genesisFilePath)
         val pool = PoolHelper.getPool(genesisFile)
 
@@ -43,15 +41,15 @@ class IndyService(services: AppServiceHub) : SingletonSerializeAsToken() {
 
         val tailsPath = "tails"
 
-        val userRole = config.getOrNull(indyuser.role)
+        val userRole = ConfigHelper.getRole()
 
         indyUser = when (userRole) {
             "trustee" -> {
                 val didConfig = DidJSONParameters.CreateAndStoreMyDidJSONParameter(
-                    config[indyuser.did], config[indyuser.seed], null, null
+                    ConfigHelper.getDid(), ConfigHelper.getSeed(), null, null
                 ).toJson()
 
-                IndyUser(pool, wallet, config[indyuser.did], didConfig, tailsPath)
+                IndyUser(pool, wallet, ConfigHelper.getDid(), didConfig, tailsPath)
             }
             else -> IndyUser(pool, wallet, null, tailsPath = tailsPath)
         }
