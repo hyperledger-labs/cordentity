@@ -1,5 +1,6 @@
 package com.luxoft.blockchainlab.hyperledger.indy
 
+import com.luxoft.blockchainlab.hyperledger.indy.helpers.GenesisHelper
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.PoolHelper
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.WalletHelper
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
@@ -40,12 +41,16 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         private lateinit var pool: Pool
         private lateinit var poolName: String
 
+        val TEST_GENESIS_FILE_PATH by lazy {
+            this::class.java.classLoader.getResource("docker_pool_transactions_genesis.txt").file
+        }
+
         @JvmStatic
         @BeforeClass
         fun setUpTest() {
             // Create and Open Pool
             poolName = PoolHelper.DEFAULT_POOL_NAME
-            pool = PoolHelper.getPool(PoolHelper.TEST_GENESIS_FILE, poolName)
+            pool = PoolHelper.getPool(GenesisHelper.getGenesis(TEST_GENESIS_FILE_PATH), poolName)
         }
 
         @JvmStatic

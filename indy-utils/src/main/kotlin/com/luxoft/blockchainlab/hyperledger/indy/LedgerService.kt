@@ -159,7 +159,7 @@ class LedgerService(private val did: String, private val wallet: Wallet, private
          *
          * @return              schema or null if none exists on ledger
          */
-        fun retrieveSchema(did: String, pool: Pool, id: SchemaId): Schema? = run {
+        fun retrieveSchema(did: String, pool: Pool, id: SchemaId): Schema? {
             val result: Schema? = null
 
             repeat(retryTimes) {
@@ -168,7 +168,7 @@ class LedgerService(private val did: String, private val wallet: Wallet, private
                     val schemaRes = Ledger.submitRequest(pool, schemaReq).get()
                     val parsedRes = Ledger.parseGetSchemaResponse(schemaRes).get()
 
-                    return@run SerializationUtils.jSONToAny<Schema>(
+                    return SerializationUtils.jSONToAny<Schema>(
                         parsedRes.objectJson
                     )
                 } catch (e: Exception) {
@@ -177,7 +177,7 @@ class LedgerService(private val did: String, private val wallet: Wallet, private
                 }
             }
 
-            result
+            return result
         }
 
         /**
@@ -189,7 +189,7 @@ class LedgerService(private val did: String, private val wallet: Wallet, private
          *
          * @return              credential definition or null if none exists on ledger
          */
-        fun retrieveCredentialDefinition(did: String, pool: Pool, id: CredentialDefinitionId): CredentialDefinition? = run {
+        fun retrieveCredentialDefinition(did: String, pool: Pool, id: CredentialDefinitionId): CredentialDefinition? {
             val result: CredentialDefinition? = null
 
             repeat(retryTimes) {
@@ -198,7 +198,7 @@ class LedgerService(private val did: String, private val wallet: Wallet, private
                     val getCredDefResponse = Ledger.submitRequest(pool, getCredDefRequest).get()
                     val credDefIdInfo = Ledger.parseGetCredDefResponse(getCredDefResponse).get()
 
-                    return@run SerializationUtils.jSONToAny<CredentialDefinition>(
+                    return SerializationUtils.jSONToAny<CredentialDefinition>(
                         credDefIdInfo.objectJson
                     )
                 } catch (e: Exception) {
@@ -207,7 +207,7 @@ class LedgerService(private val did: String, private val wallet: Wallet, private
                 }
             }
 
-            result
+            return result
         }
 
         /**
@@ -219,8 +219,7 @@ class LedgerService(private val did: String, private val wallet: Wallet, private
          *
          * @return              revocation registry definition or null if none exists on ledger
          */
-        fun retrieveRevocationRegistryDefinition(did: String, pool: Pool, id: RevocationRegistryDefinitionId): RevocationRegistryDefinition? =
-            run {
+        fun retrieveRevocationRegistryDefinition(did: String, pool: Pool, id: RevocationRegistryDefinitionId): RevocationRegistryDefinition? {
                 val result: RevocationRegistryDefinition? = null
 
                 repeat(retryTimes) {
@@ -229,16 +228,14 @@ class LedgerService(private val did: String, private val wallet: Wallet, private
                         val response = Ledger.submitRequest(pool, request).get()
                         val revRegDefJson = Ledger.parseGetRevocRegDefResponse(response).get().objectJson
 
-                        return@run SerializationUtils.jSONToAny<RevocationRegistryDefinition>(
-                            revRegDefJson
-                        )
+                        return SerializationUtils.jSONToAny<RevocationRegistryDefinition>(revRegDefJson)
                     } catch (e: Exception) {
                         logger.debug { "Revocation registry definition retrieving failed (id: $id). Retry attempt $it" }
                         sleep(delayMs * it)
                     }
                 }
 
-                result
+                return result
             }
 
         /**
@@ -321,7 +318,7 @@ class LedgerService(private val did: String, private val wallet: Wallet, private
             pool: Pool,
             id: RevocationRegistryDefinitionId,
             timestamp: Long
-        ): Pair<Long, RevocationRegistryEntry>? = run {
+        ): Pair<Long, RevocationRegistryEntry>? {
             val result: Pair<Long, RevocationRegistryEntry>? = null
 
             repeat(retryTimes) {
@@ -336,14 +333,14 @@ class LedgerService(private val did: String, private val wallet: Wallet, private
                             revReg.objectJson
                         )
 
-                    return@run Pair(tmsp, revRegEntry)
+                    return Pair(tmsp, revRegEntry)
                 } catch (e: Exception) {
                     logger.debug { "Revocation registry entry retrieving failed (id: $id, timestamp: $timestamp). Retry attempt $it" }
                     sleep(delayMs * it)
                 }
             }
 
-            result
+            return result
         }
 
         /**
@@ -361,7 +358,7 @@ class LedgerService(private val did: String, private val wallet: Wallet, private
             pool: Pool,
             id: RevocationRegistryDefinitionId,
             interval: Interval
-        ): Pair<Long, RevocationRegistryEntry>? = run {
+        ): Pair<Long, RevocationRegistryEntry>? {
             val result: Pair<Long, RevocationRegistryEntry>? = null
 
             repeat(retryTimes) {
@@ -379,14 +376,14 @@ class LedgerService(private val did: String, private val wallet: Wallet, private
                             revRegDeltaJson.objectJson
                         )
 
-                    return@run Pair(timestamp, revRegDelta)
+                    return Pair(timestamp, revRegDelta)
                 } catch (e: Exception) {
                     logger.debug { "Revocation registry delta retrieving failed (id: $id, interval: $interval). Retry attempt $it" }
                     sleep(delayMs * it)
                 }
             }
 
-            result
+            return result
         }
     }
 }

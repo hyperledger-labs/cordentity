@@ -1,5 +1,6 @@
 package com.luxoft.blockchainlab.hyperledger.indy
 
+import com.luxoft.blockchainlab.hyperledger.indy.helpers.GenesisHelper
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.PoolHelper
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.WalletHelper
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
@@ -17,6 +18,10 @@ class IndyUserTest {
     lateinit var indyUser: IndyUser
     lateinit var wallet: Wallet
 
+    val TEST_GENESIS_FILE_PATH by lazy {
+        this::class.java.classLoader.getResource("docker_pool_transactions_genesis.txt").file
+    }
+
     @Before
     fun setup() {
         val walletName = "default-wallet"
@@ -26,7 +31,7 @@ class IndyUserTest {
         val walletConfig = WalletConfig(walletName)
 
         wallet = WalletHelper.getWallet(walletConfig, credentials)
-        val pool = PoolHelper.getPool(PoolHelper.TEST_GENESIS_FILE, poolName)
+        val pool = PoolHelper.getPool(GenesisHelper.getGenesis(TEST_GENESIS_FILE_PATH), poolName)
 
         indyUser = IndyUser(pool, wallet, null, tailsPath = "tails")
     }
