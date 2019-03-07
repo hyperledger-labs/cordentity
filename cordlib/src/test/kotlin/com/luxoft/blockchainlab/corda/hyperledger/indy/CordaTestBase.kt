@@ -6,7 +6,6 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.IssueCredentialF
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.VerifyCredentialFlowB2B
 import com.luxoft.blockchainlab.corda.hyperledger.indy.service.IndyService
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.ConfigHelper
-import com.luxoft.blockchainlab.hyperledger.indy.helpers.PoolHelper
 import io.mockk.every
 import io.mockk.mockkObject
 import net.corda.core.concurrent.CordaFuture
@@ -125,6 +124,9 @@ open class CordaTestBase {
 
         companion object {
             private val sessionId = Random().nextLong().absoluteValue.toString()
+            val TEST_GENESIS_FILE_PATH by lazy {
+                this::class.java.classLoader.getResource("docker_pool_transactions_genesis.txt").file
+            }
         }
 
         private val organisation: String = args.config.myLegalName.organisation
@@ -133,7 +135,7 @@ open class CordaTestBase {
 
             mockkObject(ConfigHelper)
 
-            every { ConfigHelper.getGenesisPath() } returns PoolHelper.TEST_GENESIS_FILE_PATH
+            every { ConfigHelper.getGenesisPath() } returns TEST_GENESIS_FILE_PATH
             every { ConfigHelper.getWalletName() } returns organisation + sessionId
             every { ConfigHelper.getWalletPassword() } returns "password"
             every { ConfigHelper.getRole() } returns ""

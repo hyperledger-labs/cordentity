@@ -9,9 +9,7 @@ import org.hyperledger.indy.sdk.pool.PoolLedgerConfigExistsException
 import java.io.File
 import java.io.IOException
 import java.nio.file.Files
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutionException
-import java.nio.file.Files.createSymbolicLink
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.*
@@ -24,12 +22,6 @@ import kotlin.math.absoluteValue
 object PoolHelper {
 
     const val DEFAULT_POOL_NAME = "default_pool"
-
-    //ONLY FOR IN PROJECT TESTS
-    val TEST_GENESIS_FILE_PATH by lazy {
-        javaClass.classLoader.getResource("docker_pool_transactions_genesis.txt").file
-    }
-    val TEST_GENESIS_FILE by lazy { File(TEST_GENESIS_FILE_PATH) }
 
     /**
      * Creates (or not if exists) pool ledger files and returns [Pool] object
