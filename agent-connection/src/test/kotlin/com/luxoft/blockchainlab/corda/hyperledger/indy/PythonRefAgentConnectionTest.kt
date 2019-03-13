@@ -7,7 +7,6 @@ import org.junit.Ignore
 import org.junit.Test
 import java.util.concurrent.CompletableFuture
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import java.net.URI
 import java.net.URL
 
@@ -19,7 +18,7 @@ class PythonRefAgentConnectionTest {
          * indy-agent.py is incapable of determining its endpoint other than this way
          */
         val uri = URI(agentUrl)
-        val rootPath = "http://" + uri.host + ":" + uri.port + "/"
+        val rootPath = "http://${uri.host}:${uri.port}/"
         val rootUrl = URL(rootPath)
         rootUrl.openConnection().getInputStream().close()
     }
@@ -34,41 +33,45 @@ class PythonRefAgentConnectionTest {
         agentUrl2 = "ws://127.0.0.1:8095/ws"
         agentInitEndpoint(agentUrl2)
     }
+    private var inviteStr:String = ""
     @Ignore("Requires external services")
     @Test
     fun `externalTest`() {
         val agent95completed = CompletableFuture<Unit>()
         val agent94completed = CompletableFuture<Unit>()
-        val agent95 = PythonRefAgentConnection().apply { connect(agentUrl1,"user95","pass95") }
-        val inviteMsg = agent95.genInvite()
-        CompletableFuture.runAsync {
-            agent95.run {
-                waitForInvitedParty()
-                val proof = receiveCredentialOffer()
-                val proof2 = receiveCredentialOffer()
-                val proof3 = receiveCredentialOffer()
-                assertEquals(proof.schemaId,"1")
-                assertEquals(proof2.schemaId,"2")
-                assertEquals(proof3.schemaId,"3")
-
+        PythonRefAgentConnection().apply {
+            connect(agentUrl1, "user95", "pass95").handle { _, ex ->
+                if (ex != null) throw AgentConnectionException(ex.message!!)
+                else genInvite().subscribe {
+                    inviteStr = it!!
+                    waitForInvitedParty().subscribe {
+                        receiveCredentialOffer().subscribe { proof1 ->
+                            assertEquals(proof1?.schemaId,"1")
+                            receiveCredentialOffer().subscribe { proof2 ->
+                                assertEquals(proof2?.schemaId,"2")
+                                receiveCredentialOffer().subscribe { proof3 ->
+                                    assertEquals(proof3?.schemaId, "3")
+                                    disconnect()
+                                    agent95completed.complete(Unit)
+                                }
+                            }
+                        }
+                    }
+                    PythonRefAgentConnection().apply {
+                        connect(agentUrl2, "user94", "pass94").handle { _, ex ->
+                            if (ex != null) throw AgentConnectionException(ex.message!!)
+                            else acceptInvite(inviteStr).subscribe {
+                                sendCredentialOffer(CredentialOffer("1", "", KeyCorrectnessProof("", "", emptyList()), ""))
+                                sendCredentialOffer(CredentialOffer("2", "", KeyCorrectnessProof("", "", emptyList()), ""))
+                                sendCredentialOffer(CredentialOffer("3", "", KeyCorrectnessProof("", "", emptyList()), ""))
+                                disconnect()
+                                agent94completed.complete(Unit)
+                            }
+                        }
+                    }
+                }
             }
-        }.handle { t, u ->
-            if (u != null) u.printStackTrace()
-            assertNull(u)
-            agent95completed.complete(Unit)
         }
-
-        val agent94 = PythonRefAgentConnection().apply {
-            connect(agentUrl2,"user94","pass94")
-            acceptInvite(inviteMsg)
-            sendCredentialOffer(CredentialOffer("1", "", KeyCorrectnessProof("", "", emptyList()), ""))
-            sendCredentialOffer(CredentialOffer("2", "", KeyCorrectnessProof("", "", emptyList()), ""))
-            sendCredentialOffer(CredentialOffer("3", "", KeyCorrectnessProof("", "", emptyList()), ""))
-            agent94completed.complete(Unit)
-        }
-
         CompletableFuture.allOf(agent94completed,agent95completed).get()
-        agent95.disconnect()
-        agent94.disconnect()
     }
 }

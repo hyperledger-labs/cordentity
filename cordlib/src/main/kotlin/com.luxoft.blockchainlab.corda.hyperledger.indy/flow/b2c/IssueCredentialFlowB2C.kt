@@ -1,5 +1,6 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2c
 
+import co.paralleluniverse.fibers.FiberAsync
 import co.paralleluniverse.fibers.Suspendable
 import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialContract
 import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialDefinitionContract
@@ -7,10 +8,8 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredential
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.getCredentialDefinitionById
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.indyUser
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.whoIsNotary
-import com.luxoft.blockchainlab.hyperledger.indy.CredentialDefinitionId
-import com.luxoft.blockchainlab.hyperledger.indy.IndyCredentialDefinitionNotFoundException
-import com.luxoft.blockchainlab.hyperledger.indy.IndyCredentialMaximumReachedException
-import com.luxoft.blockchainlab.hyperledger.indy.IndyUser
+import com.luxoft.blockchainlab.corda.hyperledger.indy.handle
+import com.luxoft.blockchainlab.hyperledger.indy.*
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndContract
 import net.corda.core.flows.*
@@ -49,16 +48,21 @@ object IssueCredentialFlowB2C {
 
                 connectionService().sendCredentialOffer(offer)
 
-                val credentialRequest = connectionService().receiveCredentialRequest()
+                val credentialRequest = object : FiberAsync<CredentialRequestInfo, Throwable>() {
+                    override fun requestAsync() {
+                        connectionService().receiveCredentialRequest().handle { message, ex ->
+                            if (ex != null) asyncFailed(ex)
+                            else asyncCompleted(message)
+                        }
+                    }
+                }.run()
 
                 val credential = indyUser().issueCredential(
                         credentialRequest,
                         credentialProposal,
                         offer
                 )
-
                 connectionService().sendCredential(credential)
-
                 val credentialOut = IndyCredential(
                         identifier,
                         credentialRequest,
@@ -97,6 +101,7 @@ object IssueCredentialFlowB2C {
 
                 // Notarise and record the transaction in both parties' vaults.
                 subFlow(FinalityFlow(selfSignedTx))
+
             } catch (ex: Exception) {
                 logger.error("Credential has not been issued", ex)
                 throw FlowException(ex.message)

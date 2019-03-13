@@ -12,6 +12,7 @@ dependencies {
     compile project(":cordentity-cordlib-contracts-states")
     compile project(':cordentity-indy-utils')
     compile project(':cordentity-agent-connection')
+    implementation 'co.paralleluniverse:quasar-kotlin:0.8.0'
 }
 
 apply plugin: 'maven-publish'

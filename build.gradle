@@ -51,6 +51,7 @@ subprojects {
         compile 'com.github.alexeykoren:konfig:2.0.4'
 
         implementation 'io.github.microutils:kotlin-logging:1.6.22'
+        implementation 'io.reactivex:rxjava:1.3.8'
 
         testImplementation "org.jetbrains.kotlin:kotlin-test:$kotlin_version"
         testImplementation "junit:junit:$junit_version"

@@ -1,5 +1,6 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2c
 
+import co.paralleluniverse.fibers.FiberAsync
 import co.paralleluniverse.fibers.Suspendable
 import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialContract
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredentialProof
@@ -7,10 +8,8 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.ProofAttribute
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.ProofPredicate
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.indyUser
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.whoIsNotary
-import com.luxoft.blockchainlab.hyperledger.indy.CredentialFieldReference
-import com.luxoft.blockchainlab.hyperledger.indy.CredentialPredicate
-import com.luxoft.blockchainlab.hyperledger.indy.IndyUser
-import com.luxoft.blockchainlab.hyperledger.indy.Interval
+import com.luxoft.blockchainlab.corda.hyperledger.indy.handle
+import com.luxoft.blockchainlab.hyperledger.indy.*
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndContract
 import net.corda.core.flows.*
@@ -58,7 +57,14 @@ object VerifyCredentialFlowB2C {
 
                 connectionService().sendProofRequest(proofRequest)
 
-                val proof = connectionService().receiveProof()
+                val proof = object : FiberAsync<ProofInfo, Throwable>() {
+                    override fun requestAsync() {
+                        connectionService().receiveProof().handle { message, ex ->
+                            if (ex != null) asyncFailed(ex)
+                            else asyncCompleted(message)
+                        }
+                    }
+                }.run()
 
                 val usedData = indyUser().getDataUsedInProof(proofRequest, proof)
                 val credentialProofOut =
