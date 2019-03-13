@@ -2,7 +2,7 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy
 
 import com.luxoft.blockchainlab.hyperledger.indy.*
 
-enum class AgentConnectionStatus { AGENT_CONNECTION_CONNECTED, AGENT_CONNECTION_DISCONNECTED }
+enum class AgentConnectionStatus { AGENT_CONNECTED, AGENT_DISCONNECTED }
 
 data class IndyParty(val did: String, val endpoint: String, val verkey: String? = null)
 
@@ -13,7 +13,7 @@ interface AgentConnection {
     fun connect(url: String, login: String, password: String)
     fun disconnect()
 
-    fun genInvite(): String
+    fun generateInvite(): String
     fun acceptInvite(invite: String)
     fun waitForInvitedParty()
 

@@ -40,7 +40,7 @@ class PythonRefAgentConnectionTest {
         val agent95completed = CompletableFuture<Unit>()
         val agent94completed = CompletableFuture<Unit>()
         val agent95 = PythonRefAgentConnection().apply { connect(agentUrl1,"user95","pass95") }
-        val inviteMsg = agent95.genInvite()
+        val inviteMsg = agent95.generateInvite()
         CompletableFuture.runAsync {
             agent95.run {
                 waitForInvitedParty()

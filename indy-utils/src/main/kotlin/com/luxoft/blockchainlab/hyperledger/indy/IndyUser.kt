@@ -215,7 +215,6 @@ open class IndyUser : IndyIssuer, IndyProver, IndyTrustee {
             if (getRootCause(e) !is DuplicateMasterSecretNameException) throw e
 
             logger.debug("MasterSecret already exists, who cares, continuing")
-            logger.info { "" }
         }
     }
 
