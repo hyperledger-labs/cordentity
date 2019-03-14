@@ -21,7 +21,7 @@ object AssignPermissionsFlow {
      * */
     @CordaSerializable
     // TODO: make private
-    data class IndyPermissionsRequest(
+    private data class IndyPermissionsRequest(
         val did: String = "",
         val verkey: String = "",
         val alias: String?,
@@ -49,8 +49,7 @@ object AssignPermissionsFlow {
                 val otherSide: Party = whoIs(authority)
                 val flowSession: FlowSession = initiateFlow(otherSide)
 
-                // FIXME: parameters `role` and `alias` are mixed up
-                flowSession.send(IndyPermissionsRequest(indyUser().did, indyUser().verkey, role, alias))
+                flowSession.send(IndyPermissionsRequest(indyUser().did, indyUser().verkey, alias, role))
 
             } catch (t: Throwable) {
                 logger.error("", t)
@@ -66,13 +65,12 @@ object AssignPermissionsFlow {
         override fun call() {
             try {
                 flowSession.receive(IndyPermissionsRequest::class.java).unwrap { indyPermissions ->
-                    // FIXME: parameters `role` and `alias` are mixed up
                     indyUser().setPermissionsFor(
                         IdentityDetails(
                             indyPermissions.did,
                             indyPermissions.verkey,
-                            indyPermissions.role,
-                            indyPermissions.alias
+                            indyPermissions.alias,
+                            indyPermissions.role
                         )
                     )
                 }
