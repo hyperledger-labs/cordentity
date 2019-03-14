@@ -1,9 +1,9 @@
 package com.luxoft.blockchainlab.hyperledger.indy
 
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
+import mu.KotlinLogging
 import org.hyperledger.indy.sdk.ledger.LedgerInvalidTransactionException
 import org.hyperledger.indy.sdk.ledger.LedgerResults
-import org.slf4j.LoggerFactory
 import java.util.concurrent.CompletableFuture
 
 open class IndyWrapperException(msg: String) : IllegalArgumentException(msg)
@@ -14,7 +14,7 @@ class ArtifactRequestFailed(msg: String) : IndyWrapperException("Request to publ
 enum class Status { REJECT, REPLY }
 data class IndyOpCode(val op: Status, val result: Any?)
 
-val logger = LoggerFactory.getLogger(IndyUser::class.java.name)
+val logger = KotlinLogging.logger {}
 
 fun handleIndyError(execResult: String) {
     val res = SerializationUtils.jSONToAny<IndyOpCode>(execResult)

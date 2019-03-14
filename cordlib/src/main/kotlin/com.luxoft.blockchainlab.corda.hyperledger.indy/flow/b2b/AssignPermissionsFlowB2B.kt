@@ -1,6 +1,8 @@
-package com.luxoft.blockchainlab.corda.hyperledger.indy.flow
+package com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b
 
 import co.paralleluniverse.fibers.Suspendable
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.indyUser
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.whoIs
 import com.luxoft.blockchainlab.hyperledger.indy.IdentityDetails
 import net.corda.core.flows.*
 import net.corda.core.identity.CordaX500Name
@@ -11,7 +13,7 @@ import net.corda.core.utilities.unwrap
 /**
  * Flows to change permissions of another Corda party [authority]
  * */
-object AssignPermissionsFlow {
+object AssignPermissionsFlowB2B {
 
     /**
      * @param did          Target DID as base58-encoded string for 16 or 32 bit DID value.
@@ -59,13 +61,13 @@ object AssignPermissionsFlow {
         }
     }
 
-    @InitiatedBy(Issuer::class)
+    @InitiatedBy(AssignPermissionsFlowB2B.Issuer::class)
     open class Authority(private val flowSession: FlowSession) : FlowLogic<Unit>() {
 
         @Suspendable
         override fun call() {
             try {
-                flowSession.receive(IndyPermissionsRequest::class.java).unwrap { indyPermissions ->
+                flowSession.receive(AssignPermissionsFlowB2B.IndyPermissionsRequest::class.java).unwrap { indyPermissions ->
                     // FIXME: parameters `role` and `alias` are mixed up
                     indyUser().setPermissionsFor(
                         IdentityDetails(

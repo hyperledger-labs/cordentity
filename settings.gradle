@@ -5,5 +5,6 @@ include 'cordlib'
 include 'cordapp'
 include 'cordlib-contracts-states'
 include 'cordapp-contracts-states'
+include 'agent-connection'
 
 rootProject.children.each { it.name = "${name}-${it.name}" }

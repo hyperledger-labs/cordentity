@@ -1,12 +1,11 @@
 dependencies {
-    compile group: 'org.hyperledger', name: 'indy', version: "$indy_version"
+    compile 'com.github.seniorjoinu:indy-sdk:v1.7.0-indy-android-compat-5'
+    implementation group: 'commons-io', name: 'commons-io', version: '2.6'
 
     compile "com.fasterxml.jackson.core:jackson-databind:$jackson_version"
     compile "com.fasterxml.jackson.module:jackson-module-kotlin:$jackson_version"
-
-    compile group: 'commons-io', name: 'commons-io', version: '2.6'
-
-    compile group: 'org.slf4j', name: 'slf4j-api', version: '1.7.21'
+    
+    testImplementation 'net.java.dev.jna:jna:4.5.1'
 }
 
 sourceSets {

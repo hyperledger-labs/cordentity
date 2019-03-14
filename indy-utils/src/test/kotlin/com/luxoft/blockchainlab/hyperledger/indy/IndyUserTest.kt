@@ -32,7 +32,7 @@ class IndyUserTest {
 
         wallet = Wallet.openWallet(walletConfig, credentials).get()
         val pool = PoolManager.openIndyPool(PoolManager.TEST_GENESIS_FILE, poolName)
-        indyUser = IndyUser(pool, wallet, null)
+        indyUser = IndyUser(pool, wallet, null, tailsPath = "tails")
     }
 
     @After

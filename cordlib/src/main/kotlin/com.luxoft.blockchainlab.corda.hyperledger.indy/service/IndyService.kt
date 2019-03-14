@@ -6,13 +6,13 @@ import com.luxoft.blockchainlab.hyperledger.indy.utils.PoolManager
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import com.luxoft.blockchainlab.hyperledger.indy.utils.getRootCause
 import com.natpryce.konfig.*
+import mu.KotlinLogging
 import net.corda.core.node.AppServiceHub
 import net.corda.core.node.services.CordaService
 import net.corda.core.serialization.SingletonSerializeAsToken
 import org.hyperledger.indy.sdk.did.DidJSONParameters
 import org.hyperledger.indy.sdk.wallet.Wallet
 import org.hyperledger.indy.sdk.wallet.WalletExistsException
-import org.slf4j.LoggerFactory
 import java.io.File
 
 /**
@@ -43,7 +43,7 @@ class IndyService(services: AppServiceHub) : SingletonSerializeAsToken() {
             )  //  file with node-specific name
             .ifNot(EnvironmentVariables(), indyuser) // Good for docker-compose, ansible-playbook or similar
 
-    private val logger = LoggerFactory.getLogger(IndyService::class.java.name)
+    private val logger = KotlinLogging.logger {}
 
     val indyUser: IndyUser
 
@@ -67,23 +67,28 @@ class IndyService(services: AppServiceHub) : SingletonSerializeAsToken() {
         val genesisFile = File(config[indyuser.genesisFile])
         val pool = PoolManager.openIndyPool(genesisFile)
 
+        val tailsPath = "tails"
+
         indyUser = if (config.getOrNull(indyuser.role)?.compareTo("trustee", true) == 0) {
             val didConfig = DidJSONParameters.CreateAndStoreMyDidJSONParameter(
                 config[indyuser.did], config[indyuser.seed], null, null
             ).toJson()
 
-            IndyUser(pool, wallet, config[indyuser.did], didConfig)
+            IndyUser(pool, wallet, config[indyuser.did], didConfig, tailsPath)
         } else {
-            IndyUser(pool, wallet, null)
+            IndyUser(pool, wallet, null, tailsPath = tailsPath)
         }
     }
+}
 
-    @Suppress("ClassName")
-    object indyuser : PropertyGroup() {
-        val role by stringType
-        val did by stringType
-        val seed by stringType
-        val walletName by stringType
-        val genesisFile by stringType
-    }
+@Suppress("ClassName")
+object indyuser : PropertyGroup() {
+    val role by stringType
+    val did by stringType
+    val seed by stringType
+    val walletName by stringType
+    val genesisFile by stringType
+    val agentWSEndpoint by stringType
+    val agentUser by stringType
+    val agentPassword by stringType
 }

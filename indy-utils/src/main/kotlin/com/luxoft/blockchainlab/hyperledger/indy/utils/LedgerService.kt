@@ -1,10 +1,10 @@
 package com.luxoft.blockchainlab.hyperledger.indy.utils
 
 import com.luxoft.blockchainlab.hyperledger.indy.*
+import mu.KotlinLogging
 import org.hyperledger.indy.sdk.ledger.Ledger
 import org.hyperledger.indy.sdk.pool.Pool
 import org.hyperledger.indy.sdk.wallet.Wallet
-import org.slf4j.LoggerFactory
 import java.lang.Thread.sleep
 import java.util.*
 
@@ -104,10 +104,10 @@ class LedgerService(private val did: String, private val wallet: Wallet, private
     fun addNym(about: IdentityDetails) = LedgerService.addNym(did, pool, wallet, about)
 
     companion object {
-        val logger = LoggerFactory.getLogger(IndyUser::class.java.name)!!
+        val logger = KotlinLogging.logger {}
 
-        private val delayMs = 2000L
-        private val retryTimes = 5
+        private val delayMs = 100L
+        private val retryTimes = 10
 
         /**
          * Adds NYM record to ledger. E.g. "I trust this person"
@@ -150,7 +150,7 @@ class LedgerService(private val did: String, private val wallet: Wallet, private
                     return@run SerializationUtils.jSONToAny<Schema>(parsedRes.objectJson)
                 } catch (e: Exception) {
                     logger.debug("Schema retrieving failed (id: $id). Retry attempt $it")
-                    sleep(delayMs)
+                    sleep(delayMs * it)
                 }
             }
 
@@ -178,7 +178,7 @@ class LedgerService(private val did: String, private val wallet: Wallet, private
                     return@run SerializationUtils.jSONToAny<CredentialDefinition>(credDefIdInfo.objectJson)
                 } catch (e: Exception) {
                     logger.debug("Credential definition retrieving failed (id: $id). Retry attempt $it")
-                    sleep(delayMs)
+                    sleep(delayMs * it)
                 }
             }
 
@@ -207,7 +207,7 @@ class LedgerService(private val did: String, private val wallet: Wallet, private
                         return@run SerializationUtils.jSONToAny<RevocationRegistryDefinition>(revRegDefJson)
                     } catch (e: Exception) {
                         logger.debug("Revocation registry definition retrieving failed (id: $id). Retry attempt $it")
-                        sleep(delayMs)
+                        sleep(delayMs * it)
                     }
                 }
 
@@ -246,7 +246,7 @@ class LedgerService(private val did: String, private val wallet: Wallet, private
                     return@run Pair(tmsp, revRegEntry)
                 } catch (e: Exception) {
                     logger.debug("Revocation registry entry retrieving failed (id: $id, timestamp: $timestamp). Retry attempt $it")
-                    sleep(delayMs)
+                    sleep(delayMs * it)
                 }
             }
 
@@ -286,7 +286,7 @@ class LedgerService(private val did: String, private val wallet: Wallet, private
                     return@run Pair(timestamp, revRegDelta)
                 } catch (e: Exception) {
                     logger.debug("Revocation registry delta retrieving failed (id: $id, interval: $interval). Retry attempt $it")
-                    sleep(delayMs)
+                    sleep(delayMs * it)
                 }
             }
 
