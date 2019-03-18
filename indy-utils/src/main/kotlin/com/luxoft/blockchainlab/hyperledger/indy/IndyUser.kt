@@ -10,8 +10,6 @@ import com.luxoft.blockchainlab.hyperledger.indy.utils.getRootCause
 import mu.KotlinLogging
 import org.hyperledger.indy.sdk.anoncreds.Anoncreds
 import org.hyperledger.indy.sdk.anoncreds.DuplicateMasterSecretNameException
-import org.hyperledger.indy.sdk.blob_storage.BlobStorageReader
-import org.hyperledger.indy.sdk.blob_storage.BlobStorageWriter
 import org.hyperledger.indy.sdk.did.Did
 import org.hyperledger.indy.sdk.pairwise.Pairwise
 import org.hyperledger.indy.sdk.pool.Pool
@@ -177,6 +175,13 @@ open class IndyUser(
         return RevocationRegistryInfo(definitionFromLedger, entryFromLedger.second)
     }
 
+    /**
+     * Creates credential offer
+     *
+     * @param credentialDefinitionId    credential definition id
+     *
+     * @return                          created credential offer
+     */
     override fun createCredentialOffer(credentialDefinitionId: CredentialDefinitionId): CredentialOffer {
         val credOfferJson = Anoncreds.issuerCreateCredentialOffer(wallet, credentialDefinitionId.toString()).get()
 

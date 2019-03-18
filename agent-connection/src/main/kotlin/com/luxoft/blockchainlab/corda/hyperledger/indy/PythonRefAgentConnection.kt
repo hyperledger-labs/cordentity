@@ -11,14 +11,13 @@ import java.lang.Thread.sleep
 import java.net.URI
 import java.time.Instant
 import java.util.*
-import kotlin.RuntimeException
 
 
 class PythonRefAgentConnection : AgentConnection {
     override fun disconnect() {
-        if (getConnectionStatus() == AgentConnectionStatus.AGENT_CONNECTION_CONNECTED) {
-            webSocket.closeBlocking()
-            connectionStatus = AgentConnectionStatus.AGENT_CONNECTION_DISCONNECTED
+        if (getConnectionStatus() == AgentConnectionStatus.AGENT_CONNECTED) {
+            webSocket.close()
+            connectionStatus = AgentConnectionStatus.AGENT_DISCONNECTED
         }
     }
 
@@ -32,13 +31,13 @@ class PythonRefAgentConnection : AgentConnection {
             if(!checkState(stateResponse, login)) {
                 sendJson(WalletConnect(login, password, id = Instant.now().toEpochMilli().toString()))
                 stateResponse = waitForMessageOfType<State>(MESSAGE_TYPES.STATE_RESPONSE)
+                if (!checkState(stateResponse, login))
+                    throw AgentConnectionException("Error connecting to $url")
             }
-            if(!checkState(stateResponse, login))
-                throw AgentConnectionException("Error connecting to $url")
         }
     }
 
-    private var connectionStatus : AgentConnectionStatus = AgentConnectionStatus.AGENT_CONNECTION_DISCONNECTED
+    private var connectionStatus: AgentConnectionStatus = AgentConnectionStatus.AGENT_DISCONNECTED
 
     override fun getConnectionStatus(): AgentConnectionStatus = connectionStatus
 
@@ -50,16 +49,16 @@ class PythonRefAgentConnection : AgentConnection {
         return if(stateMessage != null &&
                 stateMessage.content?.get("initialized") == true &&
                 stateMessage.content?.get("agent_name") == userName ) {
-            connectionStatus = AgentConnectionStatus.AGENT_CONNECTION_CONNECTED
+            connectionStatus = AgentConnectionStatus.AGENT_CONNECTED
             true
         } else {
-            connectionStatus = AgentConnectionStatus.AGENT_CONNECTION_DISCONNECTED
+            connectionStatus = AgentConnectionStatus.AGENT_DISCONNECTED
             false
         }
     }
 
     override fun acceptInvite(invite: String) {
-        if (invite != null && getConnectionStatus() == AgentConnectionStatus.AGENT_CONNECTION_CONNECTED) {
+        if (invite != null && getConnectionStatus() == AgentConnectionStatus.AGENT_CONNECTED) {
             sendJson(ReceiveInviteMessage(invite))
             val invite = webSocket.waitForMessageOfType<InviteReceivedMessage>(MESSAGE_TYPES.INVITE_RECEIVED)
             sendRequest(invite.key)
@@ -72,19 +71,19 @@ class PythonRefAgentConnection : AgentConnection {
 
     fun sendJson(obj: Any) = webSocket.sendJson(obj)
 
-    override fun genInvite(): String {
+    override fun generateInvite(): String {
         webSocket.sendJson(SendMessage(type = MESSAGE_TYPES.GENERATE_INVITE, id = Instant.now().toEpochMilli().toString()))
         return webSocket.waitForMessageOfType<ReceiveInviteMessage>(MESSAGE_TYPES.INVITE_GENERATED).invite
     }
 
     override fun waitForInvitedParty() {
-        if (getConnectionStatus() == AgentConnectionStatus.AGENT_CONNECTION_CONNECTED) {
+        if (getConnectionStatus() == AgentConnectionStatus.AGENT_CONNECTED) {
             webSocket.waitForMessageOfType<RequestReceivedMessage>(MESSAGE_TYPES.REQUEST_RECEIVED).also {
                 counterParty = IndyParty(it.did, it.endpoint)
                 sendJson(RequestSendResponseMessage(it.did))
             }
         } else {
-            throw AgentConnectionException("Agent is disconnected")
+            throw AgentConnectionException("Waiting for invited party, but not connected to agent")
         }
     }
 
@@ -114,27 +113,27 @@ class PythonRefAgentConnection : AgentConnection {
     override fun receiveProof(): ProofInfo = webSocket.waitForTypedMessage()
 }
 
-class AgentWebSocketClient(serverUri: URI) : WebSocketClient(serverUri) {
+class AgentWebSocketClient(val serverUri: URI) : WebSocketClient(serverUri) {
     private val log = KotlinLogging.logger {}
 
     override fun onOpen(handshakedata: ServerHandshake?) {
-        log.info { "AgentConnection opened: $handshakedata" }
+        log.info { "AgentConnection to $serverUri opened: $handshakedata" }
     }
 
     override fun onClose(code: Int, reason: String?, remote: Boolean) {
-        log.info { "AgentConnection closed: $code,$reason,$remote" }
+        log.info { "AgentConnection to $serverUri closed: $code,$reason,$remote" }
     }
 
     val receivedMessages = mutableListOf<String>()
 
     override fun onMessage(message: String?) {
-        log.info { "Message: $message" }
+        log.info { "Message from $serverUri: $message" }
         if (message != null)
             synchronized(receivedMessages) { receivedMessages.add(message) }
     }
 
     override fun onError(ex: Exception?) {
-        log.warn(ex) { "AgentConnection error" }
+        log.warn(ex) { "AgentConnection to $serverUri error" }
     }
 
     fun sendJson(obj: Any) = send(SerializationUtils.anyToJSON(obj))
@@ -171,10 +170,8 @@ class AgentWebSocketClient(serverUri: URI) : WebSocketClient(serverUri) {
                     .find { SerializationUtils.jSONToAny<MessageReceived>(it).message.content.clazz == T::class.java.canonicalName }
 
             if (message != null) {
-                val result = SerializationUtils.jSONToAny<T>(
-                        SerializationUtils.anyToJSON(
-                                SerializationUtils.jSONToAny<MessageReceived>(message).message.content.message
-                        )
+                val result = SerializationUtils.convertValue<T>(
+                        SerializationUtils.jSONToAny<MessageReceived>(message).message.content.message
                 )
                 receivedMessages.remove(message)
                 return result

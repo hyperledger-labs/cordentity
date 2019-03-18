@@ -25,7 +25,7 @@ object CreateCredentialDefinitionFlow {
     @InitiatingFlow
     @StartableByRPC
     class Authority(private val schemaId: SchemaId, private val credentialsLimit: Int = 100) :
-        FlowLogic<CredentialDefinitionId>() {
+            FlowLogic<CredentialDefinitionId>() {
 
         @Suspendable
         override fun call(): CredentialDefinitionId {
@@ -42,13 +42,13 @@ object CreateCredentialDefinitionFlow {
                 val signers = listOf(ourIdentity.owningKey)
                 // create new credential definition state
                 val credentialDefinition = IndyCredentialDefinition(
-                    schemaId,
-                    credentialDefinitionId,
-                    credentialsLimit,
-                    listOf(ourIdentity)
+                        schemaId,
+                        credentialDefinitionId,
+                        credentialsLimit,
+                        listOf(ourIdentity)
                 )
                 val credentialDefinitionOut =
-                    StateAndContract(credentialDefinition, IndyCredentialDefinitionContract::class.java.name)
+                        StateAndContract(credentialDefinition, IndyCredentialDefinitionContract::class.java.name)
                 val credentialDefinitionCmdType = IndyCredentialDefinitionContract.Command.Create()
                 val credentialDefinitionCmd = Command(credentialDefinitionCmdType, signers)
 
@@ -62,16 +62,16 @@ object CreateCredentialDefinitionFlow {
 
                 // do stuff
                 val trxBuilder = TransactionBuilder(whoIsNotary()).withItems(
-                    schemaIn,
-                    credentialDefinitionOut,
-                    credentialDefinitionCmd,
-                    schemaOut,
-                    schemaCmd
+                        schemaIn,
+                        credentialDefinitionOut,
+                        credentialDefinitionCmd,
+                        schemaOut,
+                        schemaCmd
                 )
 
                 trxBuilder.toWireTransaction(serviceHub)
-                    .toLedgerTransaction(serviceHub)
-                    .verify()
+                        .toLedgerTransaction(serviceHub)
+                        .verify()
 
                 val selfSignedTx = serviceHub.signInitialTransaction(trxBuilder, ourIdentity.owningKey)
 
