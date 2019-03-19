@@ -3,7 +3,7 @@ package com.luxoft.blockchainlab.hyperledger.indy
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.GenesisHelper
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.PoolHelper
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.WalletHelper
-import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
+import com.luxoft.blockchainlab.hyperledger.indy.models.*
 import com.luxoft.blockchainlab.hyperledger.indy.utils.StorageUtils
 import junit.framework.Assert.assertFalse
 import org.hyperledger.indy.sdk.did.Did
@@ -13,7 +13,6 @@ import org.hyperledger.indy.sdk.wallet.Wallet
 import org.junit.*
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
-import java.lang.RuntimeException
 
 
 class AnoncredsDemoTest : IndyIntegrationTest() {
@@ -129,9 +128,9 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
     @Throws(Exception::class)
     fun `revocation works fine`() {
         val gvtSchema = issuer1.createSchema(GVT_SCHEMA_NAME, SCHEMA_VERSION, GVT_SCHEMA_ATTRIBUTES)
-        val credDef = issuer1.createCredentialDefinition(gvtSchema.getSchemaId(), true)
-        val revocationRegistry = issuer1.createRevocationRegistry(credDef.getCredentialDefinitionId())
-        val credOffer = issuer1.createCredentialOffer(credDef.getCredentialDefinitionId())
+        val credDef = issuer1.createCredentialDefinition(gvtSchema.schemaId(), true)
+        val revocationRegistry = issuer1.createRevocationRegistry(credDef.credentialDefinitionId())
+        val credOffer = issuer1.createCredentialOffer(credDef.credentialDefinitionId())
         val credReq = prover.createCredentialRequest(prover.did, credOffer)
         val credentialInfo = issuer1.issueCredential(credReq, gvtCredentialValues, credOffer)
         prover.receiveCredential(credentialInfo, credReq, credOffer)
@@ -156,7 +155,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         assertTrue(IndyUser.verifyProof(proofReq, proof, usedData))
 
         issuer1.revokeCredential(
-            credentialInfo.credential.getRevocationRegistryId()!!,
+            credentialInfo.credential.revocationRegistryId()!!,
             credentialInfo.credRevocId!!
         )
         Thread.sleep(3000)
@@ -180,8 +179,8 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
     @Throws(Exception::class)
     fun `1 issuer 1 prover 1 credential setup works fine`() {
         val gvtSchema = issuer1.createSchema(GVT_SCHEMA_NAME, SCHEMA_VERSION, GVT_SCHEMA_ATTRIBUTES)
-        val credDef = issuer1.createCredentialDefinition(gvtSchema.getSchemaId(), false)
-        val credOffer = issuer1.createCredentialOffer(credDef.getCredentialDefinitionId())
+        val credDef = issuer1.createCredentialDefinition(gvtSchema.schemaId(), false)
+        val credOffer = issuer1.createCredentialOffer(credDef.credentialDefinitionId())
         val credReq = prover.createCredentialRequest(prover.did, credOffer)
         val credentialInfo = issuer1.issueCredential(credReq, gvtCredentialValues, credOffer)
         prover.receiveCredential(credentialInfo, credReq, credOffer)
@@ -209,12 +208,12 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
     @Throws(Exception::class)
     fun `2 issuers 1 prover 2 credentials setup works fine`() {
         val schema1 = issuer1.createSchema(GVT_SCHEMA_NAME, SCHEMA_VERSION, GVT_SCHEMA_ATTRIBUTES)
-        val credDef1 = issuer1.createCredentialDefinition(schema1.getSchemaId(), false)
+        val credDef1 = issuer1.createCredentialDefinition(schema1.schemaId(), false)
 
         val schema2 = issuer2.createSchema(XYZ_SCHEMA_NAME, SCHEMA_VERSION, XYZ_SCHEMA_ATTRIBUTES)
-        val credDef2 = issuer2.createCredentialDefinition(schema2.getSchemaId(), false)
-        val gvtCredOffer = issuer1.createCredentialOffer(credDef1.getCredentialDefinitionId())
-        val xyzCredOffer = issuer2.createCredentialOffer(credDef2.getCredentialDefinitionId())
+        val credDef2 = issuer2.createCredentialDefinition(schema2.schemaId(), false)
+        val gvtCredOffer = issuer1.createCredentialOffer(credDef1.credentialDefinitionId())
+        val xyzCredOffer = issuer2.createCredentialOffer(credDef2.credentialDefinitionId())
 
         val gvtCredReq = prover.createCredentialRequest(prover.did, gvtCredOffer)
         val gvtCredential = issuer1.issueCredential(gvtCredReq, gvtCredentialValues, gvtCredOffer)
@@ -255,12 +254,12 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
     @Throws(Exception::class)
     fun `1 issuer 1 prover 2 credentials setup works fine`() {
         val gvtSchema = issuer1.createSchema(GVT_SCHEMA_NAME, SCHEMA_VERSION, GVT_SCHEMA_ATTRIBUTES)
-        val gvtCredDef = issuer1.createCredentialDefinition(gvtSchema.getSchemaId(), false)
+        val gvtCredDef = issuer1.createCredentialDefinition(gvtSchema.schemaId(), false)
 
         val xyzSchema = issuer1.createSchema(XYZ_SCHEMA_NAME, SCHEMA_VERSION, XYZ_SCHEMA_ATTRIBUTES)
-        val xyzCredDef = issuer1.createCredentialDefinition(xyzSchema.getSchemaId(), false)
-        val gvtCredOffer = issuer1.createCredentialOffer(gvtCredDef.getCredentialDefinitionId())
-        val xyzCredOffer = issuer1.createCredentialOffer(xyzCredDef.getCredentialDefinitionId())
+        val xyzCredDef = issuer1.createCredentialDefinition(xyzSchema.schemaId(), false)
+        val gvtCredOffer = issuer1.createCredentialOffer(gvtCredDef.credentialDefinitionId())
+        val xyzCredOffer = issuer1.createCredentialOffer(xyzCredDef.credentialDefinitionId())
 
         val gvtCredReq = prover.createCredentialRequest(prover.did, gvtCredOffer)
         val gvtCredential = issuer1.issueCredential(gvtCredReq, gvtCredentialValues, gvtCredOffer)

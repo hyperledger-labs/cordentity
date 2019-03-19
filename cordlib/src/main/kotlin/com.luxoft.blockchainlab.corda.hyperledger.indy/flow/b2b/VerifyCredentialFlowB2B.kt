@@ -5,6 +5,7 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialCo
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredentialProof
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.*
 import com.luxoft.blockchainlab.hyperledger.indy.*
+import com.luxoft.blockchainlab.hyperledger.indy.models.*
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndContract
 import net.corda.core.flows.*
@@ -129,7 +130,7 @@ object VerifyCredentialFlowB2B {
         @Suspendable
         override fun call() {
             try {
-                val indyProofRequest = flowSession.receive(ProofRequest::class.java).unwrap { it }
+                val indyProofRequest = flowSession.receive<ProofRequest>().unwrap { it }
                 flowSession.send(indyUser().createProof(indyProofRequest))
 
                 val flow = object : SignTransactionFlow(flowSession) {

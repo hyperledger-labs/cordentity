@@ -1,7 +1,7 @@
 package com.luxoft.blockchainlab.hyperledger.indy.helpers
 
-import com.luxoft.blockchainlab.hyperledger.indy.BlobStorageHandler
-import com.luxoft.blockchainlab.hyperledger.indy.TailsConfig
+import com.luxoft.blockchainlab.hyperledger.indy.models.BlobStorageHandler
+import com.luxoft.blockchainlab.hyperledger.indy.models.TailsConfig
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import org.hyperledger.indy.sdk.blob_storage.BlobStorageReader
 import org.hyperledger.indy.sdk.blob_storage.BlobStorageWriter

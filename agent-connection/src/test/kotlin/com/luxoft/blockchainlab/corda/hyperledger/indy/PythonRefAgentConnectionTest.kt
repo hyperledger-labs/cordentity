@@ -1,7 +1,7 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy
 
-import com.luxoft.blockchainlab.hyperledger.indy.CredentialOffer
-import com.luxoft.blockchainlab.hyperledger.indy.KeyCorrectnessProof
+import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialOffer
+import com.luxoft.blockchainlab.hyperledger.indy.models.KeyCorrectnessProof
 import org.junit.Before
 import org.junit.Ignore
 import org.junit.Test

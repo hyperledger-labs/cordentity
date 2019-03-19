@@ -2,8 +2,8 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy.service
 
 
 import com.luxoft.blockchainlab.hyperledger.indy.IndyUser
-import com.luxoft.blockchainlab.hyperledger.indy.WalletConfig
-import com.luxoft.blockchainlab.hyperledger.indy.WalletPassword
+import com.luxoft.blockchainlab.hyperledger.indy.models.WalletConfig
+import com.luxoft.blockchainlab.hyperledger.indy.models.WalletPassword
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.*
 import mu.KotlinLogging
 import net.corda.core.node.AppServiceHub

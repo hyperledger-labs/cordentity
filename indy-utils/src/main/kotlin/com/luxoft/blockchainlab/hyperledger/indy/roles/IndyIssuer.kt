@@ -1,6 +1,7 @@
 package com.luxoft.blockchainlab.hyperledger.indy.roles
 
 import com.luxoft.blockchainlab.hyperledger.indy.*
+import com.luxoft.blockchainlab.hyperledger.indy.models.*
 
 
 /**

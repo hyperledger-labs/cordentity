@@ -1,12 +1,11 @@
 package com.luxoft.blockchainlab.hyperledger.indy.helpers
 
-import com.luxoft.blockchainlab.hyperledger.indy.WalletConfig
-import com.luxoft.blockchainlab.hyperledger.indy.WalletPassword
+import com.luxoft.blockchainlab.hyperledger.indy.models.WalletConfig
+import com.luxoft.blockchainlab.hyperledger.indy.models.WalletPassword
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import com.luxoft.blockchainlab.hyperledger.indy.utils.getRootCause
 import org.hyperledger.indy.sdk.wallet.Wallet
 import org.hyperledger.indy.sdk.wallet.WalletExistsException
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Helps to manage wallets

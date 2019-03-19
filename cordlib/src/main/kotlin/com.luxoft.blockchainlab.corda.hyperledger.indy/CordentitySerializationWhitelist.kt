@@ -1,6 +1,6 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy
 
-import com.luxoft.blockchainlab.hyperledger.indy.*
+import com.luxoft.blockchainlab.hyperledger.indy.models.*
 import net.corda.core.serialization.SerializationWhitelist
 
 

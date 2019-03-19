@@ -1,7 +1,7 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy.flow
 
-import com.luxoft.blockchainlab.hyperledger.indy.CredentialDefinitionId
-import com.luxoft.blockchainlab.hyperledger.indy.SchemaId
+import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialDefinitionId
+import com.luxoft.blockchainlab.hyperledger.indy.models.SchemaId
 import net.corda.core.serialization.CordaSerializable
 
 /**

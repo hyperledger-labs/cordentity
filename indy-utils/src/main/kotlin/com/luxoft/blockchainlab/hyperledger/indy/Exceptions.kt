@@ -1,5 +1,8 @@
 package com.luxoft.blockchainlab.hyperledger.indy
 
+import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialDefinitionId
+import com.luxoft.blockchainlab.hyperledger.indy.models.RevocationRegistryDefinitionId
+import com.luxoft.blockchainlab.hyperledger.indy.models.SchemaId
 import java.lang.RuntimeException
 
 

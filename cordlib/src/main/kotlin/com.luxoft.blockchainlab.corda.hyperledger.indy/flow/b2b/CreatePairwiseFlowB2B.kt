@@ -3,8 +3,7 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b
 import co.paralleluniverse.fibers.Suspendable
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.indyUser
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.whoIs
-import com.luxoft.blockchainlab.hyperledger.indy.IdentityDetails
-import com.luxoft.blockchainlab.hyperledger.indy.roles.getIdentity
+import com.luxoft.blockchainlab.hyperledger.indy.models.IdentityDetails
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import net.corda.core.flows.*
 import net.corda.core.identity.CordaX500Name
@@ -37,7 +36,9 @@ object CreatePairwiseFlowB2B {
                     indyUser().createSessionDid(identityDetails)
                 }
 
-                flowSession.send(indyUser().getIdentity(sessionDid).getIdentityRecord())
+                val serializedIdentity = indyUser().getIdentity(sessionDid)
+
+                flowSession.send(serializedIdentity)
                 return sessionDid
 
             } catch (ex: Exception) {
@@ -54,7 +55,7 @@ object CreatePairwiseFlowB2B {
         @Suspendable
         override fun call() {
             try {
-                val myIdentityRecord = indyUser().getIdentity().getIdentityRecord()
+                val myIdentityRecord = SerializationUtils.anyToJSON(indyUser().getIdentity())
 
                 flowSession.sendAndReceive<String>(myIdentityRecord).unwrap { theirIdentityRecord ->
                     val identityDetails = SerializationUtils.jSONToAny<IdentityDetails>(theirIdentityRecord)

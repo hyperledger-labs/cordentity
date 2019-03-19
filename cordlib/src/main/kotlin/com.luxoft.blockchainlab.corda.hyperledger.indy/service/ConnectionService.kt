@@ -2,15 +2,13 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy.service
 
 import com.luxoft.blockchainlab.corda.hyperledger.indy.PythonRefAgentConnection
 import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection
-import com.luxoft.blockchainlab.hyperledger.indy.*
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.ConfigHelper
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.indyuser
-import com.natpryce.konfig.*
+import com.luxoft.blockchainlab.hyperledger.indy.models.*
 import net.corda.core.flows.FlowLogic
 import net.corda.core.node.AppServiceHub
 import net.corda.core.node.services.CordaService
 import net.corda.core.serialization.SingletonSerializeAsToken
-import java.io.File
 
 
 @CordaService

@@ -1,6 +1,7 @@
 package com.luxoft.blockchainlab.hyperledger.indy
 
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.TailsHelper
+import com.luxoft.blockchainlab.hyperledger.indy.models.*
 import com.luxoft.blockchainlab.hyperledger.indy.roles.IndyIssuer
 import com.luxoft.blockchainlab.hyperledger.indy.roles.IndyProver
 import com.luxoft.blockchainlab.hyperledger.indy.roles.IndyTrustee
@@ -70,7 +71,7 @@ open class IndyUser(
     }
 
     override fun addKnownIdentities(identityDetails: IdentityDetails) {
-        Did.storeTheirDid(wallet, identityDetails.getIdentityRecord()).get()
+        Did.storeTheirDid(wallet, SerializationUtils.anyToJSON(identityDetails)).get()
     }
 
     override fun setPermissionsFor(identityDetails: IdentityDetails) {
