@@ -1,7 +1,8 @@
 package com.luxoft.blockchainlab.hyperledger.indy.helpers
 
 import com.natpryce.konfig.*
-import java.io.File
+import java.nio.file.Path
+import java.nio.file.Paths
 
 /**
  * Helps with config retrieving
@@ -21,8 +22,8 @@ object ConfigHelper : IndyConfiguration {
      * @return: [Configuration] [indyuser]
      * @throws: [KotlinNullPointerException] - if no configuration at all was found
      */
-    fun getConfig(path: String = CFG_PATH, name: String = CFG_NAME): Configuration {
-        val cfgFile = File(path, name)
+    fun getConfig(path: Path = Paths.get(CFG_PATH, CFG_NAME)): Configuration {
+        val cfgFile = path.toFile()
 
         return EmptyConfiguration
             .ifNot(ConfigurationProperties.fromFileOrNull(cfgFile), indyuser)

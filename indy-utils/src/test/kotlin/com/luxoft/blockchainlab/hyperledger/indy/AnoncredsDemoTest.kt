@@ -40,10 +40,6 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         private lateinit var pool: Pool
         private lateinit var poolName: String
 
-        val TEST_GENESIS_FILE_PATH by lazy {
-            this::class.java.classLoader.getResource("docker_pool_transactions_genesis.txt").file
-        }
-
         @JvmStatic
         @BeforeClass
         fun setUpTest() {

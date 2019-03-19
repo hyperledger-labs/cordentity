@@ -1,6 +1,7 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy.service
 
 
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.name
 import com.luxoft.blockchainlab.hyperledger.indy.IndyUser
 import com.luxoft.blockchainlab.hyperledger.indy.models.WalletConfig
 import com.luxoft.blockchainlab.hyperledger.indy.models.WalletPassword
@@ -24,7 +25,7 @@ class IndyService(services: AppServiceHub) : SingletonSerializeAsToken() {
     val indyUser: IndyUser
 
     init {
-        val nodeName = services.myInfo.legalIdentities.first().name.organisation
+        val nodeName = services.myInfo.name().organisation
 
         val walletName =  ConfigHelper.getWalletName()
         val walletPassword = ConfigHelper.getWalletPassword()

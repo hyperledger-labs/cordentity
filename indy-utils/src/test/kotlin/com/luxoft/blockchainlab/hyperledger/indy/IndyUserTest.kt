@@ -1,5 +1,6 @@
 package com.luxoft.blockchainlab.hyperledger.indy
 
+import com.luxoft.blockchainlab.hyperledger.indy.IndyIntegrationTest.Companion.TEST_GENESIS_FILE_PATH
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.GenesisHelper
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.PoolHelper
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.WalletHelper
@@ -21,10 +22,6 @@ class IndyUserTest {
 
     lateinit var indyUser: IndyUser
     lateinit var wallet: Wallet
-
-    val TEST_GENESIS_FILE_PATH by lazy {
-        this::class.java.classLoader.getResource("docker_pool_transactions_genesis.txt").file
-    }
 
     @Before
     fun setup() {

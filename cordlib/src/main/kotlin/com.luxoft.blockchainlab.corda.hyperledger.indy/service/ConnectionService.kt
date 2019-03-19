@@ -6,36 +6,35 @@ import com.luxoft.blockchainlab.hyperledger.indy.helpers.ConfigHelper
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.indyuser
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
 import net.corda.core.flows.FlowLogic
-import net.corda.core.node.AppServiceHub
 import net.corda.core.node.services.CordaService
 import net.corda.core.serialization.SingletonSerializeAsToken
 
 
 @CordaService
-class ConnectionService(serviceHub: AppServiceHub) : SingletonSerializeAsToken() {
-    private val config = ConfigHelper.getConfig(serviceHub.myInfo.legalIdentities.first().name.organisation)
+class ConnectionService : SingletonSerializeAsToken() {
+    private val config = ConfigHelper.getConfig()
 
-    fun getCounterParty() = connection!!.getCounterParty()
+    fun getCounterParty() = getConnection().getCounterParty()
 
-    fun sendCredentialOffer(offer: CredentialOffer) = connection!!.sendCredentialOffer(offer)
+    fun sendCredentialOffer(offer: CredentialOffer) = getConnection().sendCredentialOffer(offer)
 
-    fun receiveCredentialOffer() = connection!!.receiveCredentialOffer()
+    fun receiveCredentialOffer() = getConnection().receiveCredentialOffer()
 
-    fun sendCredentialRequest(request: CredentialRequestInfo) = connection!!.sendCredentialRequest(request)
+    fun sendCredentialRequest(request: CredentialRequestInfo) = getConnection().sendCredentialRequest(request)
 
-    fun receiveCredentialRequest() = connection!!.receiveCredentialRequest()
+    fun receiveCredentialRequest() = getConnection().receiveCredentialRequest()
 
-    fun sendCredential(credential: CredentialInfo) = connection!!.sendCredential(credential)
+    fun sendCredential(credential: CredentialInfo) = getConnection().sendCredential(credential)
 
-    fun receiveCredential() = connection!!.receiveCredential()
+    fun receiveCredential() = getConnection().receiveCredential()
 
-    fun sendProofRequest(request: ProofRequest) = connection!!.sendProofRequest(request)
+    fun sendProofRequest(request: ProofRequest) = getConnection().sendProofRequest(request)
 
-    fun receiveProofRequest() = connection!!.receiveProofRequest()
+    fun receiveProofRequest() = getConnection().receiveProofRequest()
 
-    fun sendProof(proof: ProofInfo) = connection!!.sendProof(proof)
+    fun sendProof(proof: ProofInfo) = getConnection().sendProof(proof)
 
-    fun receiveProof() = connection!!.receiveProof()
+    fun receiveProof() = getConnection().receiveProof()
 
     private val connection = if (config.getOrNull(indyuser.agentWSEndpoint) != null)
         PythonRefAgentConnection().apply { connect(config[indyuser.agentWSEndpoint], login = config[indyuser.agentUser], password = config[indyuser.agentPassword]) }
