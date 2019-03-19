@@ -40,7 +40,7 @@ object IssueCredentialFlowB2C {
 
                 if (!originalCredentialDef.canProduceCredentials())
                     throw IndyCredentialMaximumReachedException(
-                            originalCredentialDef.credentialDefinitionId.getRevocationRegistryDefinitionId(
+                            originalCredentialDef.credentialDefinitionId.possibleRevocationRegistryDefinitionId(
                                     IndyUser.REVOCATION_TAG
                             )
                     )

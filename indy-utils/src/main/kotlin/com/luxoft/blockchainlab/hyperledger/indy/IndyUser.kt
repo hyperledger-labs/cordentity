@@ -140,7 +140,7 @@ open class IndyUser(
         val revRegDefConfigJson = SerializationUtils.anyToJSON(revRegDefConfig)
         val tailsWriter = TailsHelper.getTailsHandler(tailsPath).writer
 
-        val revRegId = credentialDefinitionId.getRevocationRegistryDefinitionId(REVOCATION_TAG)
+        val revRegId = credentialDefinitionId.possibleRevocationRegistryDefinitionId(REVOCATION_TAG)
         val definitionFromLedger = ledgerService.retrieveRevocationRegistryDefinition(revRegId)
 
         if (definitionFromLedger == null) {
@@ -189,9 +189,9 @@ open class IndyUser(
     }
 
     override fun createCredentialRequest(proverDid: String, offer: CredentialOffer): CredentialRequestInfo {
-        val credDef = ledgerService.retrieveCredentialDefinition(offer.getCredentialDefinitionId())
+        val credDef = ledgerService.retrieveCredentialDefinition(offer.credentialDefinitionId())
             ?: throw IndyCredentialDefinitionNotFoundException(
-                offer.getCredentialDefinitionId(),
+                offer.credentialDefinitionId(),
                 "Create credential request has been failed"
             )
 
@@ -219,7 +219,7 @@ open class IndyUser(
         val tailsReaderHandle = TailsHelper.getTailsHandler(tailsPath).reader.blobStorageReaderHandle
 
         var revocationRegistryId: RevocationRegistryDefinitionId? =
-            credentialRequest.request.getCredentialDefinitionId().getRevocationRegistryDefinitionId(REVOCATION_TAG)
+            credentialRequest.request.credentialDefinitionId().possibleRevocationRegistryDefinitionId(REVOCATION_TAG)
 
         if (ledgerService.retrieveRevocationRegistryDefinition(revocationRegistryId!!) == null)
             revocationRegistryId = null
@@ -285,20 +285,20 @@ open class IndyUser(
         credentialRequest: CredentialRequestInfo,
         offer: CredentialOffer
     ) {
-        val revRegDefJson = if (credentialInfo.credential.getRevocationRegistryId() != null) {
+        val revRegDefJson = if (credentialInfo.credential.revocationRegistryId() != null) {
             val revRegDef =
-                ledgerService.retrieveRevocationRegistryDefinition(credentialInfo.credential.getRevocationRegistryId()!!)
+                ledgerService.retrieveRevocationRegistryDefinition(credentialInfo.credential.revocationRegistryId()!!)
                     ?: throw IndyRevRegNotFoundException(
-                        credentialInfo.credential.getRevocationRegistryId()!!,
+                        credentialInfo.credential.revocationRegistryId()!!,
                         "Receive credential has been failed"
                     )
 
             SerializationUtils.anyToJSON(revRegDef)
         } else null
 
-        val credDef = ledgerService.retrieveCredentialDefinition(offer.getCredentialDefinitionId())
+        val credDef = ledgerService.retrieveCredentialDefinition(offer.credentialDefinitionId())
             ?: throw IndyCredentialDefinitionNotFoundException(
-                offer.getCredentialDefinitionId(),
+                offer.credentialDefinitionId(),
                 "Receive credential has been failed"
             )
 
@@ -423,7 +423,7 @@ open class IndyUser(
     ): List<ProofDataEntry> {
 
         return collectionFromCreds.map { attribute ->
-            val credDefId = attribute.credentialInfo.getCredentialDefinitionId()
+            val credDefId = attribute.credentialInfo.credentialDefinitionId()
 
             val keys = collectionFromRequest.entries
                 .filter { it.value.schemaId == attribute.credentialInfo.schemaId }
@@ -432,8 +432,8 @@ open class IndyUser(
             val referentCredentials = keys.map { ReferentCredential(it, reference) }
 
             val credRevId = attribute.credentialInfo.credentialRevocationId
-            val revRegId = attribute.credentialInfo.getRevocationRegistryId()
-            val schemaId = attribute.credentialInfo.getSchemaId()
+            val revRegId = attribute.credentialInfo.revocationRegistryId()
+            val schemaId = attribute.credentialInfo.schemaId()
 
             if (nonRevoked == null || credRevId == null || revRegId == null) {
                 return@map ProofDataEntry(schemaId, credDefId, referentCredentials, null)
@@ -510,7 +510,7 @@ open class IndyUser(
             proof: ProofInfo
         ): DataUsedInProofJson {
             val usedSchemas = proof.proofData.identifiers
-                .map { it.getSchemaId() }
+                .map { it.schemaId() }
                 .distinct()
                 .map {
                     LedgerService.retrieveSchema(did, pool, it)
@@ -520,7 +520,7 @@ open class IndyUser(
             val usedSchemasJson = SerializationUtils.anyToJSON(usedSchemas)
 
             val usedCredentialDefs = proof.proofData.identifiers
-                .map { it.getCredentialDefinitionId() }
+                .map { it.credentialDefinitionId() }
                 .distinct()
                 .map {
                     LedgerService.retrieveCredentialDefinition(did, pool, it)
@@ -531,7 +531,7 @@ open class IndyUser(
 
             val (revRegDefsJson, revRegDeltasJson) = if (proofRequest.nonRevoked != null) {
                 val revRegDefs = proof.proofData.identifiers
-                    .map { it.getRevocationRegistryId()!! }
+                    .map { it.revocationRegistryId()!! }
                     .distinct()
                     .map {
                         LedgerService.retrieveRevocationRegistryDefinition(did, pool, it)
@@ -540,7 +540,7 @@ open class IndyUser(
                     .associate { it.id to it }
 
                 val revRegDeltas = proof.proofData.identifiers
-                    .map { Pair(it.getRevocationRegistryId()!!, it.timestamp!!) }
+                    .map { Pair(it.revocationRegistryId()!!, it.timestamp!!) }
                     .distinct()
                     .associate { (revRegId, timestamp) ->
                         val response = LedgerService.retrieveRevocationRegistryEntry(did, pool, revRegId, timestamp)

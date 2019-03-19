@@ -40,27 +40,6 @@ data class Interval(val from: Long?, val to: Long) {
  */
 data class ParsedPairwise(@JsonProperty("my_did") val myDid: String, val metadata: String)
 
-interface ContainsSchemaId {
-    val schemaId: String
-}
-
-fun ContainsSchemaId.getSchemaId() = SchemaId.fromString(schemaId)
-
-interface ContainsCredentialDefinitionId {
-    val credentialDefinitionId: String
-}
-
-fun ContainsCredentialDefinitionId.getCredentialDefinitionId() =
-    CredentialDefinitionId.fromString(credentialDefinitionId)
-
-interface ContainsRevocationRegistryId {
-    val revocationRegistryId: String?
-}
-
-fun ContainsRevocationRegistryId.getRevocationRegistryId() =
-    if (revocationRegistryId == null) null else RevocationRegistryDefinitionId.fromString(revocationRegistryId!!)
-
-
 /**
  * Represents a particular attribute of a credential
  */
@@ -847,6 +826,16 @@ data class IdentityDetails(
     fun getIdentityRecord() = """{"did":"$did","verkey":"$verkey"}"""
 }
 
+/**
+ * Schema id is the local identifier of some schema. Don't confuse with schema sequence number which represents schema's
+ * index on ledger. This class (de)serializes schema id.
+ * Indy uses raw string value of schema id, but it's parts are actually very useful. By possessing some schema id one
+ * could also know its:
+ *
+ * @param did: [String] - the DID of the schema issuer
+ * @param name: [String] - the name of the schema
+ * @param version: [String] - the version of the schema
+ */
 class SchemaId(val did: String, val name: String, val version: String) {
     override fun toString() = "$did:2:$name:$version"
 
@@ -859,10 +848,20 @@ class SchemaId(val did: String, val name: String, val version: String) {
     }
 }
 
+/**
+ * Credential definition id is the identifier of some credential definition. This class (de)serializes credential
+ * definition id. Indy uses raw string value of credential definition id, but it's parts are actually very useful.
+ * By possessing some credential definition id one could also know its:
+ *
+ * @param did: [String] - the DID of the credential definition issuer
+ * @param schemaSeqNo: [Int] - the schema's index on ledger
+ * @param tag: [String] - the tag of the credential definition (used for versioning)
+ */
 data class CredentialDefinitionId(val did: String, val schemaSeqNo: Int, val tag: String) {
     override fun toString() = "$did:3:CL:$schemaSeqNo:$tag"
 
-    fun getRevocationRegistryDefinitionId(revTag: String) = RevocationRegistryDefinitionId(did, this, revTag)
+    fun possibleRevocationRegistryDefinitionId(revTag: String)
+            = RevocationRegistryDefinitionId(did, this.toString(), revTag)
 
     companion object : FromString<CredentialDefinitionId> {
         override fun fromString(str: String): CredentialDefinitionId {
@@ -878,14 +877,23 @@ data class CredentialDefinitionId(val did: String, val schemaSeqNo: Int, val tag
     }
 }
 
+/**
+ * Revocation registry definition id is the local identifier of some revocation registry. This class (de)serializes
+ * revocation registry definition id.
+ * Indy uses raw string value of revocation registry definition id, but it's parts are actually very useful.
+ * By possessing some revocation registry definition id id one could also know its:
+ *
+ * @param did: [String] - the DID of the revocation registry issuer
+ * @param credentialDefinitionId: [CredentialDefinitionId] - the id of credential definition which
+ *  this revocation registry accompanies
+ * @param tag: [String] - the tag of the revocation registry definition (used for versioning)
+ */
 data class RevocationRegistryDefinitionId(
     val did: String,
-    private val credentialDefinitionId: CredentialDefinitionId,
+    override val credentialDefinitionId: String,
     val tag: String
-) {
+): ContainsCredentialDefinitionId {
     override fun toString() = "$did:4:$credentialDefinitionId:CL_ACCUM:$tag"
-
-    fun getCredentialDefinitionId() = credentialDefinitionId
 
     companion object : FromString<RevocationRegistryDefinitionId> {
         override fun fromString(str: String): RevocationRegistryDefinitionId {
@@ -897,13 +905,42 @@ data class RevocationRegistryDefinitionId(
 
             val seqNo = strSplitted[5].toInt()
 
-            return RevocationRegistryDefinitionId(didRev, CredentialDefinitionId(didCred, seqNo, tagCred), tagRev)
+            return RevocationRegistryDefinitionId(didRev, CredentialDefinitionId(didCred, seqNo, tagCred).toString(), tagRev)
         }
     }
 }
 
+/**
+ * Interface for class that can be constructed from some string data
+ */
 interface FromString<T : Any> {
     fun fromString(str: String): T
+}
+
+/**
+ * Represents a class which somehow provides schema id
+ */
+interface ContainsSchemaId {
+    val schemaId: String
+    fun schemaId() = SchemaId.fromString(schemaId)
+}
+
+/**
+ * Represents a class which somehow provides credential definition id
+ */
+interface ContainsCredentialDefinitionId {
+    val credentialDefinitionId: String
+    fun credentialDefinitionId() = CredentialDefinitionId.fromString(credentialDefinitionId)
+}
+
+/**
+ * Represents a class which somehow provides revocation registry definition id
+ */
+interface ContainsRevocationRegistryId {
+    val revocationRegistryId: String?
+    fun revocationRegistryId() =
+        if (revocationRegistryId == null) null
+        else RevocationRegistryDefinitionId.fromString(revocationRegistryId!!)
 }
 
 data class WalletPassword(val key: String)
