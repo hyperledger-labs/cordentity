@@ -141,7 +141,7 @@ open class IndyUser(
         val revRegDefConfigJson = SerializationUtils.anyToJSON(revRegDefConfig)
         val tailsWriter = TailsHelper.getTailsHandler(tailsPath).writer
 
-        val revRegId = credentialDefinitionId.possibleRevocationRegistryDefinitionId(REVOCATION_TAG)
+        val revRegId = credentialDefinitionId.getPossibleRevocationRegistryDefinitionId(REVOCATION_TAG)
         val definitionFromLedger = ledgerService.retrieveRevocationRegistryDefinition(revRegId)
 
         if (definitionFromLedger == null) {
@@ -220,7 +220,7 @@ open class IndyUser(
         val tailsReaderHandle = TailsHelper.getTailsHandler(tailsPath).reader.blobStorageReaderHandle
 
         var revocationRegistryId: RevocationRegistryDefinitionId? =
-            credentialRequest.request.getCredentialDefinitionIdObject().possibleRevocationRegistryDefinitionId(REVOCATION_TAG)
+            credentialRequest.request.getCredentialDefinitionIdObject().getPossibleRevocationRegistryDefinitionId(REVOCATION_TAG)
 
         if (ledgerService.retrieveRevocationRegistryDefinition(revocationRegistryId!!) == null)
             revocationRegistryId = null

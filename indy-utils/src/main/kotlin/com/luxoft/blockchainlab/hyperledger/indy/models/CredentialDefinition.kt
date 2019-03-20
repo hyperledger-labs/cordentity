@@ -68,7 +68,7 @@ data class CredentialDefinitionConfig(val supportRevocation: Boolean = true)
 data class CredentialDefinitionId(val did: String, val schemaSeqNo: Int, val tag: String) {
     override fun toString() = "$did:3:CL:$schemaSeqNo:$tag"
 
-    fun possibleRevocationRegistryDefinitionId(revTag: String)
+    fun getPossibleRevocationRegistryDefinitionId(revTag: String)
             = RevocationRegistryDefinitionId(did, this.toString(), revTag)
 
     companion object : FromString<CredentialDefinitionId> {
