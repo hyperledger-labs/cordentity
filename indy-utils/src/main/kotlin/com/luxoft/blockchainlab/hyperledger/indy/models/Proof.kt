@@ -9,8 +9,8 @@ import com.fasterxml.jackson.annotation.JsonProperty
  */
 data class CredentialFieldReference(
     val fieldName: String,
-    @JsonProperty("schema_id") override val schemaId: String,
-    @JsonProperty("credential_definition_id") override val credentialDefinitionId: String
+    @JsonProperty("schema_id") override val schemaIdRaw: String,
+    @JsonProperty("credential_definition_id") override val credentialDefinitionIdRaw: String
 ) : ContainsSchemaId, ContainsCredentialDefinitionId
 
 /**
@@ -131,12 +131,12 @@ data class CredentialReferenceInfo(
 )
 
 data class CredentialReference(
-    override val schemaId: String,
-    @JsonProperty("cred_def_id") override val credentialDefinitionId: String,
+    @JsonProperty("schema_id") override val schemaIdRaw: String,
+    @JsonProperty("cred_def_id") override val credentialDefinitionIdRaw: String,
     val referent: String,
     @JsonProperty("attrs") val attributes: RawJsonMap,
     @JsonProperty("cred_rev_id") val credentialRevocationId: String?,
-    @JsonProperty("rev_reg_id") override val revocationRegistryId: String?
+    @JsonProperty("rev_reg_id") override val revocationRegistryIdRaw: String?
 ) : ContainsSchemaId, ContainsCredentialDefinitionId, ContainsRevocationRegistryId
 
 data class RequestedCredentials(
@@ -229,19 +229,19 @@ data class ProofRequest(
 
 data class CredentialAttributeReference(
     override val name: String,
-    override val schemaId: String
-) : AbstractCredentialReference(name, schemaId)
+    @JsonProperty("schema_id") override val schemaIdRaw: String
+) : AbstractCredentialReference(name, schemaIdRaw)
 
 data class CredentialPredicateReference(
     override val name: String,
     val p_type: String,
     val p_value: Int,
-    override val schemaId: String
-) : AbstractCredentialReference(name, schemaId)
+    @JsonProperty("schema_id") override val schemaIdRaw: String
+) : AbstractCredentialReference(name, schemaIdRaw)
 
 abstract class AbstractCredentialReference(
     open val name: String,
-    override val schemaId: String
+    @JsonProperty("schema_id") override val schemaIdRaw: String
 ) : ContainsSchemaId
 
 /**
@@ -422,9 +422,9 @@ data class ProofInfo(
 }
 
 data class ProofIdentifier(
-    override val schemaId: String,
-    @JsonProperty("cred_def_id") override val credentialDefinitionId: String,
-    @JsonProperty("rev_reg_id") override val revocationRegistryId: String?,
+    @JsonProperty("schema_id") override val schemaIdRaw: String,
+    @JsonProperty("cred_def_id") override val credentialDefinitionIdRaw: String,
+    @JsonProperty("rev_reg_id") override val revocationRegistryIdRaw: String?,
     val timestamp: Long?
 ) : ContainsSchemaId, ContainsRevocationRegistryId, ContainsCredentialDefinitionId
 

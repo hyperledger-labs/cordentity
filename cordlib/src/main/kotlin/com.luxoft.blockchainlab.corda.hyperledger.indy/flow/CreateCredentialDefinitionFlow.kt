@@ -37,7 +37,7 @@ object CreateCredentialDefinitionFlow {
 
                 // create indy stuff
                 val credentialDefinitionObj = indyUser().createCredentialDefinition(schemaId, true)
-                val credentialDefinitionId = credentialDefinitionObj.credentialDefinitionId()
+                val credentialDefinitionId = credentialDefinitionObj.getCredentialDefinitionIdObject()
 
                 indyUser().createRevocationRegistry(credentialDefinitionId, credentialsLimit)
 

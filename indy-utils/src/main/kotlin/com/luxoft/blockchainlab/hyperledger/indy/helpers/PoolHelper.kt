@@ -23,66 +23,47 @@ object PoolHelper {
 
     const val DEFAULT_POOL_NAME = "default_pool"
 
+    init { init() }
+    @JvmStatic private fun init() = Pool.setProtocolVersion(2).get()
+
     /**
-     * Creates (or not if exists) pool ledger files and returns [Pool] object
+     * Creates pool ledger files
      *
-     * If pool already opened, creates a symlink with random name that targets needed pool
+     * If pool with this [poolName] is already created, throws exception
      *
      * @param genesisFile: [File] - file with genesis transaction
-     * @param poolName: [String] - name of pool
-     * @param poolConfig: [OpenPoolLedgerJSONParameter] - pool config (when you create new pool)
+     * @param poolName: [String] - name of the pool
+     */
+    fun createPoolIfMissing(genesisFile: File, poolName: String = DEFAULT_POOL_NAME) {
+        val ledgerConfig = PoolJSONParameters.CreatePoolLedgerConfigJSONParameter(genesisFile.absolutePath)
+
+        Pool.createPoolLedgerConfig(poolName, ledgerConfig.toJson()).get()
+    }
+
+    /**
+     * Checks if pool ledger directory exists
+     *
+     * @param poolName: [String] - name of the pool
+     */
+    fun poolExists(poolName: String = DEFAULT_POOL_NAME): Boolean {
+        val poolDir = Paths.get(EnvironmentUtils.getIndyHomePath(), "pool", poolName)
+
+        return poolDir.toFile().exists()
+    }
+
+    /**
+     * Checks connection with pool and returns [Pool] object if everything is ok.
+     *
+     * If pool with this [poolName] is already opened, throws exception
+     *
+     * @param poolName: [String] - name of the pool
+     * @param poolConfig: [OpenPoolLedgerJSONParameter] - pool connection config (where one can define timeouts)
      * @return: [Pool] - target pool handle
      */
-    fun getPool(
-        genesisFile: File,
+    fun openPoolIfCreated(
         poolName: String = DEFAULT_POOL_NAME,
         poolConfig: OpenPoolLedgerJSONParameter = OpenPoolLedgerJSONParameter(null, null)
     ): Pool {
-
-        val ledgerConfig = PoolJSONParameters.CreatePoolLedgerConfigJSONParameter(genesisFile.absolutePath)
-
-        try {
-            Pool.createPoolLedgerConfig(poolName, ledgerConfig.toJson()).get()
-        } catch (e: ExecutionException) {
-            if (e.cause !is PoolLedgerConfigExistsException) throw e
-        }
-
-        Pool.setProtocolVersion(2).get()
-
-        return try {
-            Pool.openPoolLedger(poolName, poolConfig.toJson()).get()
-        } catch (ex: ExecutionException) {
-            if (ex.cause !is InvalidPoolException) throw ex
-
-            val linkName = symlinkPool(poolName)
-
-            Pool.openPoolLedger(linkName, poolConfig.toJson()).get()
-        }
-    }
-
-    private fun symlinkPool(poolName: String): String {
-        val poolDir = Paths.get(EnvironmentUtils.getIndyHomePath(), "pool")
-        val linkName = poolName + Random().nextLong().absoluteValue
-        val targetDir = poolDir.resolve(poolName)
-        val targetGenesisPath = targetDir.resolve("$poolName.txn")
-        val targetConfigPath = targetDir.resolve("config.json")
-
-        val linkDir = poolDir.resolve(linkName)
-        linkDir.toFile().mkdir()
-        val linkGenesisPath = linkDir.resolve("$linkName.txn")
-        val linkConfigPath = linkDir.resolve("config.json")
-
-        createSymbolicLink(targetGenesisPath, linkGenesisPath)
-        createSymbolicLink(targetConfigPath, linkConfigPath)
-
-        return linkName
-    }
-
-    @Throws(IOException::class)
-    private fun createSymbolicLink(targetPath: Path, linkPath: Path) {
-        if (Files.exists(linkPath)) {
-            Files.delete(linkPath)
-        }
-        Files.createSymbolicLink(linkPath, targetPath)
+        return Pool.openPoolLedger(poolName, poolConfig.toJson()).get()
     }
 }

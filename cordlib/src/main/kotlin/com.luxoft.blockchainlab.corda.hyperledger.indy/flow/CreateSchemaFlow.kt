@@ -57,7 +57,7 @@ object CreateSchemaFlow {
 
                 subFlow(FinalityFlow(selfSignedTx))
 
-                return schemaObj.schemaId()
+                return schemaObj.getSchemaIdObject()
 
             } catch (t: Throwable) {
                 logger.error("New schema creating has been failed", t)

@@ -33,20 +33,17 @@ import com.fasterxml.jackson.annotation.JsonProperty
 data class CredentialDefinition(
     val ver: String,
     val id: String,
-    @JsonProperty("schemaId") override val schemaId: String,
+    @JsonProperty("schemaId") val schemaSeqNo: String,
     val type: String,
     val tag: String,
     val value: CredentialPubKeys,
-    @JsonIgnore override val credentialDefinitionId: String = id
-) : ContainsSchemaId, ContainsCredentialDefinitionId {
+    @JsonIgnore override val credentialDefinitionIdRaw: String = id
+) : ContainsCredentialDefinitionId {
     @JsonIgnore
     fun getOwner() = id.split(":").first()
 
     @JsonIgnore
-    fun getSchemaSeqNo() = schemaId
-
-    @JsonIgnore
-    fun getFilter() = """{schemaSeqNo:${getSchemaSeqNo()},owner:${getOwner()}}"""
+    fun getFilter() = """{schemaSeqNo:$schemaSeqNo},owner:${getOwner()}}"""
 }
 
 data class CredentialPubKeys(
@@ -92,6 +89,6 @@ data class CredentialDefinitionId(val did: String, val schemaSeqNo: Int, val tag
  * Represents a class which somehow provides credential definition id
  */
 interface ContainsCredentialDefinitionId {
-    val credentialDefinitionId: String
-    fun credentialDefinitionId() = CredentialDefinitionId.fromString(credentialDefinitionId)
+    val credentialDefinitionIdRaw: String
+    fun getCredentialDefinitionIdObject() = CredentialDefinitionId.fromString(credentialDefinitionIdRaw)
 }

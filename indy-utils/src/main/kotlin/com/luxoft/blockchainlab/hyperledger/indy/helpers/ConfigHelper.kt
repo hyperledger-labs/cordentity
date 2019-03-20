@@ -22,31 +22,33 @@ object ConfigHelper : IndyConfiguration {
      * @return: [Configuration] [indyuser]
      * @throws: [KotlinNullPointerException] - if no configuration at all was found
      */
-    fun getConfig(path: Path = Paths.get(CFG_PATH, CFG_NAME)): Configuration {
-        val cfgFile = path.toFile()
+    val config by lazy {
+        val cfgFile = Paths.get(CFG_PATH, CFG_NAME).toFile()
 
-        return EmptyConfiguration
+        EmptyConfiguration
             .ifNot(ConfigurationProperties.fromFileOrNull(cfgFile), indyuser)
             .ifNot(EnvironmentVariables(), indyuser)
     }
 
-    override fun getWalletName() = getConfig()[indyuser.walletName]
+    override fun getWalletName() = config.getOrNull(indyuser.walletName)
 
-    override fun getGenesisPath() = getConfig()[indyuser.genesisFile]
+    override fun getGenesisPath() = config.getOrNull(indyuser.genesisFile)
 
-    override fun getDid() = getConfig()[indyuser.did]
+    override fun getDid() = config.getOrNull(indyuser.did)
 
-    override fun getSeed() = getConfig()[indyuser.seed]
+    override fun getSeed() = config.getOrNull(indyuser.seed)
 
-    override fun getRole() = getConfig()[indyuser.role]
+    override fun getRole() = config.getOrNull(indyuser.role)
 
-    override fun getAgentWSEndpoint() = getConfig()[indyuser.agentWSEndpoint]
+    override fun getAgentWSEndpoint() = config.getOrNull(indyuser.agentWSEndpoint)
 
-    override fun getAgentUser() = getConfig()[indyuser.agentUser]
+    override fun getAgentUser() = config.getOrNull(indyuser.agentUser)
 
-    override fun getAgentPassword() = getConfig()[indyuser.agentPassword]
+    override fun getAgentPassword() = config.getOrNull(indyuser.agentPassword)
 
-    override fun getWalletPassword() = getConfig()[indyuser.walletPassword]
+    override fun getWalletPassword() = config.getOrNull(indyuser.walletPassword)
+
+    override fun getPoolName() = config.getOrNull(indyuser.poolName)
 }
 
 @Suppress("ClassName")
@@ -57,6 +59,7 @@ object indyuser : PropertyGroup() {
     val walletName by stringType
     val walletPassword by stringType
     val genesisFile by stringType
+    val poolName by stringType
     val agentWSEndpoint by stringType
     val agentUser by stringType
     val agentPassword by stringType
@@ -64,21 +67,23 @@ object indyuser : PropertyGroup() {
 
 interface IndyConfiguration {
 
-    fun getWalletName(): String
+    fun getWalletName(): String?
 
-    fun getWalletPassword(): String
+    fun getWalletPassword(): String?
 
-    fun getGenesisPath(): String
+    fun getGenesisPath(): String?
 
-    fun getDid(): String
+    fun getPoolName(): String?
 
-    fun getSeed(): String
+    fun getDid(): String?
 
-    fun getRole(): String
+    fun getSeed(): String?
 
-    fun getAgentWSEndpoint(): String
+    fun getRole(): String?
 
-    fun getAgentUser(): String
+    fun getAgentWSEndpoint(): String?
 
-    fun getAgentPassword(): String
+    fun getAgentUser(): String?
+
+    fun getAgentPassword(): String?
 }

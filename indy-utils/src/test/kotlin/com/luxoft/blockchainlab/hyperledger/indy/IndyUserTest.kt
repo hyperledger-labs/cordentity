@@ -6,13 +6,8 @@ import com.luxoft.blockchainlab.hyperledger.indy.helpers.PoolHelper
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.WalletHelper
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialDefinitionId
 import com.luxoft.blockchainlab.hyperledger.indy.models.SchemaId
-import com.luxoft.blockchainlab.hyperledger.indy.models.WalletConfig
-import com.luxoft.blockchainlab.hyperledger.indy.models.WalletPassword
-import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
-import com.luxoft.blockchainlab.hyperledger.indy.utils.getRootCause
 import org.hyperledger.indy.sdk.anoncreds.Anoncreds
 import org.hyperledger.indy.sdk.wallet.Wallet
-import org.hyperledger.indy.sdk.wallet.WalletExistsException
 import org.junit.After
 import org.junit.Before
 import org.junit.Ignore
@@ -27,12 +22,14 @@ class IndyUserTest {
     fun setup() {
         val walletName = "default-wallet"
         val poolName = "default-pool"
+        val walletPassword = "password"
 
-        val credentials = WalletPassword("key")
-        val walletConfig = WalletConfig(walletName)
+        wallet = WalletHelper.openWallet(walletName, walletPassword)
 
-        wallet = WalletHelper.getWallet(walletConfig, credentials)
-        val pool = PoolHelper.getPool(GenesisHelper.getGenesis(TEST_GENESIS_FILE_PATH), poolName)
+        val genesisFile = GenesisHelper.getGenesis(TEST_GENESIS_FILE_PATH)
+        if (!PoolHelper.poolExists(poolName))
+            PoolHelper.createPoolIfMissing(genesisFile, poolName)
+        val pool = PoolHelper.openPoolIfCreated(poolName)
 
         indyUser = IndyUser(pool, wallet, null, tailsPath = "tails")
     }

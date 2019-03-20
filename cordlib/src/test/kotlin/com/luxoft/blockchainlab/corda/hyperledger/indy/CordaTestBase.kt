@@ -123,7 +123,7 @@ open class CordaTestBase {
     open class MockIndyNode(args: MockNodeArgs) : InternalMockNetwork.MockNode(args) {
 
         companion object {
-            private val sessionId = Random().nextLong().absoluteValue.toString()
+            val sessionId = Random().nextLong().absoluteValue.toString()
             val TEST_GENESIS_FILE_PATH by lazy {
                 this::class.java.classLoader.getResource("docker_pool_transactions_genesis.txt").file
             }
@@ -132,9 +132,9 @@ open class CordaTestBase {
         private val organisation: String = args.config.myLegalName.organisation
 
         override fun start(): StartedNode<MockNode> {
-
             mockkObject(ConfigHelper)
 
+            every { ConfigHelper.getPoolName() } returns organisation + sessionId
             every { ConfigHelper.getGenesisPath() } returns TEST_GENESIS_FILE_PATH
             every { ConfigHelper.getWalletName() } returns organisation + sessionId
             every { ConfigHelper.getWalletPassword() } returns "password"

@@ -11,8 +11,6 @@ import java.io.File
  * Helps to manage tails file
  */
 object TailsHelper {
-    private var cachedTailsHandler: BlobStorageHandler? = null
-
     /**
      * Returns [BlobStorageHandler] for some [tailsPath]
      *
@@ -22,17 +20,13 @@ object TailsHelper {
      * @return: [BlobStorageHandler]
      */
     fun getTailsHandler(tailsPath: String): BlobStorageHandler {
-        if (cachedTailsHandler == null) {
-            val tailsConfig = SerializationUtils.anyToJSON(TailsConfig(tailsPath))
+        val tailsConfig = SerializationUtils.anyToJSON(TailsConfig(tailsPath))
 
-            File(tailsPath).mkdirs()
+        File(tailsPath).mkdirs()
 
-            val reader = BlobStorageReader.openReader("default", tailsConfig).get()
-            val writer = BlobStorageWriter.openWriter("default", tailsConfig).get()
+        val reader = BlobStorageReader.openReader("default", tailsConfig).get()
+        val writer = BlobStorageWriter.openWriter("default", tailsConfig).get()
 
-            cachedTailsHandler = BlobStorageHandler(reader, writer)
-        }
-
-        return cachedTailsHandler!!
+        return BlobStorageHandler(reader, writer)
     }
 }

@@ -37,9 +37,9 @@ data class RevocationRegistryDefinition(
     val id: String,
     @JsonProperty("revocDefType") val revocationRegistryDefinitionType: String,
     val tag: String,
-    @JsonProperty("credDefId") override val credentialDefinitionId: String,
+    @JsonProperty("credDefId") override val credentialDefinitionIdRaw: String,
     val value: RawJsonMap,
-    @JsonIgnore override val revocationRegistryId: String? = id
+    @JsonIgnore override val revocationRegistryIdRaw: String? = id
 ) : ContainsCredentialDefinitionId, ContainsRevocationRegistryId
 
 /**
@@ -62,7 +62,7 @@ data class RevocationState(
     val witness: RawJsonMap,
     @JsonProperty("rev_reg") val revocationRegistry: RawJsonMap,
     val timestamp: Long,
-    @JsonIgnore override var revocationRegistryId: String? = null
+    @JsonIgnore override var revocationRegistryIdRaw: String? = null
 ) : ContainsRevocationRegistryId
 
 /**
@@ -86,10 +86,10 @@ data class RevocationRegistryConfig(
  */
 data class RevocationRegistryDefinitionId(
     val did: String,
-    override val credentialDefinitionId: String,
+    override val credentialDefinitionIdRaw: String,
     val tag: String
 ): ContainsCredentialDefinitionId {
-    override fun toString() = "$did:4:$credentialDefinitionId:CL_ACCUM:$tag"
+    override fun toString() = "$did:4:$credentialDefinitionIdRaw:CL_ACCUM:$tag"
 
     companion object : FromString<RevocationRegistryDefinitionId> {
         override fun fromString(str: String): RevocationRegistryDefinitionId {
@@ -110,8 +110,8 @@ data class RevocationRegistryDefinitionId(
  * Represents a class which somehow provides revocation registry definition id
  */
 interface ContainsRevocationRegistryId {
-    val revocationRegistryId: String?
-    fun revocationRegistryId() =
-        if (revocationRegistryId == null) null
-        else RevocationRegistryDefinitionId.fromString(revocationRegistryId!!)
+    val revocationRegistryIdRaw: String?
+    fun getRevocationRegistryIdObject() =
+        if (revocationRegistryIdRaw == null) null
+        else RevocationRegistryDefinitionId.fromString(revocationRegistryIdRaw!!)
 }

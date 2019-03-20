@@ -20,13 +20,13 @@ data class Schema(
     val version: String,
     @JsonProperty("attrNames") val attributeNames: List<String>,
     @JsonProperty("seqNo") val seqNo: Int?,
-    @JsonIgnore override val schemaId: String = id
+    @JsonIgnore override val schemaIdRaw: String = id
 ) : ContainsSchemaId {
     @JsonIgnore
     fun isValid() = seqNo != null
 
     @JsonIgnore
-    fun getFilter() = """{name:$name,version:$version,owner:${schemaId().did}}"""
+    fun getFilter() = """{name:$name,version:$version,owner:${getSchemaIdObject().did}}"""
 }
 
 /**
@@ -55,6 +55,6 @@ class SchemaId(val did: String, val name: String, val version: String) {
  * Represents a class which somehow provides schema id
  */
 interface ContainsSchemaId {
-    val schemaId: String
-    fun schemaId() = SchemaId.fromString(schemaId)
+    val schemaIdRaw: String
+    fun getSchemaIdObject() = SchemaId.fromString(schemaIdRaw)
 }

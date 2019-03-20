@@ -28,7 +28,7 @@ object RevokeCredentialFlow {
 
                 val credential = credentialStateIn.state.data
 
-                val revRegId = credential.credentialInfo.credential.revocationRegistryId()!!
+                val revRegId = credential.credentialInfo.credential.getRevocationRegistryIdObject()!!
                 val credRevId = credential.credentialInfo.credRevocId!!
 
                 // revoke that credential

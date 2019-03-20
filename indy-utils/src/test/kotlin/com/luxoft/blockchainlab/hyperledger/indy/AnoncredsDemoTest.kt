@@ -21,10 +21,10 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
     private val xyzCredentialValues =
         """{"status":{"raw":"partial","encoded":"51792877103171595686471452153480627530895"},"period":{"raw":"8","encoded":"8"}}"""
 
-    private val walletPassword = WalletPassword("key")
-    private val issuerWalletConfig = WalletConfig("issuerWallet")
-    private val issuer2WalletConfig = WalletConfig("issuer2Wallet")
-    private val proverWalletConfig = WalletConfig("proverWallet")
+    private val walletPassword = "password"
+    private val issuerWalletName = "issuerWallet"
+    private val issuer2WalletName = "issuer2Wallet"
+    private val proverWalletName = "proverWallet"
 
     private lateinit var issuerWallet: Wallet
     private lateinit var issuer2Wallet: Wallet
@@ -45,7 +45,8 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         fun setUpTest() {
             // Create and Open Pool
             poolName = PoolHelper.DEFAULT_POOL_NAME
-            pool = PoolHelper.getPool(GenesisHelper.getGenesis(TEST_GENESIS_FILE_PATH), poolName)
+            PoolHelper.createPoolIfMissing(GenesisHelper.getGenesis(TEST_GENESIS_FILE_PATH), poolName)
+            pool = PoolHelper.openPoolIfCreated(poolName)
         }
 
         @JvmStatic
@@ -64,11 +65,11 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         StorageUtils.cleanupStorage()
 
         // Issuer Create and Open Wallet
-        issuerWallet = WalletHelper.getWallet(issuerWalletConfig, walletPassword)
-        issuer2Wallet = WalletHelper.getWallet(issuer2WalletConfig, walletPassword)
+        issuerWallet = WalletHelper.openWallet(issuerWalletName, walletPassword)
+        issuer2Wallet = WalletHelper.openWallet(issuer2WalletName, walletPassword)
 
         // Prover Create and Open Wallet
-        proverWallet = WalletHelper.getWallet(proverWalletConfig, walletPassword)
+        proverWallet = WalletHelper.openWallet(proverWalletName, walletPassword)
 
         val trusteeDidInfo = createTrusteeDid(issuerWallet)
         issuerDidInfo = createDid(issuerWallet)
@@ -124,9 +125,9 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
     @Throws(Exception::class)
     fun `revocation works fine`() {
         val gvtSchema = issuer1.createSchema(GVT_SCHEMA_NAME, SCHEMA_VERSION, GVT_SCHEMA_ATTRIBUTES)
-        val credDef = issuer1.createCredentialDefinition(gvtSchema.schemaId(), true)
-        val revocationRegistry = issuer1.createRevocationRegistry(credDef.credentialDefinitionId())
-        val credOffer = issuer1.createCredentialOffer(credDef.credentialDefinitionId())
+        val credDef = issuer1.createCredentialDefinition(gvtSchema.getSchemaIdObject(), true)
+        val revocationRegistry = issuer1.createRevocationRegistry(credDef.getCredentialDefinitionIdObject())
+        val credOffer = issuer1.createCredentialOffer(credDef.getCredentialDefinitionIdObject())
         val credReq = prover.createCredentialRequest(prover.did, credOffer)
         val credentialInfo = issuer1.issueCredential(credReq, gvtCredentialValues, credOffer)
         prover.receiveCredential(credentialInfo, credReq, credOffer)
@@ -151,7 +152,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         assertTrue(IndyUser.verifyProof(proofReq, proof, usedData))
 
         issuer1.revokeCredential(
-            credentialInfo.credential.revocationRegistryId()!!,
+            credentialInfo.credential.getRevocationRegistryIdObject()!!,
             credentialInfo.credRevocId!!
         )
         Thread.sleep(3000)
@@ -175,8 +176,8 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
     @Throws(Exception::class)
     fun `1 issuer 1 prover 1 credential setup works fine`() {
         val gvtSchema = issuer1.createSchema(GVT_SCHEMA_NAME, SCHEMA_VERSION, GVT_SCHEMA_ATTRIBUTES)
-        val credDef = issuer1.createCredentialDefinition(gvtSchema.schemaId(), false)
-        val credOffer = issuer1.createCredentialOffer(credDef.credentialDefinitionId())
+        val credDef = issuer1.createCredentialDefinition(gvtSchema.getSchemaIdObject(), false)
+        val credOffer = issuer1.createCredentialOffer(credDef.getCredentialDefinitionIdObject())
         val credReq = prover.createCredentialRequest(prover.did, credOffer)
         val credentialInfo = issuer1.issueCredential(credReq, gvtCredentialValues, credOffer)
         prover.receiveCredential(credentialInfo, credReq, credOffer)
@@ -204,12 +205,12 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
     @Throws(Exception::class)
     fun `2 issuers 1 prover 2 credentials setup works fine`() {
         val schema1 = issuer1.createSchema(GVT_SCHEMA_NAME, SCHEMA_VERSION, GVT_SCHEMA_ATTRIBUTES)
-        val credDef1 = issuer1.createCredentialDefinition(schema1.schemaId(), false)
+        val credDef1 = issuer1.createCredentialDefinition(schema1.getSchemaIdObject(), false)
 
         val schema2 = issuer2.createSchema(XYZ_SCHEMA_NAME, SCHEMA_VERSION, XYZ_SCHEMA_ATTRIBUTES)
-        val credDef2 = issuer2.createCredentialDefinition(schema2.schemaId(), false)
-        val gvtCredOffer = issuer1.createCredentialOffer(credDef1.credentialDefinitionId())
-        val xyzCredOffer = issuer2.createCredentialOffer(credDef2.credentialDefinitionId())
+        val credDef2 = issuer2.createCredentialDefinition(schema2.getSchemaIdObject(), false)
+        val gvtCredOffer = issuer1.createCredentialOffer(credDef1.getCredentialDefinitionIdObject())
+        val xyzCredOffer = issuer2.createCredentialOffer(credDef2.getCredentialDefinitionIdObject())
 
         val gvtCredReq = prover.createCredentialRequest(prover.did, gvtCredOffer)
         val gvtCredential = issuer1.issueCredential(gvtCredReq, gvtCredentialValues, gvtCredOffer)
@@ -250,12 +251,12 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
     @Throws(Exception::class)
     fun `1 issuer 1 prover 2 credentials setup works fine`() {
         val gvtSchema = issuer1.createSchema(GVT_SCHEMA_NAME, SCHEMA_VERSION, GVT_SCHEMA_ATTRIBUTES)
-        val gvtCredDef = issuer1.createCredentialDefinition(gvtSchema.schemaId(), false)
+        val gvtCredDef = issuer1.createCredentialDefinition(gvtSchema.getSchemaIdObject(), false)
 
         val xyzSchema = issuer1.createSchema(XYZ_SCHEMA_NAME, SCHEMA_VERSION, XYZ_SCHEMA_ATTRIBUTES)
-        val xyzCredDef = issuer1.createCredentialDefinition(xyzSchema.schemaId(), false)
-        val gvtCredOffer = issuer1.createCredentialOffer(gvtCredDef.credentialDefinitionId())
-        val xyzCredOffer = issuer1.createCredentialOffer(xyzCredDef.credentialDefinitionId())
+        val xyzCredDef = issuer1.createCredentialDefinition(xyzSchema.getSchemaIdObject(), false)
+        val gvtCredOffer = issuer1.createCredentialOffer(gvtCredDef.getCredentialDefinitionIdObject())
+        val xyzCredOffer = issuer1.createCredentialOffer(xyzCredDef.getCredentialDefinitionIdObject())
 
         val gvtCredReq = prover.createCredentialRequest(prover.did, gvtCredOffer)
         val gvtCredential = issuer1.issueCredential(gvtCredReq, gvtCredentialValues, gvtCredOffer)

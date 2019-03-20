@@ -33,18 +33,19 @@ object GenesisHelper {
     /**
      * Get genesis file if it doesn't exist in system yet
      *
-     * Creates all required parent directories according to [newFilePath] and rewrites genesis file with [content]
+     * Creates all required parent directories according to [path] and rewrites genesis file with [content]
      *
      * @param content: [String] - genesis file content (genesis transaction)
-     * @param newFilePath: [Path] - path to genesis file which will be created
+     * @param path: [Path] - path to genesis file which will be created
      * @returns: [File] - genesis file
-     * @throws SecurityException - if you're not allowed to create this [newFilePath]
+     * @throws SecurityException - if you're not allowed to create this [path]
      */
-    fun getGenesis(content: String, newFilePath: Path): File {
-        val parentDirectory = newFilePath.parent
+    @Throws(SecurityException::class)
+    fun createGenesis(content: String, path: Path): File {
+        val parentDirectory = path.parent
         parentDirectory.toFile().mkdirs()
 
-        val genesis = newFilePath.toFile()
+        val genesis = path.toFile()
         if (genesis.exists())
             genesis.delete()
         genesis.createNewFile()

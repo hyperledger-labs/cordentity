@@ -1,5 +1,6 @@
 package com.luxoft.blockchainlab.hyperledger.indy.models
 
+import com.fasterxml.jackson.annotation.JsonGetter
 import com.fasterxml.jackson.annotation.JsonProperty
 
 /**
@@ -35,8 +36,8 @@ import com.fasterxml.jackson.annotation.JsonProperty
  * }
  */
 data class CredentialOffer(
-    override val schemaId: String,
-    @JsonProperty("cred_def_id") override val credentialDefinitionId: String,
+    @JsonProperty("schema_id") override val schemaIdRaw: String,
+    @JsonProperty("cred_def_id") override val credentialDefinitionIdRaw: String,
     val keyCorrectnessProof: KeyCorrectnessProof,
     val nonce: String
 ) : ContainsSchemaId, ContainsCredentialDefinitionId
@@ -87,11 +88,11 @@ data class KeyCorrectnessProof(val c: String, val xzCap: String, val xrCap: List
  *  }
  */
 data class Credential(
-    override val schemaId: String,
-    @JsonProperty("cred_def_id") override val credentialDefinitionId: String,
+    @JsonProperty("schema_id") override val schemaIdRaw: String,
+    @JsonProperty("cred_def_id") override val credentialDefinitionIdRaw: String,
     @JsonProperty("rev_reg") val revocationRegistry: RawJsonMap?,
     val witness: RawJsonMap?,
-    @JsonProperty("rev_reg_id") override val revocationRegistryId: String?,
+    @JsonProperty("rev_reg_id") override val revocationRegistryIdRaw: String?,
     val values: Map<String, CredentialValue>,
     val signature: Map<String, RawJsonMap?>,
     val signatureCorrectnessProof: RawJsonMap
@@ -128,7 +129,7 @@ data class CredentialRequestInfo(
 
 data class CredentialRequest(
     val proverDid: String,
-    @JsonProperty("cred_def_id") override val credentialDefinitionId: String,
+    @JsonProperty("cred_def_id") override val credentialDefinitionIdRaw: String,
     val blindedMs: RawJsonMap,
     val blindedMsCorrectnessProof: RawJsonMap,
     val nonce: String
