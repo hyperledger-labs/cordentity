@@ -35,8 +35,6 @@ class ReadmeExampleTest : CordaTestBase() {
 
     @Test
     fun `grocery store example`() {
-
-
         val ministry: StartedNode<InternalMockNetwork.MockNode> = issuer
         val alice: StartedNode<*> = alice
         val store: StartedNode<*> = bob
