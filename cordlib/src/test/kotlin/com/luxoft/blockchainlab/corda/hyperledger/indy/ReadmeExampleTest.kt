@@ -4,6 +4,7 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.CreateCredentialDefi
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.CreateSchemaFlow
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.ProofPredicate
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.*
+import com.luxoft.blockchainlab.hyperledger.indy.models.Interval
 import net.corda.core.identity.CordaX500Name
 import net.corda.node.internal.StartedNode
 import net.corda.testing.core.singleIdentity
@@ -34,6 +35,8 @@ class ReadmeExampleTest : CordaTestBase() {
 
     @Test
     fun `grocery store example`() {
+
+
         val ministry: StartedNode<InternalMockNetwork.MockNode> = issuer
         val alice: StartedNode<*> = alice
         val store: StartedNode<*> = bob
@@ -87,15 +90,15 @@ class ReadmeExampleTest : CordaTestBase() {
 
         // Alice.BORN >= currentYear - 18
         val eighteenYearsAgo = LocalDateTime.now().minusYears(18).year
-        val legalAgePredicate =
-            ProofPredicate(schemaId, credentialDefinitionId, "BORN", eighteenYearsAgo)
+        val youngerPredicate = ProofPredicate(schemaId, credentialDefinitionId, "BORN", eighteenYearsAgo)
 
         val older = !store.services.startFlow(
             VerifyCredentialFlowB2B.Verifier(
                 UUID.randomUUID().toString(),
                 emptyList(),
-                listOf(legalAgePredicate),
-                aliceX500
+                listOf(youngerPredicate),
+                aliceX500,
+                Interval.now()
             )
         ).resultFuture.get()
 

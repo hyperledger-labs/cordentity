@@ -148,7 +148,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
             name = "proof_req_0.1",
             attributes = listOf(field_name, field_sex),
             predicates = listOf(CredentialPredicate(field_age, 18)),
-            nonRevoked = Interval.recent()
+            nonRevoked = Interval.now()
         )
 
         val proof = prover.createProof(proofReq)
@@ -168,7 +168,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
             name = "proof_req_0.1",
             attributes = listOf(field_name, field_sex),
             predicates = listOf(CredentialPredicate(field_age, 18)),
-            nonRevoked = Interval.recent()
+            nonRevoked = Interval.now()
         )
         val proofAfterRevocation = prover.createProof(proofReqAfterRevocation)
 

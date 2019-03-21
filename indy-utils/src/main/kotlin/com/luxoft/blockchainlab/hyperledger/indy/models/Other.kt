@@ -23,7 +23,6 @@ object Timestamp {
  */
 data class Interval(val from: Long?, val to: Long) {
     companion object {
-        fun recent() = Interval(Timestamp.now() - 1, Timestamp.now())
         fun allTime() = Interval(null, Timestamp.now())
         fun now() = Interval(Timestamp.now(), Timestamp.now())
     }

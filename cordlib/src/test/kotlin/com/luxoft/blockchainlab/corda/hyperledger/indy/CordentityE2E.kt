@@ -98,7 +98,7 @@ class CordentityE2E : CordaTestBase() {
             prover: StartedNode<MockNode>,
             attributes: List<ProofAttribute>,
             predicates: List<ProofPredicate>,
-            nonRevoked: Interval? = null
+            nonRevoked: Interval = Interval.now()
     ): Boolean {
         val identifier = UUID.randomUUID().toString()
 
@@ -305,7 +305,7 @@ class CordentityE2E : CordaTestBase() {
 
         Thread.sleep(3000)
 
-        val credentialAfterRevocationVerified = verifyCredential(bob, alice, attributes, predicates, Interval.recent())
+        val credentialAfterRevocationVerified = verifyCredential(bob, alice, attributes, predicates)
         assertFalse(credentialAfterRevocationVerified)
     }
 

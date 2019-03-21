@@ -23,6 +23,9 @@ import net.corda.testing.node.internal.MockNodeArgs
 import net.corda.testing.node.internal.newContext
 import org.junit.After
 import org.junit.Before
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
+import org.slf4j.event.Level
 import java.time.Duration
 import java.util.*
 import kotlin.math.absoluteValue
@@ -113,6 +116,8 @@ open class CordaTestBase {
 
     @Before
     fun commonSetup() {
+        System.setProperty(org.slf4j.impl.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "TRACE")
+
         net = InternalMockNetwork(
             cordappPackages = listOf("com.luxoft.blockchainlab.corda.hyperledger.indy"),
             networkParameters = testNetworkParameters(maxTransactionSize = 10485760 * 5),

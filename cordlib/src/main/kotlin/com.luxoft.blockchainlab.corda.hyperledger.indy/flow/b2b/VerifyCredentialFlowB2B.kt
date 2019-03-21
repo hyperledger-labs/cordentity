@@ -45,7 +45,7 @@ object VerifyCredentialFlowB2B {
             private val attributes: List<ProofAttribute>,
             private val predicates: List<ProofPredicate>,
             private val proverName: CordaX500Name,
-            private val nonRevoked: Interval? = null
+            private val nonRevoked: Interval = Interval.now()
     ) : FlowLogic<Boolean>() {
 
         @Suspendable
