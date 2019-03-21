@@ -1,19 +1,13 @@
 package com.luxoft.blockchainlab.hyperledger.indy.helpers
 
 import com.luxoft.blockchainlab.hyperledger.indy.utils.EnvironmentUtils
-import org.hyperledger.indy.sdk.pool.InvalidPoolException
 import org.hyperledger.indy.sdk.pool.Pool
 import org.hyperledger.indy.sdk.pool.PoolJSONParameters
 import org.hyperledger.indy.sdk.pool.PoolJSONParameters.OpenPoolLedgerJSONParameter
 import org.hyperledger.indy.sdk.pool.PoolLedgerConfigExistsException
 import java.io.File
-import java.io.IOException
-import java.nio.file.Files
+import java.io.FileNotFoundException
 import java.util.concurrent.ExecutionException
-import java.nio.file.Path
-import java.nio.file.Paths
-import java.util.*
-import kotlin.math.absoluteValue
 
 
 /**
@@ -23,47 +17,72 @@ object PoolHelper {
 
     const val DEFAULT_POOL_NAME = "default_pool"
 
-    init { init() }
-    @JvmStatic private fun init() = Pool.setProtocolVersion(2).get()
+    init {
+        Pool.setProtocolVersion(2).get()
+    }
 
     /**
-     * Creates pool ledger files
-     *
-     * If pool with this [poolName] is already created, throws exception
+     * Checks if pool ledger with [poolName] exists
+     */
+    fun exists(poolName: String): Boolean {
+        val poolDir = EnvironmentUtils.getIndyPoolPath(poolName)
+
+        return File(poolDir).exists()
+    }
+
+    /**
+     * Creates pool ledger with [genesisFile] and [poolName]
      *
      * @param genesisFile: [File] - file with genesis transaction
      * @param poolName: [String] - name of the pool
+     *
+     * @throws ExecutionException with cause [PoolLedgerConfigExistsException]
      */
-    fun createPoolIfMissing(genesisFile: File, poolName: String = DEFAULT_POOL_NAME) {
+    @Throws(ExecutionException::class)
+    fun createNonExisting(genesisFile: File, poolName: String = DEFAULT_POOL_NAME) {
         val ledgerConfig = PoolJSONParameters.CreatePoolLedgerConfigJSONParameter(genesisFile.absolutePath)
 
         Pool.createPoolLedgerConfig(poolName, ledgerConfig.toJson()).get()
     }
 
     /**
-     * Checks if pool ledger directory exists
-     *
-     * @param poolName: [String] - name of the pool
+     * Creates new or recreates existing pool ledger files with [genesisFile] and [poolName].
      */
-    fun poolExists(poolName: String = DEFAULT_POOL_NAME): Boolean {
-        val poolDir = Paths.get(EnvironmentUtils.getIndyHomePath(), "pool", poolName)
+    @Throws(ExecutionException::class)
+    fun createOrTrunc(genesisFile: File, poolName: String = DEFAULT_POOL_NAME) {
+        if (exists(poolName))
+            File(EnvironmentUtils.getIndyPoolPath(poolName)).delete()
 
-        return poolDir.toFile().exists()
+        createNonExisting(genesisFile, poolName)
     }
 
     /**
-     * Checks connection with pool and returns [Pool] object if everything is ok.
-     *
-     * If pool with this [poolName] is already opened, throws exception
-     *
-     * @param poolName: [String] - name of the pool
-     * @param poolConfig: [OpenPoolLedgerJSONParameter] - pool connection config (where one can define timeouts)
-     * @return: [Pool] - target pool handle
+     * Opens existing pool ledger with [poolName] and checks connection using [poolConfig]
      */
-    fun openPoolIfCreated(
+    @Throws(FileNotFoundException::class, ExecutionException::class)
+    fun openExisting(
         poolName: String = DEFAULT_POOL_NAME,
         poolConfig: OpenPoolLedgerJSONParameter = OpenPoolLedgerJSONParameter(null, null)
     ): Pool {
+        if (!exists(poolName))
+            throw FileNotFoundException("Pool files ${EnvironmentUtils.getIndyPoolPath(poolName)} don't exist")
+
         return Pool.openPoolLedger(poolName, poolConfig.toJson()).get()
+    }
+
+    /**
+     * Opens existing pool ledger with [poolName] and checks connection using [poolConfig] or creates new pool ledger
+     * with [genesisFile] and [poolName]
+     */
+    @Throws(ExecutionException::class)
+    fun openOrCreate(
+        genesisFile: File,
+        poolName: String = DEFAULT_POOL_NAME,
+        poolConfig: OpenPoolLedgerJSONParameter = OpenPoolLedgerJSONParameter(null, null)
+    ): Pool {
+        if (!exists(poolName))
+            createNonExisting(genesisFile, poolName)
+
+        return openExisting(poolName, poolConfig)
     }
 }

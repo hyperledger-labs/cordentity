@@ -1,8 +1,6 @@
 package com.luxoft.blockchainlab.hyperledger.indy.helpers
 
 import java.io.File
-import java.io.FileNotFoundException
-import java.nio.file.Path
 
 
 /**
@@ -11,46 +9,42 @@ import java.nio.file.Path
 object GenesisHelper {
 
     /**
-     * Get already existing genesis file
-     *
-     * Checks if genesis file exists and returns [File] object.
-     *
-     * @param genesisPath: String - path to genesis file
-     * @return: [File] - genesis file
-     * @throws FileNotFoundException - if genesis file not found
+     * Checks if genesis [path] exists
      */
-    @Throws(FileNotFoundException::class)
-    fun getGenesis(genesisPath: String): File {
-        val genesisFile = File(genesisPath)
+    fun exists(path: File) = path.exists()
 
-        // making this check here for better debugging
-        if (!genesisFile.exists())
-            throw FileNotFoundException("Genesis file not found at $genesisPath")
+    /**
+     * Creates new genesis file with [path] and [lazyContent].
+     *
+     * @throws FileAlreadyExistsException
+     * @throws SecurityException if you don't have write access to [path]
+     */
+    @Throws(FileAlreadyExistsException::class, SecurityException::class)
+    fun createNonExisting(path: File, lazyContent: () -> String) {
+        if (exists(path))
+            throw FileAlreadyExistsException(path)
 
-        return genesisFile
+        val parentDirectory = path.parentFile
+        parentDirectory.mkdirs()
+
+        path.createNewFile()
+        path.writeText(lazyContent())
     }
 
     /**
-     * Get genesis file if it doesn't exist in system yet
+     * Creates new or recreates existing genesis file with [path] and [lazyContent].
      *
-     * Creates all required parent directories according to [path] and rewrites genesis file with [content]
-     *
-     * @param content: [String] - genesis file content (genesis transaction)
-     * @param path: [Path] - path to genesis file which will be created
-     * @returns: [File] - genesis file
-     * @throws SecurityException - if you're not allowed to create this [path]
+     * @throws SecurityException if you don't have write access to [path]
      */
     @Throws(SecurityException::class)
-    fun createGenesis(content: String, path: Path): File {
-        val parentDirectory = path.parent
-        parentDirectory.toFile().mkdirs()
+    fun createOrTrunc(path: File, lazyContent: () -> String) {
+        val parentDirectory = path.parentFile
+        parentDirectory.mkdirs()
 
-        val genesis = path.toFile()
-        if (genesis.exists())
-            genesis.delete()
-        genesis.createNewFile()
-        genesis.writeText(content)
+        if (exists(path))
+            path.delete()
 
-        return genesis
+        path.createNewFile()
+        path.writeText(lazyContent())
     }
 }

@@ -5,6 +5,7 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.indyUser
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.whoIs
 import com.luxoft.blockchainlab.hyperledger.indy.models.IdentityDetails
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
+import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils.anyToJSON
 import net.corda.core.flows.*
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.identity.Party
@@ -30,15 +31,13 @@ object CreatePairwiseFlowB2B {
                 val otherSide: Party = whoIs(authority)
                 val flowSession: FlowSession = initiateFlow(otherSide)
 
-                val sessionDid = flowSession.receive<String>().unwrap { theirIdentityRecord ->
-                    val identityDetails = SerializationUtils.jSONToAny<IdentityDetails>(theirIdentityRecord)
-
-                    indyUser().createSessionDid(identityDetails)
+                val sessionDid = flowSession.receive<IdentityDetails>().unwrap {
+                    indyUser().createSessionDid(it)
                 }
 
-                val serializedIdentity = indyUser().getIdentity(sessionDid)
+                val identityDetails = indyUser().getIdentity(sessionDid)
 
-                flowSession.send(serializedIdentity)
+                flowSession.send(identityDetails)
                 return sessionDid
 
             } catch (ex: Exception) {
@@ -55,12 +54,10 @@ object CreatePairwiseFlowB2B {
         @Suspendable
         override fun call() {
             try {
-                val myIdentityRecord = SerializationUtils.anyToJSON(indyUser().getIdentity())
+                val myIdentityRecord = indyUser().getIdentity()
 
-                flowSession.sendAndReceive<String>(myIdentityRecord).unwrap { theirIdentityRecord ->
-                    val identityDetails = SerializationUtils.jSONToAny<IdentityDetails>(theirIdentityRecord)
-
-                    indyUser().addKnownIdentities(identityDetails)
+                flowSession.sendAndReceive<IdentityDetails>(myIdentityRecord).unwrap {
+                    indyUser().addKnownIdentities(it)
                 }
             } catch (t: Throwable) {
                 logger.error("", t)

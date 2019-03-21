@@ -13,6 +13,8 @@ import org.hyperledger.indy.sdk.wallet.Wallet
 import org.junit.*
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import java.io.File
+import java.lang.RuntimeException
 
 
 class AnoncredsDemoTest : IndyIntegrationTest() {
@@ -45,8 +47,12 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         fun setUpTest() {
             // Create and Open Pool
             poolName = PoolHelper.DEFAULT_POOL_NAME
-            PoolHelper.createPoolIfMissing(GenesisHelper.getGenesis(TEST_GENESIS_FILE_PATH), poolName)
-            pool = PoolHelper.openPoolIfCreated(poolName)
+            val genesisFile = File(TEST_GENESIS_FILE_PATH)
+            if (!GenesisHelper.exists(genesisFile))
+                throw RuntimeException("Genesis file $TEST_GENESIS_FILE_PATH doesn't exist")
+
+            PoolHelper.createOrTrunc(genesisFile, poolName)
+            pool = PoolHelper.openExisting(poolName)
         }
 
         @JvmStatic

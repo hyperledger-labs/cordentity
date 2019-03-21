@@ -9,6 +9,7 @@ import net.corda.core.node.AppServiceHub
 import net.corda.core.node.services.CordaService
 import net.corda.core.serialization.SingletonSerializeAsToken
 import org.hyperledger.indy.sdk.did.DidJSONParameters
+import java.io.File
 import java.lang.RuntimeException
 
 /**
@@ -46,12 +47,14 @@ class IndyService(services: AppServiceHub) : SingletonSerializeAsToken() {
         logger.debug { "Wallet created for $nodeName" }
 
         genesisFilePath ?: throw RuntimeException("Genesis file path should be specified in config")
-        val genesisFile = GenesisHelper.getGenesis(genesisFilePath)
+        val genesisFile = File(genesisFilePath)
+        if (!GenesisHelper.exists(genesisFile))
+            throw RuntimeException("Genesis file doesn't exist")
 
-        if (!PoolHelper.poolExists(poolName))
-            PoolHelper.createPoolIfMissing(genesisFile, poolName)
+        if (!PoolHelper.exists(poolName))
+            PoolHelper.createNonExisting(genesisFile, poolName)
 
-        val pool = PoolHelper.openPoolIfCreated(poolName)
+        val pool = PoolHelper.openExisting(poolName)
 
         logger.debug { "Pool $poolName opened for $nodeName" }
 

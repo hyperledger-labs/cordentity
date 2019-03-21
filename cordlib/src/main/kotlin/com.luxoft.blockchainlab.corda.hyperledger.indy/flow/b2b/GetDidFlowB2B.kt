@@ -31,11 +31,7 @@ object GetDidFlowB2B {
                 val otherSide: Party = whoIs(authority)
                 val flowSession: FlowSession = initiateFlow(otherSide)
 
-                return flowSession.receive<String>().unwrap {
-                    val identityDetails = SerializationUtils.jSONToAny<IdentityDetails>(it)
-
-                    identityDetails.did
-                }
+                return flowSession.receive<IdentityDetails>().unwrap { it.did }
 
             } catch (ex: Exception) {
                 logger.error("", ex)
@@ -50,9 +46,9 @@ object GetDidFlowB2B {
         @Suspendable
         override fun call() {
             try {
-                val serializedIdentity = SerializationUtils.anyToJSON(indyUser().getIdentity())
+                val identityDetails = indyUser().getIdentity()
 
-                flowSession.send(serializedIdentity)
+                flowSession.send(identityDetails)
             } catch (e: Exception) {
                 logger.error("", e)
                 throw FlowException(e.message)

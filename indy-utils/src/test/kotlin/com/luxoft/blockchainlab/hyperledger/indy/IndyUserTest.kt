@@ -12,6 +12,8 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Ignore
 import org.junit.Test
+import java.io.File
+import java.lang.RuntimeException
 
 class IndyUserTest {
 
@@ -26,10 +28,12 @@ class IndyUserTest {
 
         wallet = WalletHelper.openWallet(walletName, walletPassword)
 
-        val genesisFile = GenesisHelper.getGenesis(TEST_GENESIS_FILE_PATH)
-        if (!PoolHelper.poolExists(poolName))
-            PoolHelper.createPoolIfMissing(genesisFile, poolName)
-        val pool = PoolHelper.openPoolIfCreated(poolName)
+        val genesisFile = File(TEST_GENESIS_FILE_PATH)
+        if (!GenesisHelper.exists(genesisFile))
+            throw RuntimeException("Genesis file $TEST_GENESIS_FILE_PATH doesn't exist")
+
+        PoolHelper.createOrTrunc(genesisFile, poolName)
+        val pool = PoolHelper.openExisting(poolName)
 
         indyUser = IndyUser(pool, wallet, null, tailsPath = "tails")
     }

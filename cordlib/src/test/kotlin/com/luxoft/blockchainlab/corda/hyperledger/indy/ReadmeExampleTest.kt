@@ -90,7 +90,7 @@ class ReadmeExampleTest : CordaTestBase() {
         val legalAgePredicate =
             ProofPredicate(schemaId, credentialDefinitionId, "BORN", eighteenYearsAgo)
 
-        val verified = store.services.startFlow(
+        val older = !store.services.startFlow(
             VerifyCredentialFlowB2B.Verifier(
                 UUID.randomUUID().toString(),
                 emptyList(),
@@ -99,8 +99,10 @@ class ReadmeExampleTest : CordaTestBase() {
             )
         ).resultFuture.get()
 
+        assert(older)
+
         // If the verification succeeds, the store can be sure that Alice's age is above 18.
 
-        println("You can buy drinks: $verified")
+        println("You can buy drinks: $older")
     }
 }

@@ -21,6 +21,8 @@ internal object EnvironmentUtils {
         return getUserDirectoryPath() + "/.indy_client/"
     }
 
+    fun getIndyPoolPath(poolName: String) = getIndyHomePath() + "/pool/$poolName"
+
     fun getIndyHomePath(filename: String): String {
         return getIndyHomePath() + filename
     }
