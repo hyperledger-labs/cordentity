@@ -89,7 +89,7 @@ object VerifyCredentialFlowB2B {
                             proof,
                             usedData
                         )
-                    ) throw InvalidProofException("Proof verification failed")
+                    ) throw FlowException("Proof verification failed")
 
                     StateAndContract(credentialProofOut, IndyCredentialContract::class.java.name)
                 }
@@ -118,12 +118,9 @@ object VerifyCredentialFlowB2B {
 
                 return true
 
-            } catch (e: InvalidProofException) {
-                logger.info("", e)
-                return false
             } catch (e: Exception) {
                 logger.error("", e)
-                throw FlowException(e)
+                return false
             }
         }
     }
@@ -150,5 +147,3 @@ object VerifyCredentialFlowB2B {
         }
     }
 }
-
-class InvalidProofException(override val message: String? = null) : FlowException(message)

@@ -28,14 +28,7 @@ object WalletHelper {
             if (getRootCause(ex) !is WalletExistsException) throw ex
         }
 
-        return try {
-            Wallet.openWallet(walletConfigJson, walletPasswordJson).get()
-        } catch (e: ExecutionException) {
-            if (e.cause is WalletAlreadyOpenedException)
-                print("")
-
-            Wallet.openWallet(walletConfigJson, walletPasswordJson).get()
-        }
+        return Wallet.openWallet(walletConfigJson, walletPasswordJson).get()
     }
 
     /**
