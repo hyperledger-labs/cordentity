@@ -3,9 +3,9 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy
 
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.*
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.*
-import com.luxoft.blockchainlab.hyperledger.indy.CredentialDefinitionId
-import com.luxoft.blockchainlab.hyperledger.indy.Interval
-import com.luxoft.blockchainlab.hyperledger.indy.SchemaId
+import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialDefinitionId
+import com.luxoft.blockchainlab.hyperledger.indy.models.Interval
+import com.luxoft.blockchainlab.hyperledger.indy.models.SchemaId
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.utilities.getOrThrow
 import net.corda.node.internal.StartedNode
@@ -98,7 +98,7 @@ class CordentityE2E : CordaTestBase() {
             prover: StartedNode<MockNode>,
             attributes: List<ProofAttribute>,
             predicates: List<ProofPredicate>,
-            nonRevoked: Interval? = null
+            nonRevoked: Interval = Interval.now()
     ): Boolean {
         val identifier = UUID.randomUUID().toString()
 
@@ -305,7 +305,7 @@ class CordentityE2E : CordaTestBase() {
 
         Thread.sleep(3000)
 
-        val credentialAfterRevocationVerified = verifyCredential(bob, alice, attributes, predicates, Interval.recent())
+        val credentialAfterRevocationVerified = verifyCredential(bob, alice, attributes, predicates)
         assertFalse(credentialAfterRevocationVerified)
     }
 

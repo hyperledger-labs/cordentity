@@ -10,6 +10,7 @@ import net.corda.testing.core.singleIdentity
 import net.corda.testing.node.internal.InternalMockNetwork
 import net.corda.testing.node.internal.InternalMockNetwork.MockNode
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Test
 import java.time.LocalDateTime
 import java.util.*
@@ -33,6 +34,7 @@ class ReadmeExampleTest : CordaTestBase() {
     }
 
     @Test
+    @Ignore("The test not represents the logic it should")
     fun `grocery store example`() {
         val ministry: StartedNode<InternalMockNetwork.MockNode> = issuer
         val alice: StartedNode<*> = alice

@@ -1,9 +1,9 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy.data.state
 
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.schema.CredentialProofSchemaV1
-import com.luxoft.blockchainlab.hyperledger.indy.DataUsedInProofJson
-import com.luxoft.blockchainlab.hyperledger.indy.ProofInfo
-import com.luxoft.blockchainlab.hyperledger.indy.ProofRequest
+import com.luxoft.blockchainlab.hyperledger.indy.models.DataUsedInProofJson
+import com.luxoft.blockchainlab.hyperledger.indy.models.ProofInfo
+import com.luxoft.blockchainlab.hyperledger.indy.models.ProofRequest
 import net.corda.core.contracts.LinearState
 import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.identity.AbstractParty

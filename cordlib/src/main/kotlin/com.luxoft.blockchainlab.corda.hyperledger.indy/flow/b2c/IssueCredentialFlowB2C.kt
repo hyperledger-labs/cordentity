@@ -7,7 +7,8 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredential
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.getCredentialDefinitionById
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.indyUser
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.whoIsNotary
-import com.luxoft.blockchainlab.hyperledger.indy.CredentialDefinitionId
+import com.luxoft.blockchainlab.corda.hyperledger.indy.service.connectionService
+import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialDefinitionId
 import com.luxoft.blockchainlab.hyperledger.indy.IndyCredentialDefinitionNotFoundException
 import com.luxoft.blockchainlab.hyperledger.indy.IndyCredentialMaximumReachedException
 import com.luxoft.blockchainlab.hyperledger.indy.IndyUser
@@ -32,16 +33,16 @@ object IssueCredentialFlowB2C {
                 // checking if cred def exists and can produce new credentials
                 val originalCredentialDefIn = getCredentialDefinitionById(credentialDefinitionId)
                         ?: throw IndyCredentialDefinitionNotFoundException(
-                                credentialDefinitionId.toString(),
+                                credentialDefinitionId,
                                 "State doesn't exist in Corda vault"
                         )
                 val originalCredentialDef = originalCredentialDefIn.state.data
 
                 if (!originalCredentialDef.canProduceCredentials())
                     throw IndyCredentialMaximumReachedException(
-                            originalCredentialDef.credentialDefinitionId.getRevocationRegistryDefinitionId(
+                            originalCredentialDef.credentialDefinitionId.getPossibleRevocationRegistryDefinitionId(
                                     IndyUser.REVOCATION_TAG
-                            ).toString()
+                            )
                     )
 
                 // issue credential

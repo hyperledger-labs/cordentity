@@ -1,7 +1,7 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy
 
-import com.luxoft.blockchainlab.hyperledger.indy.CredentialOffer
-import com.luxoft.blockchainlab.hyperledger.indy.KeyCorrectnessProof
+import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialOffer
+import com.luxoft.blockchainlab.hyperledger.indy.models.KeyCorrectnessProof
 import org.junit.Before
 import org.junit.Ignore
 import org.junit.Test
@@ -47,9 +47,9 @@ class PythonRefAgentConnectionTest {
                 val proof = receiveCredentialOffer()
                 val proof2 = receiveCredentialOffer()
                 val proof3 = receiveCredentialOffer()
-                assertEquals(proof.schemaId,"1")
-                assertEquals(proof2.schemaId,"2")
-                assertEquals(proof3.schemaId,"3")
+                assertEquals(proof.schemaIdRaw,"1")
+                assertEquals(proof2.schemaIdRaw,"2")
+                assertEquals(proof3.schemaIdRaw,"3")
 
             }
         }.handle { t, u ->

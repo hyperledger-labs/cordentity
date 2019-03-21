@@ -1,6 +1,6 @@
 package com.luxoft.blockchainlab.hyperledger.indy.roles
 
-import com.luxoft.blockchainlab.hyperledger.indy.IdentityDetails
+import com.luxoft.blockchainlab.hyperledger.indy.models.IdentityDetails
 
 
 /**
@@ -8,11 +8,6 @@ import com.luxoft.blockchainlab.hyperledger.indy.IdentityDetails
  */
 interface IndyWalletHolder {
     val did: String
-
-    /**
-     * Closes wallet of this indy user
-     */
-    fun close()
 
     /**
      * Gets identity details by did
@@ -31,9 +26,9 @@ interface IndyWalletHolder {
      * @return                          newly created did
      */
     fun createSessionDid(identityRecord: IdentityDetails): String
-}
 
-/**
- * Gets identity details of this indy user
- */
-fun IndyWalletHolder.getIdentity() = getIdentity(did)
+    /**
+     * Gets identity details of this indy user
+     */
+    fun getIdentity() = getIdentity(did)
+}

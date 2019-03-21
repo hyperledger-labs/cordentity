@@ -1,6 +1,7 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy
 
-import com.luxoft.blockchainlab.hyperledger.indy.*
+import com.luxoft.blockchainlab.hyperledger.indy.models.*
+
 
 enum class AgentConnectionStatus { AGENT_CONNECTED, AGENT_DISCONNECTED }
 

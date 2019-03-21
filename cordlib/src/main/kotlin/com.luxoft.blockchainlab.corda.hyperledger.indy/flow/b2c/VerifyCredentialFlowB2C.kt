@@ -7,10 +7,11 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.ProofAttribute
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.ProofPredicate
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.indyUser
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.whoIsNotary
-import com.luxoft.blockchainlab.hyperledger.indy.CredentialFieldReference
-import com.luxoft.blockchainlab.hyperledger.indy.CredentialPredicate
+import com.luxoft.blockchainlab.corda.hyperledger.indy.service.connectionService
+import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialFieldReference
+import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialPredicate
 import com.luxoft.blockchainlab.hyperledger.indy.IndyUser
-import com.luxoft.blockchainlab.hyperledger.indy.Interval
+import com.luxoft.blockchainlab.hyperledger.indy.models.Interval
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndContract
 import net.corda.core.flows.*
@@ -24,7 +25,7 @@ object VerifyCredentialFlowB2C {
             private val identifier: String,
             private val attributes: List<ProofAttribute>,
             private val predicates: List<ProofPredicate>,
-            private val nonRevoked: Interval? = null
+            private val nonRevoked: Interval = Interval.now()
     ) : FlowLogic<Boolean>() {
 
         @Suspendable

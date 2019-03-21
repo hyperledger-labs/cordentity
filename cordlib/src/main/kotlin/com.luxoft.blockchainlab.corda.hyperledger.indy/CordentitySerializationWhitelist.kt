@@ -1,6 +1,6 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy
 
-import com.luxoft.blockchainlab.hyperledger.indy.*
+import com.luxoft.blockchainlab.hyperledger.indy.models.*
 import net.corda.core.serialization.SerializationWhitelist
 
 
@@ -46,6 +46,9 @@ class CordentitySerializationWhitelist : SerializationWhitelist {
         IdentityDetails::class.java,
         RevocationRegistryDefinitionId::class.java,
         CredentialDefinitionId::class.java,
-        SchemaId::class.java
+        SchemaId::class.java,
+        ContainsSchemaId::class.java,
+        ContainsCredentialDefinitionId::class.java,
+        ContainsRevocationRegistryId::class.java
     )
 }
