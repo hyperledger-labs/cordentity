@@ -26,7 +26,8 @@ class IndyUserTest {
         val poolName = "default-pool"
         val walletPassword = "password"
 
-        wallet = WalletHelper.openWallet(walletName, walletPassword)
+        WalletHelper.createOrTrunc(walletName, walletPassword)
+        wallet = WalletHelper.openExisting(walletName, walletPassword)
 
         val genesisFile = File(TEST_GENESIS_FILE_PATH)
         if (!GenesisHelper.exists(genesisFile))

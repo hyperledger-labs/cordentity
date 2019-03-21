@@ -42,7 +42,7 @@ object GenesisHelper {
         parentDirectory.mkdirs()
 
         if (exists(path))
-            path.delete()
+            path.deleteRecursively()
 
         path.createNewFile()
         path.writeText(lazyContent())

@@ -23,6 +23,8 @@ internal object EnvironmentUtils {
 
     fun getIndyPoolPath(poolName: String) = getIndyHomePath() + "/pool/$poolName"
 
+    fun getIndyWalletPath(walletName: String) = getIndyHomePath() + "/wallet/$walletName"
+
     fun getIndyHomePath(filename: String): String {
         return getIndyHomePath() + filename
     }

@@ -51,7 +51,7 @@ object PoolHelper {
     @Throws(ExecutionException::class)
     fun createOrTrunc(genesisFile: File, poolName: String = DEFAULT_POOL_NAME) {
         if (exists(poolName))
-            File(EnvironmentUtils.getIndyPoolPath(poolName)).delete()
+            File(EnvironmentUtils.getIndyPoolPath(poolName)).deleteRecursively()
 
         createNonExisting(genesisFile, poolName)
     }

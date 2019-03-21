@@ -67,15 +67,16 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
     @Before
     @Throws(Exception::class)
     fun setUp() {
-        // Clean indy stuff
-        StorageUtils.cleanupStorage()
-
         // Issuer Create and Open Wallet
-        issuerWallet = WalletHelper.openWallet(issuerWalletName, walletPassword)
-        issuer2Wallet = WalletHelper.openWallet(issuer2WalletName, walletPassword)
+        WalletHelper.createOrTrunc(issuerWalletName, walletPassword)
+        issuerWallet = WalletHelper.openExisting(issuerWalletName, walletPassword)
+
+        WalletHelper.createOrTrunc(issuer2WalletName, walletPassword)
+        issuer2Wallet = WalletHelper.openExisting(issuer2WalletName, walletPassword)
 
         // Prover Create and Open Wallet
-        proverWallet = WalletHelper.openWallet(proverWalletName, walletPassword)
+        WalletHelper.createOrTrunc(proverWalletName, walletPassword)
+        proverWallet = WalletHelper.openExisting(proverWalletName, walletPassword)
 
         val trusteeDidInfo = createTrusteeDid(issuerWallet)
         issuerDidInfo = createDid(issuerWallet)
@@ -101,9 +102,6 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
 
         // Prover Remove Wallet
         proverWallet.closeWallet().get()
-
-        // Clean indy stuff
-        StorageUtils.cleanupStorage()
     }
 
     private fun createTrusteeDid(wallet: Wallet) = Did.createAndStoreMyDid(wallet, """{"seed":"$TRUSTEE_SEED"}""").get()

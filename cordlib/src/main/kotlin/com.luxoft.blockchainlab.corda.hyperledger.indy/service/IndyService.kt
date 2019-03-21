@@ -42,7 +42,8 @@ class IndyService(services: AppServiceHub) : SingletonSerializeAsToken() {
 
         walletName ?: throw RuntimeException("Wallet name should be specified in config")
         walletPassword ?: throw RuntimeException("Wallet password should be specified in config")
-        val wallet = WalletHelper.openWallet(walletName, walletPassword)
+
+        val wallet = WalletHelper.openOrCreate(walletName, walletPassword)
 
         logger.debug { "Wallet created for $nodeName" }
 
@@ -51,10 +52,7 @@ class IndyService(services: AppServiceHub) : SingletonSerializeAsToken() {
         if (!GenesisHelper.exists(genesisFile))
             throw RuntimeException("Genesis file doesn't exist")
 
-        if (!PoolHelper.exists(poolName))
-            PoolHelper.createNonExisting(genesisFile, poolName)
-
-        val pool = PoolHelper.openExisting(poolName)
+        val pool = PoolHelper.openOrCreate(genesisFile, poolName)
 
         logger.debug { "Pool $poolName opened for $nodeName" }
 
