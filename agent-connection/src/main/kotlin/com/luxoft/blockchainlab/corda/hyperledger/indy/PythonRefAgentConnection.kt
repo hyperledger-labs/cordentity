@@ -2,17 +2,9 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.node.ObjectNode
-import com.luxoft.blockchainlab.hyperledger.indy.*
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
-import mu.KotlinLogging
-import org.java_websocket.client.WebSocketClient
-import org.java_websocket.handshake.ServerHandshake
-import rx.Emitter
-import rx.schedulers.Schedulers
-import rx.Observable
-import rx.Observer
+import rx.Single
 import java.net.URI
-import java.time.Instant
 import java.util.*
 
 class PythonRefAgentConnection : AgentConnection {
@@ -23,47 +15,66 @@ class PythonRefAgentConnection : AgentConnection {
         }
     }
 
-    override fun connect(url: String, login: String, password: String): Observable<Unit> {
+    /**
+     * Connects to an agent's endpoint
+     */
+    override fun connect(url: String, login: String, password: String): Single<Unit> {
         disconnect()
-        return Observable.create(
-            { observer : Observer<Unit> ->
-                try {
-                    webSocket = AgentWebSocketClient(URI(url))
-                    webSocket.apply {
-                        connectBlocking()
-                        sendJson(StateRequest())
-                        receiveMessageOfType<State>(MESSAGE_TYPES.STATE_RESPONSE).subscribe({ stateResponse ->
-                            if (!checkState(stateResponse, login)) {
-                                sendJson(WalletConnect(login, password, id = Instant.now().toEpochMilli().toString()))
-                                receiveMessageOfType<State>(MESSAGE_TYPES.STATE_RESPONSE).subscribe({ newState ->
-                                    if (!checkState(newState, login))
-                                        throw AgentConnectionException("Error connecting to $url")
-                                    else {
-                                        observer.onNext(Unit)
-                                    }
-                                }, { e: Throwable -> throw(e) }, { observer.onCompleted() })
-                            } else {
-                                observer.onNext(Unit)
-                                observer.onCompleted()
-                            }
-                        }, { e: Throwable -> throw(e) }, {})
-                    }
-                } catch (e: Throwable) {
-                    observer.onError(e)
+        return Single.create { observer ->
+            try {
+                webSocket = AgentWebSocketClient(URI(url), login)
+                webSocket.apply {
+                    connectBlocking()
+                    /**
+                     * Check the agent's current state
+                     */
+                    sendJson(StateRequest())
+                    receiveMessageOfType<State>(MESSAGE_TYPES.STATE_RESPONSE).subscribe({ stateResponse ->
+                        if (!checkState(stateResponse, login)) {
+                            /**
+                             * If the agent is not yet initialized, send the "connect" request
+                             */
+                            sendJson(WalletConnect(login, password))
+                            /**
+                             * The agent will respond with the "state" message which again must be checked
+                             */
+                            receiveMessageOfType<State>(MESSAGE_TYPES.STATE_RESPONSE).subscribe({ newState ->
+                                if (!checkState(newState, login))
+                                    throw AgentConnectionException("Error connecting to $url")
+                                else {
+                                    observer.onSuccess(Unit)
+                                }
+                            }, { e: Throwable -> throw(e) })
+                        } else {
+                            /**
+                             * The agent is already logged in
+                             */
+                            observer.onSuccess(Unit)
+                        }
+                    }, { e: Throwable -> throw(e) })
                 }
-            },
-            Emitter.BackpressureMode.NONE
-        ).subscribeOn(Schedulers.newThread())
+            } catch (e: Throwable) {
+                observer.onError(e)
+            }
+        }
     }
 
     private var connectionStatus: AgentConnectionStatus = AgentConnectionStatus.AGENT_DISCONNECTED
 
     override fun getConnectionStatus(): AgentConnectionStatus = connectionStatus
 
-    private var counterParty: IndyParty? = null
-
     private lateinit var webSocket : AgentWebSocketClient
 
+    private fun getPubkeyFromInvite(invite: String): String {
+        val invEncoded = invite.split("?c_i=")[1]
+        val inv = Base64.getDecoder().decode(invEncoded).toString(Charsets.UTF_8)
+        val keyList = SerializationUtils.jSONToAny<Map<String, List<String>>>(inv)["recipientKeys"]
+        return keyList?.get(0)!!
+    }
+
+    /**
+     * Returns true, based on the "state" message returned from the agent, if the agent is already logged-in.
+     */
     private fun checkState(stateMessage: State?, userName: String) : Boolean {
         return if(stateMessage != null &&
                 stateMessage.content?.get("initialized") == true &&
@@ -76,238 +87,118 @@ class PythonRefAgentConnection : AgentConnection {
         }
     }
 
-    override fun acceptInvite(invite: String): Observable<Unit> {
-        return Observable.create(
-            { observer : Observer<Unit> ->
-                try {
-                    if (getConnectionStatus() == AgentConnectionStatus.AGENT_CONNECTED) {
-                        sendJson(ReceiveInviteMessage(invite))
-                        webSocket.receiveMessageOfType<InviteReceivedMessage>(MESSAGE_TYPES.INVITE_RECEIVED).subscribe({ invRcv ->
-                            sendRequest(invRcv.key)
-                            webSocket.receiveMessageOfType<RequestResponseReceivedMessage>(MESSAGE_TYPES.RESPONSE_RECEIVED).subscribe({
-                                counterParty = IndyParty(it.their_did, invRcv.endpoint)
-                                observer.onNext(Unit)
-                            }, { e: Throwable -> throw(e) }, { observer.onCompleted() })
-                        }, { e: Throwable -> throw(e) }, {})
-                    } else {
-                        throw AgentConnectionException("AgentConnection object has wrong state")
-                    }
-                } catch (e: Throwable) {
-                    observer.onError(e)
-                }
-            },
-            Emitter.BackpressureMode.NONE
-        ).subscribeOn(Schedulers.newThread())
-    }
-
-    private fun sendJson(obj: Any) = webSocket.sendJson(obj)
-
-    override fun genInvite(): Observable<String> {
-        return Observable.create(
-            { observer : Observer<String> ->
-                try {
-                    webSocket.sendJson(SendMessage(type = MESSAGE_TYPES.GENERATE_INVITE, id = Instant.now().toEpochMilli().toString()))
-                    webSocket.receiveMessageOfType<ReceiveInviteMessage>(MESSAGE_TYPES.INVITE_GENERATED).subscribe({ msg ->
-                        observer.onNext(msg.invite)
-                    }, { e: Throwable -> throw(e) }, { observer.onCompleted() })
-                } catch (e: Throwable) {
-                    observer.onError(e)
-                }
-            },
-            Emitter.BackpressureMode.NONE
-        ).subscribeOn(Schedulers.newThread())
-    }
-
-    override fun waitForInvitedParty() : Observable<Unit> {
-        return Observable.create(
-            { observer : Observer<Unit> ->
-                try {
-                    if (getConnectionStatus() == AgentConnectionStatus.AGENT_CONNECTED) {
-                        webSocket.receiveMessageOfType<RequestReceivedMessage>(MESSAGE_TYPES.REQUEST_RECEIVED).subscribe({
-                            counterParty = IndyParty(it.did, it.endpoint)
-                            sendJson(RequestSendResponseMessage(it.did))
-                            observer.onNext(Unit)
-                        }, { e: Throwable -> throw(e) }, { observer.onCompleted() })
-                    } else {
-                        throw AgentConnectionException("Agent is disconnected")
-                    }
-                } catch (e: Throwable) {
-                    observer.onError(e)
-                }
-            },
-            Emitter.BackpressureMode.NONE
-        ).subscribeOn(Schedulers.newThread())
-    }
-
-    private fun sendRequest(key: String) = webSocket.sendJson(SendRequestMessage(key))
-
-    override fun getCounterParty() = counterParty
-
-    private fun <T : Any> receiveClassObject(className: Class<T>): Observable<T> {
-        return Observable.create(
-                { observer: Observer<T> ->
-                try {
-                    webSocket.popClassObject(className).subscribe({ objectJson ->
-                        val classObject: T = SerializationUtils.jSONToAny(objectJson, className)
-                        observer.onNext(classObject)
-                        observer.onCompleted()
-                    }, { e: Throwable -> observer.onError(e) }, { observer.onCompleted() })
-                } catch (e: Throwable) {
-                    observer.onError(e)
-                }
-            },
-            Emitter.BackpressureMode.NONE
-        ).subscribeOn(Schedulers.newThread())
-    }
-
-    private inline fun <reified T : Any> receiveClassObject() = receiveClassObject(T::class.java)
-
-    override fun sendCredentialOffer(offer: CredentialOffer) = webSocket.sendClassObject(offer, counterParty!!)
-
-    override fun receiveCredentialOffer() = receiveClassObject<CredentialOffer>()
-
-    override fun sendCredentialRequest(request: CredentialRequestInfo) = webSocket.sendClassObject(request, counterParty!!)
-
-    override fun receiveCredentialRequest() = receiveClassObject<CredentialRequestInfo>()
-
-    override fun sendCredential(credential: CredentialInfo) = webSocket.sendClassObject(credential, counterParty!!)
-
-    override fun receiveCredential() = receiveClassObject<CredentialInfo>()
-
-    override fun sendProofRequest(request: ProofRequest) = webSocket.sendClassObject(request, counterParty!!)
-
-    override fun receiveProofRequest() = receiveClassObject<ProofRequest>()
-
-    override fun sendProof(proof: ProofInfo) = webSocket.sendClassObject(proof, counterParty!!)
-
-    override fun receiveProof() = receiveClassObject<ProofInfo>()
-}
-
-class AgentWebSocketClient(serverUri: URI) : WebSocketClient(serverUri) {
-    private val log = KotlinLogging.logger {}
-
-    override fun onOpen(handshakedata: ServerHandshake?) {
-        log.info { "AgentConnection opened: $handshakedata" }
-    }
-
-    override fun onClose(code: Int, reason: String?, remote: Boolean) {
-        log.info { "AgentConnection closed: $code,$reason,$remote" }
-    }
-
-    private val receivedMessages = mutableListOf<String>()
-    private val subscribedObservers = mutableMapOf<String, Observer<String>>()
-
-    override fun onMessage(message: String?) {
-        log.info { "Message: $message" }
-        if (message != null) {
-            synchronized(receivedMessages) {
-                if (SerializationUtils.jSONToAny<Map<String, Any>>(message)["@type"].toString().contentEquals(MESSAGE_TYPES.MESSAGE_RECEIVED)) {
-                    val className = SerializationUtils.jSONToAny<MessageReceived>(message).message.content.clazz
-                    val messageBody = SerializationUtils.jSONToAny<MessageReceived>(message).message.content.message
-                    if (className in subscribedObservers.keys) {
-                        val observer = subscribedObservers[className]
-                        subscribedObservers.remove(className)
-                        observer?.onNext(SerializationUtils.anyToJSON(messageBody))
-                        observer?.onCompleted()
-                        return
-                    }
-                } else {
-                    val type = SerializationUtils.jSONToAny<Map<String, Any>>(message)["@type"].toString()
-                    if (type in subscribedObservers.keys) {
-                        val observer = subscribedObservers[type]
-                        subscribedObservers.remove(type)
-                        observer?.onNext(message)
-                        observer?.onCompleted()
-                        return
-                    }
-                }
-            }
-            synchronized(receivedMessages) { receivedMessages.add(message) }
-        }
-    }
-
-    override fun onError(ex: Exception?) {
-        log.warn(ex) { "AgentConnection error" }
-    }
-
-    fun sendJson(obj: Any) = send(SerializationUtils.anyToJSON(obj))
-
-    fun <T : Any> receiveMessageOfType(type: String, className: Class<T>): Observable<T> {
-        return Observable.create(
-                { observer: Observer<T> ->
-                    try {
-                        popMessageOfType(type).subscribe({ message ->
-                            val typedMessage: T = SerializationUtils.jSONToAny(message, className)
-                            observer.onNext(typedMessage)
-                        }, { e: Throwable -> observer.onError(e) }, { observer.onCompleted() })
-                    } catch (e: Throwable) {
-                        observer.onError(e)
-                    }
-                },
-                Emitter.BackpressureMode.NONE
-        ).subscribeOn(Schedulers.newThread())
-    }
-
-    inline fun <reified T : Any> receiveMessageOfType(type: String): Observable<T> = receiveMessageOfType(type, T::class.java)
-
-    fun sendClassObject(message: TypedBodyMessage, counterParty: IndyParty) = sendJson(SendMessage(counterParty.did, message))
-
-    inline fun <reified T : Any> sendClassObject(message: T, counterParty: IndyParty) = sendClassObject(TypedBodyMessage(message, T::class.java.canonicalName), counterParty)
-
-    private fun popMessageOfType(type: String): Observable<String> {
-        return Observable.create(
-                { observer: Observer<String> ->
-                    try {
-                        synchronized(receivedMessages) {
-                            val result = receivedMessages.find { SerializationUtils.jSONToAny<Map<String, Any>>(it)["@type"].toString().contentEquals(type) }
-                            if (result != null) {
-                                receivedMessages.remove(result)
-                                observer.onNext(result)
-                                observer.onCompleted()
-                            } else {
-                                if (type in subscribedObservers.keys) {
-                                    throw AgentConnectionException("Only 1 subscriber allowed per message type.")
-                                } else {
-                                    subscribedObservers[type] = observer
-                                }
-                            }
-                        }
-                    } catch (e: Throwable) {
-                        observer.onError(e)
-                    }
-                },
-                Emitter.BackpressureMode.NONE
-        ).subscribeOn(Schedulers.newThread())
-    }
-
-    fun <T : Any> popClassObject(className: Class<T>): Observable<String> {
-        return Observable.create({ observer: Observer<String> ->
+    /**
+     * Establishes a connection to remote IndyParty based on the given invite
+     */
+    override fun acceptInvite(invite: String): Single<IndyPartyConnection> {
+        return Single.create { observer ->
             try {
-                synchronized(receivedMessages) {
-                    val message = receivedMessages
-                            .filter { SerializationUtils.jSONToAny<Map<String, Any>>(it)["@type"].toString().contentEquals(MESSAGE_TYPES.MESSAGE_RECEIVED) }
-                            .find { SerializationUtils.jSONToAny<MessageReceived>(it).message.content.clazz == className.canonicalName }
-
-                    if (message != null) {
-                        val result = SerializationUtils.anyToJSON(
-                                SerializationUtils.jSONToAny<MessageReceived>(message).message.content.message
-                                )
-                        receivedMessages.remove(message)
-                        observer.onNext(result)
-                        observer.onCompleted()
-                    } else {
-                        if (className.canonicalName in subscribedObservers.keys) {
-                            throw(AgentConnectionException("Only 1 subscriber allowed per message class."))
-                        } else {
-                            subscribedObservers[className.canonicalName] = observer
-                        }
-                    }
+                if (getConnectionStatus() == AgentConnectionStatus.AGENT_CONNECTED) {
+                    /**
+                     * To accept the invite, first inform the agent with "receive_invite" message
+                     */
+                    sendJson(ReceiveInviteMessage(invite))
+                    val pKey = getPubkeyFromInvite(invite)
+                    /**
+                     * The agent must respond with "invite_received" message, containing the public key from invite
+                     */
+                    webSocket.receiveMessageOfType<InviteReceivedMessage>(MESSAGE_TYPES.INVITE_RECEIVED, pKey).subscribe({ invRcv ->
+                        /**
+                         * Now instruct the agent to send the connection request with "send_request" message.
+                         * The agent builds up the connection request and forwards it to the other IndyParty's endpoint,
+                         * recalling the invite by its public key
+                         */
+                        sendRequest(invRcv.key)
+                        /**
+                         * The agent receives the response from the other party and informs the client with "response_received"
+                         * message
+                         */
+                        webSocket.receiveMessageOfType<ObjectNode>(MESSAGE_TYPES.RESPONSE_RECEIVED, pKey).subscribe({
+                            /**
+                             * The "response_received" message will contain the other party's DID and endpoint
+                             */
+                            val theirPubkey = it["history"]["connection"]["DIDDoc"]["publicKey"][0]["publicKeyBase58"].asText()
+                            observer.onSuccess(IndyParty(webSocket, it["their_did"].asText(), invRcv.endpoint, theirPubkey))
+                        }, { e: Throwable -> throw(e) })
+                    }, { e: Throwable -> throw(e) })
+                } else {
+                    throw AgentConnectionException("AgentConnection object has wrong state")
                 }
             } catch (e: Throwable) {
                 observer.onError(e)
             }
-        }, Emitter.BackpressureMode.NONE).subscribeOn(Schedulers.newThread())
+        }
     }
+
+    private fun sendJson(obj: Any) = webSocket.sendJson(obj)
+
+    /**
+     * Retrieves a new invite from the agent
+     */
+    override fun genInvite(): Single<String> {
+        return Single.create { observer ->
+            try {
+                /**
+                 * to generate the invite, send "generate_invite" message to the agent, and wait for "invite_generated"
+                 * which must contain an invite
+                 */
+                webSocket.sendJson(SendMessage(type = MESSAGE_TYPES.GENERATE_INVITE))
+                webSocket.receiveMessageOfType<ReceiveInviteMessage>(MESSAGE_TYPES.INVITE_GENERATED).subscribe({ msg ->
+                    observer.onSuccess(msg.invite)
+                }, { e: Throwable -> throw(e) })
+            } catch (e: Throwable) {
+                observer.onError(e)
+            }
+        }
+    }
+
+    /**
+     * Waits for incoming connection from whatever party which possesses the invite
+     */
+    override fun waitForInvitedParty(invite: String): Single<IndyPartyConnection> {
+        return Single.create { observer ->
+            try {
+                if (getConnectionStatus() == AgentConnectionStatus.AGENT_CONNECTED) {
+                    /**
+                     * On an incoming connection request, the agent must send the "request_received"
+                     */
+                    webSocket.receiveMessageOfType<RequestReceivedMessage>(MESSAGE_TYPES.REQUEST_RECEIVED).subscribe({
+                        /**
+                         * on the "request_received" message, reply with "send_response" with remote DID to any incoming connection request.
+                         * at this stage it doesn't matter which party sent the connection request
+                         */
+                        sendJson(RequestSendResponseMessage(it.did))
+                        /**
+                         * Check if the STATE already has the public key ("connection_key") corresponding to the invite
+                         */
+                        sendJson(StateRequest())
+                        webSocket.receiveMessageOfType<ObjectNode>(MESSAGE_TYPES.STATE_RESPONSE).subscribe { stateResponse ->
+                            val pairwise = stateResponse["content"]["pairwise_connections"].find { node ->
+                                node["metadata"]["connection_key"].asText() == getPubkeyFromInvite(invite)
+                            }
+                            if (pairwise != null) {
+                                /**
+                                 * if so, wait for "response_sent" from DID (their_did) associated with the invite public key
+                                 */
+                                webSocket.receiveMessageOfType<RequestResponseSentMessage>(MESSAGE_TYPES.RESPONSE_SENT, pairwise["their_did"].asText()).subscribe { responseSent ->
+                                    observer.onSuccess(IndyParty(webSocket, responseSent.did,
+                                            pairwise["metadata"]["their_endpoint"].asText(),
+                                            pairwise["metadata"]["their_vk"].asText()))
+                                }
+                            } else
+                                throw AgentConnectionException("Remote IndyParty delayed to report to the Agent. Try refreshing the state.")
+                        }
+                    }, { e: Throwable -> throw(e) })
+                } else {
+                    throw AgentConnectionException("Agent is disconnected")
+                }
+            } catch (e: Throwable) {
+                observer.onError(e)
+            }
+        }
+    }
+
+    private fun sendRequest(key: String) = webSocket.sendJson(SendRequestMessage(key))
 }
 
 object MESSAGE_TYPES {
@@ -330,11 +221,12 @@ object MESSAGE_TYPES {
     val REQUEST_RECEIVED = ADMIN_CONNECTIONS_BASE + "request_received"
     val SEND_RESPONSE = ADMIN_CONNECTIONS_BASE + "send_response"
     val RESPONSE_RECEIVED = ADMIN_CONNECTIONS_BASE + "response_received"
+    val RESPONSE_SENT = ADMIN_CONNECTIONS_BASE + "response_sent"
     val STATE_REQUEST = ADMIN_BASE + "state_request"
     val STATE_RESPONSE = ADMIN_BASE + "state"
 }
 
-data class WalletConnect(val name: String, val passphrase: String, @JsonProperty("@type") val type: String = MESSAGE_TYPES.CONNECT, val id: String? = null)
+data class WalletConnect(val name: String, val passphrase: String, @JsonProperty("@type") val type: String = MESSAGE_TYPES.CONNECT)
 data class StateRequest(@JsonProperty("@type") val type: String = MESSAGE_TYPES.STATE_REQUEST)
 data class State(@JsonProperty("@type") val type: String = MESSAGE_TYPES.STATE_RESPONSE, val content: Map<String, out Any>? = null)
 data class ReceiveInviteMessage(val invite: String, val label: String = "", @JsonProperty("@type") val type: String = MESSAGE_TYPES.RECEIVE_INVITE)
@@ -343,7 +235,8 @@ data class SendRequestMessage(val key: String, @JsonProperty("@type") val type: 
 data class RequestReceivedMessage(val label: String, val did: String, val endpoint: String, @JsonProperty("@type") val type: String)
 data class RequestSendResponseMessage(val did: String, @JsonProperty("@type") val type: String = MESSAGE_TYPES.SEND_RESPONSE)
 data class RequestResponseReceivedMessage(val their_did: String, val history: ObjectNode, @JsonProperty("@type") val type: String)
-data class SendMessage(val to: String? = null, val message: TypedBodyMessage? = null, @JsonProperty("@type") val type: String = MESSAGE_TYPES.SEND_MESSAGE, val id: String? = null)
+data class RequestResponseSentMessage(@JsonProperty("@type") val type: String = MESSAGE_TYPES.RESPONSE_SENT, val label: String, val did: String)
+data class SendMessage(val to: String? = null, val message: TypedBodyMessage? = null, @JsonProperty("@type") val type: String = MESSAGE_TYPES.SEND_MESSAGE)
 data class MessageReceivedMessage(val from: String, val sent_time: String, val content: TypedBodyMessage)
 data class MessageReceived(val id: String?, val with: String?, val message: MessageReceivedMessage, @JsonProperty("@type") val type: String = MESSAGE_TYPES.SEND_MESSAGE)
 data class LoadMessage(val with: String, @JsonProperty("@type") val type: String = MESSAGE_TYPES.GET_MESSAGES)
