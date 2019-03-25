@@ -1,6 +1,5 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2c
 
-import co.paralleluniverse.fibers.FiberAsync
 import co.paralleluniverse.fibers.Suspendable
 import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialContract
 import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialDefinitionContract
@@ -8,8 +7,11 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredential
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.getCredentialDefinitionById
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.indyUser
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.whoIsNotary
-import com.luxoft.blockchainlab.corda.hyperledger.indy.handle
-import com.luxoft.blockchainlab.hyperledger.indy.*
+import com.luxoft.blockchainlab.corda.hyperledger.indy.service.connectionService
+import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialDefinitionId
+import com.luxoft.blockchainlab.hyperledger.indy.IndyCredentialDefinitionNotFoundException
+import com.luxoft.blockchainlab.hyperledger.indy.IndyCredentialMaximumReachedException
+import com.luxoft.blockchainlab.hyperledger.indy.IndyUser
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndContract
 import net.corda.core.flows.*
@@ -31,16 +33,16 @@ object IssueCredentialFlowB2C {
                 // checking if cred def exists and can produce new credentials
                 val originalCredentialDefIn = getCredentialDefinitionById(credentialDefinitionId)
                         ?: throw IndyCredentialDefinitionNotFoundException(
-                                credentialDefinitionId.toString(),
+                                credentialDefinitionId,
                                 "State doesn't exist in Corda vault"
                         )
                 val originalCredentialDef = originalCredentialDefIn.state.data
 
                 if (!originalCredentialDef.canProduceCredentials())
                     throw IndyCredentialMaximumReachedException(
-                            originalCredentialDef.credentialDefinitionId.getRevocationRegistryDefinitionId(
+                            originalCredentialDef.credentialDefinitionId.getPossibleRevocationRegistryDefinitionId(
                                     IndyUser.REVOCATION_TAG
-                            ).toString()
+                            )
                     )
 
                 // issue credential
@@ -48,21 +50,16 @@ object IssueCredentialFlowB2C {
 
                 connectionService().sendCredentialOffer(offer)
 
-                val credentialRequest = object : FiberAsync<CredentialRequestInfo, Throwable>() {
-                    override fun requestAsync() {
-                        connectionService().receiveCredentialRequest().handle { message, ex ->
-                            if (ex != null) asyncFailed(ex)
-                            else asyncCompleted(message)
-                        }
-                    }
-                }.run()
+                val credentialRequest = connectionService().receiveCredentialRequest()
 
                 val credential = indyUser().issueCredential(
                         credentialRequest,
                         credentialProposal,
                         offer
                 )
+
                 connectionService().sendCredential(credential)
+
                 val credentialOut = IndyCredential(
                         identifier,
                         credentialRequest,
@@ -101,7 +98,6 @@ object IssueCredentialFlowB2C {
 
                 // Notarise and record the transaction in both parties' vaults.
                 subFlow(FinalityFlow(selfSignedTx))
-
             } catch (ex: Exception) {
                 logger.error("Credential has not been issued", ex)
                 throw FlowException(ex.message)

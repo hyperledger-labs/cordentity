@@ -1,6 +1,7 @@
 package com.luxoft.blockchainlab.hyperledger.indy.roles
 
 import com.luxoft.blockchainlab.hyperledger.indy.*
+import com.luxoft.blockchainlab.hyperledger.indy.models.*
 
 
 /**
@@ -10,26 +11,14 @@ import com.luxoft.blockchainlab.hyperledger.indy.*
 interface IndyProver : IndyWalletHolder {
 
     /**
-     * Creates master secret by it's id
-     *
-     * @param masterSecretId
-     */
-    fun createMasterSecret(masterSecretId: String)
-
-    /**
      * Creates credential request
      *
      * @param proverDid                 prover's did
      * @param offer                     credential offer
-     * @param masterSecretId            <optional> master secret id
      *
      * @return                          credential request and all reliable data
      */
-    fun createCredentialRequest(
-        proverDid: String,
-        offer: CredentialOffer,
-        masterSecretId: String
-    ): CredentialRequestInfo
+    fun createCredentialRequest(proverDid: String, offer: CredentialOffer): CredentialRequestInfo
 
     /**
      * Stores credential in prover's wallet
@@ -48,9 +37,8 @@ interface IndyProver : IndyWalletHolder {
      * Creates proof for provided proof request
      *
      * @param proofRequest              proof request created by verifier
-     * @param masterSecretId            <optional> master secret id
      *
      * @return                          proof and all reliable data
      */
-    fun createProof(proofRequest: ProofRequest, masterSecretId: String): ProofInfo
+    fun createProof(proofRequest: ProofRequest): ProofInfo
 }

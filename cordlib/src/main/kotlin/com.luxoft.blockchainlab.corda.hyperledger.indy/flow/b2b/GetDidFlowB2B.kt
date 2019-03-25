@@ -3,8 +3,7 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b
 import co.paralleluniverse.fibers.Suspendable
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.indyUser
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.whoIs
-import com.luxoft.blockchainlab.hyperledger.indy.IdentityDetails
-import com.luxoft.blockchainlab.hyperledger.indy.roles.getIdentity
+import com.luxoft.blockchainlab.hyperledger.indy.models.IdentityDetails
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import net.corda.core.flows.*
 import net.corda.core.identity.CordaX500Name
@@ -32,11 +31,7 @@ object GetDidFlowB2B {
                 val otherSide: Party = whoIs(authority)
                 val flowSession: FlowSession = initiateFlow(otherSide)
 
-                return flowSession.receive<String>().unwrap {
-                    val identityDetails = SerializationUtils.jSONToAny<IdentityDetails>(it)
-
-                    identityDetails.did
-                }
+                return flowSession.receive<IdentityDetails>().unwrap { it.did }
 
             } catch (ex: Exception) {
                 logger.error("", ex)
@@ -51,7 +46,9 @@ object GetDidFlowB2B {
         @Suspendable
         override fun call() {
             try {
-                flowSession.send(indyUser().getIdentity().getIdentityRecord())
+                val identityDetails = indyUser().getIdentity()
+
+                flowSession.send(identityDetails)
             } catch (e: Exception) {
                 logger.error("", e)
                 throw FlowException(e.message)

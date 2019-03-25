@@ -1,6 +1,5 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2c
 
-import co.paralleluniverse.fibers.FiberAsync
 import co.paralleluniverse.fibers.Suspendable
 import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialContract
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredentialProof
@@ -8,8 +7,11 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.ProofAttribute
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.ProofPredicate
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.indyUser
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.whoIsNotary
-import com.luxoft.blockchainlab.corda.hyperledger.indy.handle
-import com.luxoft.blockchainlab.hyperledger.indy.*
+import com.luxoft.blockchainlab.corda.hyperledger.indy.service.connectionService
+import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialFieldReference
+import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialPredicate
+import com.luxoft.blockchainlab.hyperledger.indy.IndyUser
+import com.luxoft.blockchainlab.hyperledger.indy.models.Interval
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndContract
 import net.corda.core.flows.*
@@ -23,7 +25,7 @@ object VerifyCredentialFlowB2C {
             private val identifier: String,
             private val attributes: List<ProofAttribute>,
             private val predicates: List<ProofPredicate>,
-            private val nonRevoked: Interval? = null
+            private val nonRevoked: Interval = Interval.now()
     ) : FlowLogic<Boolean>() {
 
         @Suspendable
@@ -57,14 +59,7 @@ object VerifyCredentialFlowB2C {
 
                 connectionService().sendProofRequest(proofRequest)
 
-                val proof = object : FiberAsync<ProofInfo, Throwable>() {
-                    override fun requestAsync() {
-                        connectionService().receiveProof().handle { message, ex ->
-                            if (ex != null) asyncFailed(ex)
-                            else asyncCompleted(message)
-                        }
-                    }
-                }.run()
+                val proof = connectionService().receiveProof()
 
                 val usedData = indyUser().getDataUsedInProof(proofRequest, proof)
                 val credentialProofOut =

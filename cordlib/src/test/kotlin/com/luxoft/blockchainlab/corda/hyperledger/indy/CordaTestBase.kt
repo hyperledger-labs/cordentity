@@ -5,10 +5,9 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.CreatePairwiseFl
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.IssueCredentialFlowB2B
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.VerifyCredentialFlowB2B
 import com.luxoft.blockchainlab.corda.hyperledger.indy.service.IndyService
-import com.luxoft.blockchainlab.hyperledger.indy.utils.PoolManager
-import com.natpryce.konfig.Configuration
-import com.natpryce.konfig.ConfigurationMap
-import com.natpryce.konfig.TestConfigurationsProvider
+import com.luxoft.blockchainlab.hyperledger.indy.helpers.ConfigHelper
+import io.mockk.every
+import io.mockk.mockkObject
 import net.corda.core.concurrent.CordaFuture
 import net.corda.core.flows.FlowLogic
 import net.corda.core.identity.CordaX500Name
@@ -20,9 +19,13 @@ import net.corda.testing.common.internal.testNetworkParameters
 import net.corda.testing.core.singleIdentity
 import net.corda.testing.node.internal.InternalMockNetwork
 import net.corda.testing.node.internal.InternalMockNetwork.MockNode
+import net.corda.testing.node.internal.MockNodeArgs
 import net.corda.testing.node.internal.newContext
 import org.junit.After
 import org.junit.Before
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
+import org.slf4j.event.Level
 import java.time.Duration
 import java.util.*
 import kotlin.math.absoluteValue
@@ -51,9 +54,7 @@ open class CordaTestBase {
     protected lateinit var net: InternalMockNetwork
         private set
 
-    private val parties: MutableList<StartedNode<MockNode>> = mutableListOf()
-
-    protected val random = Random()
+    protected val parties: MutableList<StartedNode<MockNode>> = mutableListOf()
 
     /**
      * Shares permissions from [authority] to [issuer]
@@ -115,40 +116,52 @@ open class CordaTestBase {
 
     @Before
     fun commonSetup() {
-        TestConfigurationsProvider.provider = object : TestConfigurationsProvider {
-            override fun getConfig(name: String): Configuration? {
-                // Watch carefully for these hard-coded values
-                // Now we assume that issuer(indy trustee) is the first created node from SomeNodes
-                return if (name == "Trustee") {
-                    ConfigurationMap(
-                        mapOf(
-                            "indyuser.walletName" to name,
-                            "indyuser.role" to "trustee",
-                            "indyuser.did" to "V4SGRU86Z58d6TV7PBUe6f",
-                            "indyuser.seed" to "000000000000000000000000Trustee1",
-                            "indyuser.genesisFile" to PoolManager.TEST_GENESIS_FILE_PATH
-                        )
-                    )
-                } else ConfigurationMap(
-                    mapOf(
-                        "indyuser.walletName" to name + random.nextLong().absoluteValue,
-                        "indyuser.genesisFile" to PoolManager.TEST_GENESIS_FILE_PATH
-                    )
-                )
-            }
-        }
+        System.setProperty(org.slf4j.impl.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "TRACE")
 
         net = InternalMockNetwork(
             cordappPackages = listOf("com.luxoft.blockchainlab.corda.hyperledger.indy"),
-            networkParameters = testNetworkParameters(maxTransactionSize = 10485760 * 5)
+            networkParameters = testNetworkParameters(maxTransactionSize = 10485760 * 5),
+            defaultFactory = CordaTestBase::MockIndyNode
         )
+    }
+
+    open class MockIndyNode(args: MockNodeArgs) : InternalMockNetwork.MockNode(args) {
+
+        companion object {
+            val sessionId = Random().nextLong().absoluteValue.toString()
+            val TEST_GENESIS_FILE_PATH by lazy {
+                this::class.java.classLoader.getResource("docker_pool_transactions_genesis.txt").file
+            }
+        }
+
+        private val organisation: String = args.config.myLegalName.organisation
+
+        override fun start(): StartedNode<MockNode> {
+            mockkObject(ConfigHelper)
+
+            every { ConfigHelper.getPoolName() } returns organisation + sessionId
+            every { ConfigHelper.getGenesisPath() } returns TEST_GENESIS_FILE_PATH
+            every { ConfigHelper.getWalletName() } returns organisation + sessionId
+            every { ConfigHelper.getWalletPassword() } returns "password"
+            every { ConfigHelper.getRole() } returns ""
+
+            if (organisation == "Trustee") {
+                every { ConfigHelper.getDid() } returns "V4SGRU86Z58d6TV7PBUe6f"
+                every { ConfigHelper.getRole() } returns "trustee"
+                every { ConfigHelper.getSeed() } returns "000000000000000000000000Trustee1"
+            }
+
+            return super.start()
+        }
     }
 
     @After
     fun commonTearDown() {
         try {
             for (party in parties) {
-                party.services.cordaService(IndyService::class.java).indyUser.close()
+                val indyUser = party.services.cordaService(IndyService::class.java).indyUser
+                indyUser.wallet.closeWallet().get()
+                indyUser.pool.closePoolLedger().get()
             }
 
             parties.clear()

@@ -1,15 +1,19 @@
 package com.luxoft.blockchainlab.hyperledger.indy
 
-import com.luxoft.blockchainlab.hyperledger.indy.utils.PoolManager
-import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
-import com.luxoft.blockchainlab.hyperledger.indy.utils.getRootCause
+import com.luxoft.blockchainlab.hyperledger.indy.IndyIntegrationTest.Companion.TEST_GENESIS_FILE_PATH
+import com.luxoft.blockchainlab.hyperledger.indy.helpers.GenesisHelper
+import com.luxoft.blockchainlab.hyperledger.indy.helpers.PoolHelper
+import com.luxoft.blockchainlab.hyperledger.indy.helpers.WalletHelper
+import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialDefinitionId
+import com.luxoft.blockchainlab.hyperledger.indy.models.SchemaId
 import org.hyperledger.indy.sdk.anoncreds.Anoncreds
 import org.hyperledger.indy.sdk.wallet.Wallet
-import org.hyperledger.indy.sdk.wallet.WalletExistsException
 import org.junit.After
 import org.junit.Before
 import org.junit.Ignore
 import org.junit.Test
+import java.io.File
+import java.lang.RuntimeException
 
 class IndyUserTest {
 
@@ -20,18 +24,18 @@ class IndyUserTest {
     fun setup() {
         val walletName = "default-wallet"
         val poolName = "default-pool"
-        val credentials = """{"key": "key"}"""
+        val walletPassword = "password"
 
-        val walletConfig = SerializationUtils.anyToJSON(WalletConfig(walletName))
+        WalletHelper.createOrTrunc(walletName, walletPassword)
+        wallet = WalletHelper.openExisting(walletName, walletPassword)
 
-        try {
-            Wallet.createWallet(walletConfig, credentials).get()
-        } catch (ex: Exception) {
-            if (getRootCause(ex) !is WalletExistsException) throw ex else logger.debug("Wallet already exists")
-        }
+        val genesisFile = File(TEST_GENESIS_FILE_PATH)
+        if (!GenesisHelper.exists(genesisFile))
+            throw RuntimeException("Genesis file $TEST_GENESIS_FILE_PATH doesn't exist")
 
-        wallet = Wallet.openWallet(walletConfig, credentials).get()
-        val pool = PoolManager.openIndyPool(PoolManager.TEST_GENESIS_FILE, poolName)
+        PoolHelper.createOrTrunc(genesisFile, poolName)
+        val pool = PoolHelper.openExisting(poolName)
+
         indyUser = IndyUser(pool, wallet, null, tailsPath = "tails")
     }
 

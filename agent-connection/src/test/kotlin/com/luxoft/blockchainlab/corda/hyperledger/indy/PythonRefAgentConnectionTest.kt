@@ -1,7 +1,7 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy
 
-import com.luxoft.blockchainlab.hyperledger.indy.CredentialOffer
-import com.luxoft.blockchainlab.hyperledger.indy.KeyCorrectnessProof
+import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialOffer
+import com.luxoft.blockchainlab.hyperledger.indy.models.KeyCorrectnessProof
 import org.junit.Before
 import org.junit.Ignore
 import org.junit.Test
@@ -71,7 +71,7 @@ class PythonRefAgentConnectionTest {
                     inviteStr = it!!
                     waitForInvitedParty(inviteStr).subscribe { user94 ->
                         user94.receiveCredentialOffer().subscribe { proof94 ->
-                            assertEquals(proof94?.schemaId, "94")
+                            assertEquals(proof94?.schemaIdRaw, "94:::1")
                             agent95completed.complete(Unit)
                         }
                     }
@@ -79,7 +79,8 @@ class PythonRefAgentConnectionTest {
                         connect(agentUrl2, "user94", "pass94").handle { _, ex ->
                             if (ex != null) throw AgentConnectionException(ex.message!!)
                             else acceptInvite(inviteStr).subscribe { user95 ->
-                                user95.sendCredentialOffer(CredentialOffer("94", "", KeyCorrectnessProof("", "", emptyList()), ""))
+                                val offer94 = CredentialOffer("94:::1", ":::1", KeyCorrectnessProof("", "", emptyList()), "")
+                                user95.sendCredentialOffer(offer94)
                                 agent94completed.complete(Unit)
                             }
                         }
@@ -88,7 +89,7 @@ class PythonRefAgentConnectionTest {
                         inviteStr2 = invite2
                         waitForInvitedParty(inviteStr2).subscribe { user96 ->
                             user96.receiveCredentialOffer().subscribe { proof96 ->
-                                assertEquals(proof96?.schemaId, "96")
+                                assertEquals(proof96?.schemaIdRaw, "96:::1")
                                 agent95completed2.complete(Unit)
                             }
                         }
@@ -96,7 +97,8 @@ class PythonRefAgentConnectionTest {
                             connect(agentUrl3, "user96", "pass96").handle { _, ex ->
                                 if (ex != null) throw AgentConnectionException(ex.message!!)
                                 else acceptInvite(inviteStr2).subscribe { user95 ->
-                                    user95.sendCredentialOffer(CredentialOffer("96", "", KeyCorrectnessProof("", "", emptyList()), ""))
+                                    val offer96 = CredentialOffer("96:::1", ":::1", KeyCorrectnessProof("", "", emptyList()), "")
+                                    user95.sendCredentialOffer(offer96)
                                     agent96completed.complete(Unit)
                                 }
                             }
@@ -106,7 +108,7 @@ class PythonRefAgentConnectionTest {
                         inviteStr3 = invite3
                         waitForInvitedParty(inviteStr3).subscribe { user97 ->
                             user97.receiveCredentialOffer().subscribe { proof97 ->
-                                assertEquals(proof97?.schemaId, "97")
+                                assertEquals(proof97?.schemaIdRaw, "97:::1")
                                 agent95completed3.complete(Unit)
                             }
                         }
@@ -114,7 +116,7 @@ class PythonRefAgentConnectionTest {
                             connect(agentUrl4, "user97", "pass97").handle { _, ex ->
                                 if (ex != null) throw AgentConnectionException(ex.message!!)
                                 else acceptInvite(inviteStr3).subscribe { user95 ->
-                                    user95.sendCredentialOffer(CredentialOffer("97", "", KeyCorrectnessProof("", "", emptyList()), ""))
+                                    user95.sendCredentialOffer(CredentialOffer("97:::1", ":::1", KeyCorrectnessProof("", "", emptyList()), ""))
                                     agent97completed.complete(Unit)
                                 }
                             }
@@ -124,7 +126,7 @@ class PythonRefAgentConnectionTest {
                         inviteStr4 = invite4
                         waitForInvitedParty(inviteStr4).subscribe { user98 ->
                             user98.receiveCredentialOffer().subscribe { proof98 ->
-                                assertEquals(proof98?.schemaId, "98")
+                                assertEquals(proof98?.schemaIdRaw, "98:::1")
                                 agent95completed4.complete(Unit)
                             }
                         }
@@ -132,7 +134,7 @@ class PythonRefAgentConnectionTest {
                             connect(agentUrl5, "user98", "pass98").handle { _, ex ->
                                 if (ex != null) throw AgentConnectionException(ex.message!!)
                                 else acceptInvite(inviteStr4).subscribe { user95 ->
-                                    user95.sendCredentialOffer(CredentialOffer("98", "", KeyCorrectnessProof("", "", emptyList()), ""))
+                                    user95.sendCredentialOffer(CredentialOffer("98:::1", ":::1", KeyCorrectnessProof("", "", emptyList()), ""))
                                     agent98completed.complete(Unit)
                                 }
                             }
@@ -142,7 +144,7 @@ class PythonRefAgentConnectionTest {
                         inviteStr5 = invite5
                         waitForInvitedParty(inviteStr5).subscribe { user99 ->
                             user99.receiveCredentialOffer().subscribe { proof99 ->
-                                assertEquals(proof99?.schemaId, "99")
+                                assertEquals(proof99?.schemaIdRaw, "99:::1")
                                 agent95completed5.complete(Unit)
                             }
                         }
@@ -150,7 +152,7 @@ class PythonRefAgentConnectionTest {
                             connect(agentUrl6, "user99", "pass99").handle { _, ex ->
                                 if (ex != null) throw AgentConnectionException(ex.message!!)
                                 else acceptInvite(inviteStr5).subscribe { user95 ->
-                                    user95.sendCredentialOffer(CredentialOffer("99", "", KeyCorrectnessProof("", "", emptyList()), ""))
+                                    user95.sendCredentialOffer(CredentialOffer("99:::1", ":::1", KeyCorrectnessProof("", "", emptyList()), ""))
                                     agent99completed.complete(Unit)
                                 }
                             }

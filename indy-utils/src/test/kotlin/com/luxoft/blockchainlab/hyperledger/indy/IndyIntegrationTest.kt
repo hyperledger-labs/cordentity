@@ -26,4 +26,10 @@ open class IndyIntegrationTest {
     protected val DID_MY2 = "2PRyVHmkXQnQzJQKxHxnXC"
     protected val DID_TRUSTEE = "V4SGRU86Z58d6TV7PBUe6f"
     protected val TYPE = "default"
+
+    companion object {
+        val TEST_GENESIS_FILE_PATH by lazy {
+            this::class.java.classLoader.getResource("docker_pool_transactions_genesis.txt").file
+        }
+    }
 }

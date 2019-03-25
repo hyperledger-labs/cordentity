@@ -26,7 +26,7 @@ object CredentialDefinitionSchemaV1 : MappedSchema(
         constructor(credentialDef: IndyCredentialDefinition) : this(
             credentialDef.credentialDefinitionId.toString(),
             credentialDef.schemaId.toString(),
-            credentialDef.credentialDefinitionId.getRevocationRegistryDefinitionId(IndyUser.REVOCATION_TAG).toString(),
+            credentialDef.credentialDefinitionId.getPossibleRevocationRegistryDefinitionId(IndyUser.REVOCATION_TAG).toString(),
             credentialDef.currentCredNumber
         )
     }
