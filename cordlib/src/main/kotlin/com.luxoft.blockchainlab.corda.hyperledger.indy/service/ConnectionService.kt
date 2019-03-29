@@ -5,7 +5,6 @@ import co.paralleluniverse.fibers.Suspendable
 import com.luxoft.blockchainlab.corda.hyperledger.indy.PythonRefAgentConnection
 import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.ConfigHelper
-import com.luxoft.blockchainlab.hyperledger.indy.helpers.indyuser
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
 import net.corda.core.flows.FlowLogic
 import net.corda.core.node.services.CordaService
@@ -16,25 +15,25 @@ import java.lang.RuntimeException
 
 @CordaService
 class ConnectionService : SingletonSerializeAsToken() {
-    fun sendCredentialOffer(offer: CredentialOffer) = getConnection().sendCredentialOffer(offer)
+    fun sendCredentialOffer(offer: CredentialOffer, partyDID: String) = getPartyConnection(partyDID).sendCredentialOffer(offer)
 
-    fun receiveCredentialOffer() = getConnection().receiveCredentialOffer()
+    fun receiveCredentialOffer(partyDID: String) = getPartyConnection(partyDID).receiveCredentialOffer()
 
-    fun sendCredentialRequest(request: CredentialRequestInfo) = getConnection().sendCredentialRequest(request)
+    fun sendCredentialRequest(request: CredentialRequestInfo, partyDID: String) = getPartyConnection(partyDID).sendCredentialRequest(request)
 
-    fun receiveCredentialRequest() = getConnection().receiveCredentialRequest()
+    fun receiveCredentialRequest(partyDID: String) = getPartyConnection(partyDID).receiveCredentialRequest()
 
-    fun sendCredential(credential: CredentialInfo) = getConnection().sendCredential(credential)
+    fun sendCredential(credential: CredentialInfo, partyDID: String) = getPartyConnection(partyDID).sendCredential(credential)
 
-    fun receiveCredential() = getConnection().receiveCredential()
+    fun receiveCredential(partyDID: String) = getPartyConnection(partyDID).receiveCredential()
 
-    fun sendProofRequest(request: ProofRequest) = getConnection().sendProofRequest(request)
+    fun sendProofRequest(request: ProofRequest, partyDID: String) = getPartyConnection(partyDID).sendProofRequest(request)
 
-    fun receiveProofRequest() = getConnection().receiveProofRequest()
+    fun receiveProofRequest(partyDID: String) = getPartyConnection(partyDID).receiveProofRequest()
 
-    fun sendProof(proof: ProofInfo) = getConnection().sendProof(proof)
+    fun sendProof(proof: ProofInfo, partyDID: String) = getPartyConnection(partyDID).sendProof(proof)
 
-    fun receiveProof() = getConnection().receiveProof()
+    fun receiveProof(partyDID: String) = getPartyConnection(partyDID).receiveProof()
 
     /**
      * These next private values should be initialized here despite the fact they are used only in [connection] initialization.
@@ -61,6 +60,9 @@ class ConnectionService : SingletonSerializeAsToken() {
         return connection
                 ?: throw RuntimeException("Unable to get connection: Please specify 'agentWSEndpoint', 'agentUser', 'agentPassword' properties in config")
     }
+
+    private fun getPartyConnection(partyDID: String) = getConnection().getIndyPartyConnection(partyDID).awaitFiber()
+            ?: throw RuntimeException("Unable to get IndyPartyConnection for DID: $partyDID")
 }
 
 @Suspendable

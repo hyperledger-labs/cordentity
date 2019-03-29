@@ -3,11 +3,14 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
+import mu.KotlinLogging
 import rx.Single
 import java.net.URI
 import java.util.*
 
 class PythonRefAgentConnection : AgentConnection {
+    private val log = KotlinLogging.logger {}
+
     override fun disconnect() {
         if (getConnectionStatus() == AgentConnectionStatus.AGENT_CONNECTED) {
             webSocket.close()
@@ -65,6 +68,8 @@ class PythonRefAgentConnection : AgentConnection {
 
     private lateinit var webSocket : AgentWebSocketClient
 
+    private val indyParties = HashMap<String, IndyPartyConnection>()
+
     private fun getPubkeyFromInvite(invite: String): String {
         val invEncoded = invite.split("?c_i=")[1]
         val inv = Base64.getDecoder().decode(invEncoded).toString(Charsets.UTF_8)
@@ -118,7 +123,21 @@ class PythonRefAgentConnection : AgentConnection {
                              * The "response_received" message will contain the other party's DID and endpoint
                              */
                             val theirPubkey = it["history"]["connection"]["DIDDoc"]["publicKey"][0]["publicKeyBase58"].asText()
-                            observer.onSuccess(IndyParty(webSocket, it["their_did"].asText(), invRcv.endpoint, theirPubkey))
+                            val theirDid = it["their_did"].asText()
+                            /**
+                             * retrieve my_did from agent's STATE
+                             */
+                            sendJson(StateRequest())
+                            webSocket.receiveMessageOfType<ObjectNode>(MESSAGE_TYPES.STATE_RESPONSE).subscribe { stateResponse ->
+                                val pairwise = stateResponse["content"]["pairwise_connections"].find { node ->
+                                    node["metadata"]["their_vk"].asText() == theirPubkey
+                                }
+                                if (pairwise != null) {
+                                    val indyParty = IndyParty(webSocket, theirDid, invRcv.endpoint, theirPubkey, pairwise["my_did"].asText())
+                                    indyParties[theirDid] = indyParty
+                                    observer.onSuccess(indyParty)
+                                }
+                            }
                         }, { e: Throwable -> throw(e) })
                     }, { e: Throwable -> throw(e) })
                 } else {
@@ -135,7 +154,7 @@ class PythonRefAgentConnection : AgentConnection {
     /**
      * Retrieves a new invite from the agent
      */
-    override fun genInvite(): Single<String> {
+    override fun generateInvite(): Single<String> {
         return Single.create { observer ->
             try {
                 /**
@@ -181,14 +200,56 @@ class PythonRefAgentConnection : AgentConnection {
                                  * if so, wait for "response_sent" from DID (their_did) associated with the invite public key
                                  */
                                 webSocket.receiveMessageOfType<RequestResponseSentMessage>(MESSAGE_TYPES.RESPONSE_SENT, pairwise["their_did"].asText()).subscribe { responseSent ->
-                                    observer.onSuccess(IndyParty(webSocket, responseSent.did,
+                                    val indyParty = IndyParty(webSocket, responseSent.did,
                                             pairwise["metadata"]["their_endpoint"].asText(),
-                                            pairwise["metadata"]["their_vk"].asText()))
+                                            pairwise["metadata"]["their_vk"].asText(),
+                                            pairwise["my_did"].asText())
+                                    indyParties[responseSent.did] = indyParty
+                                    observer.onSuccess(indyParty)
                                 }
                             } else
                                 throw AgentConnectionException("Remote IndyParty delayed to report to the Agent. Try refreshing the state.")
                         }
                     }, { e: Throwable -> throw(e) })
+                } else {
+                    throw AgentConnectionException("Agent is disconnected")
+                }
+            } catch (e: Throwable) {
+                observer.onError(e)
+            }
+        }
+    }
+
+    override fun getIndyPartyConnection(partyDID: String): Single<IndyPartyConnection?> {
+        return Single.create { observer ->
+            try {
+                if (getConnectionStatus() == AgentConnectionStatus.AGENT_CONNECTED) {
+                    /**
+                     * Query local connection objects associated with the remote party's DID
+                     */
+                    if (partyDID in indyParties.keys) observer.onSuccess(indyParties[partyDID]) else {
+                        /**
+                         * If not found, query agent state for the properties of the previously set pairwise connection
+                         */
+                        sendJson(StateRequest())
+                        webSocket.receiveMessageOfType<ObjectNode>(MESSAGE_TYPES.STATE_RESPONSE).subscribe { stateResponse ->
+                            val pairwise = stateResponse["content"]["pairwise_connections"].find { node ->
+                                node["their_did"].asText() == partyDID
+                            }
+                            if (pairwise != null) {
+                                observer.onSuccess(IndyParty(webSocket, partyDID,
+                                        pairwise["metadata"]["their_endpoint"].asText(),
+                                        pairwise["metadata"]["their_vk"].asText(),
+                                        pairwise["my_did"].asText()))
+                            } else {
+                                observer.onSuccess(null)
+                                log.info {
+                                    "Remote IndyParty (DID:$partyDID) is unknown to the agent. " +
+                                            "Initiate a new connection using generateInvite()/acceptInvite()/waitForInvitedParty()"
+                                }
+                            }
+                        }
+                    }
                 } else {
                     throw AgentConnectionException("Agent is disconnected")
                 }
@@ -211,6 +272,7 @@ object MESSAGE_TYPES {
     val DISCONNECT = ADMIN_WALLETCONNECTION_BASE + "disconnect"
     val SEND_MESSAGE = ADMIN_BASICMESSAGE_BASE + "send_message"
     val MESSAGE_RECEIVED = ADMIN_BASICMESSAGE_BASE + "message_received"
+    val MESSAGE_SENT = ADMIN_BASICMESSAGE_BASE + "message_sent"
     val GET_MESSAGES = ADMIN_BASICMESSAGE_BASE + "get_messages"
     val MESSAGES = ADMIN_BASICMESSAGE_BASE + "messages"
     val GENERATE_INVITE = ADMIN_CONNECTIONS_BASE + "generate_invite"
@@ -222,13 +284,14 @@ object MESSAGE_TYPES {
     val SEND_RESPONSE = ADMIN_CONNECTIONS_BASE + "send_response"
     val RESPONSE_RECEIVED = ADMIN_CONNECTIONS_BASE + "response_received"
     val RESPONSE_SENT = ADMIN_CONNECTIONS_BASE + "response_sent"
+    val REQUEST_SENT = ADMIN_CONNECTIONS_BASE + "request_sent"
     val STATE_REQUEST = ADMIN_BASE + "state_request"
     val STATE_RESPONSE = ADMIN_BASE + "state"
 }
 
 data class WalletConnect(val name: String, val passphrase: String, @JsonProperty("@type") val type: String = MESSAGE_TYPES.CONNECT)
 data class StateRequest(@JsonProperty("@type") val type: String = MESSAGE_TYPES.STATE_REQUEST)
-data class State(@JsonProperty("@type") val type: String = MESSAGE_TYPES.STATE_RESPONSE, val content: Map<String, out Any>? = null)
+data class State(@JsonProperty("@type") val type: String = MESSAGE_TYPES.STATE_RESPONSE, val content: Map<String, Any>? = null)
 data class ReceiveInviteMessage(val invite: String, val label: String = "", @JsonProperty("@type") val type: String = MESSAGE_TYPES.RECEIVE_INVITE)
 data class InviteReceivedMessage(val key: String, val label: String, val endpoint: String, @JsonProperty("@type") val type: String)
 data class SendRequestMessage(val key: String, @JsonProperty("@type") val type: String = MESSAGE_TYPES.SEND_REQUEST)

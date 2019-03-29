@@ -7,6 +7,8 @@ import org.java_websocket.client.WebSocketClient
 import org.java_websocket.handshake.ServerHandshake
 import rx.*
 import java.net.URI
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedDeque
 
 class AgentWebSocketClient(serverUri: URI, private val socketName: String) : WebSocketClient(serverUri) {
     private val log = KotlinLogging.logger {}
@@ -22,97 +24,89 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
     /**
      * inbound messages list
      */
-    private val receivedMessages = mutableListOf<String>()
+    private val receivedMessages = ConcurrentHashMap<String, ConcurrentLinkedDeque<String>>()
+
     /**
      * message routing map
      */
-    private val subscribedObservers = mutableMapOf<String, MutableList<SingleSubscriber<in String>>>()
+    private val subscribedObservers = ConcurrentHashMap<String, ConcurrentLinkedDeque<SingleSubscriber<in String>>>()
 
     /**
      * Adds an observer to (FIFO) queue corresponding to the given key.
      * If the queue doesn't exist for the given key, it's been created.
      */
-    private fun addObserver(key: String, observer: SingleSubscriber<in String>) {
-        if (key in subscribedObservers)
-            subscribedObservers[key]?.add(observer)
-        else
-            subscribedObservers[key] = mutableListOf<SingleSubscriber<in String>>().apply { add(observer) }
-    }
+    private fun addObserver(key: String, observer: SingleSubscriber<in String>) =
+            subscribedObservers.getOrPut(key) { ConcurrentLinkedDeque() }.addLast(observer)
+
+    /**
+     * Adds a message to the queue corresponding to the given key.
+     * If the queue doesn't exist for the given key, it's been created.
+     */
+    private fun storeMessage(key: String, message: String) =
+            receivedMessages.getOrPut(key) { ConcurrentLinkedDeque() }.addLast(message)
 
     /**
      * Removes an observer from the queue.
-     * If the queue is empty, it's been released.
      */
-    private fun removeObserver(key: String, observer: SingleSubscriber<in String>) {
-        if(key in subscribedObservers) {
-            val list = subscribedObservers[key]
-            list?.remove(observer)
-            if (list?.size == 0)
-                subscribedObservers.remove(key)
-        }
-    }
+    private fun popObserver(key: String) =
+            subscribedObservers.getOrPut(key) { ConcurrentLinkedDeque() }.pollFirst()
+
+    /**
+     * Pops a message by key from the queue.
+     */
+    private fun popMessage(key: String) =
+            receivedMessages.getOrPut(key) { ConcurrentLinkedDeque() }.pollFirst()
 
     /**
      * Dispatches the message to an observer.
      * Each message '@type' has own routing agreement
      */
-    override fun onMessage(message: String?) {
+    override fun onMessage(msg: String?) {
+        var message = msg
         log.info { "$socketName:ReceivedMessage: $message" }
         if (message != null) {
-            synchronized(receivedMessages) {
-                val msg = SerializationUtils.jSONToAny<ObjectNode>(message)
-                val type: String = msg["@type"].asText()
-                when {
-                    type.contentEquals(MESSAGE_TYPES.MESSAGE_RECEIVED) -> {
-                        /**
-                         * Object messages are routed by the object class name + sender DID
-                         */
-                        val msgReceived = SerializationUtils.jSONToAny<MessageReceived>(message)
-                        val className = msgReceived.message.content.clazz
-                        val serializedObject = msgReceived.message.content.message
-                        val fromDid = msgReceived.message.from
-                        val key = "$className.$fromDid"
-                        if (key in subscribedObservers.keys) {
-                            /**
-                             * select the first object observer from the list, which must be non-empty,
-                             * remove the observer from the queue, emit the serialized object
-                             */
-                            val observer = subscribedObservers[key]!![0]
-                            removeObserver(key, observer)
-                            observer.onSuccess(SerializationUtils.anyToJSON(serializedObject))
-                            return
-                        }
-                    }
-                    type.contentEquals(MESSAGE_TYPES.INVITE_RECEIVED) ->
-                        /**
-                         * 'invite_received' message is routed by type + public key
-                         */
-                        msg["@key"] = msg["key"]
-                    type.contentEquals(MESSAGE_TYPES.RESPONSE_RECEIVED) ->
-                        /**
-                         * 'response_received' message is routed by type + public key
-                         */
-                        msg["@key"] = msg["history"]["connection~sig"]["signer"]
-                    type.contentEquals(MESSAGE_TYPES.RESPONSE_SENT) ->
-                        /**
-                         * 'response_sent' message is routed by type + other party's DID
-                         */
-                        msg["@key"] = msg["did"]
-                }
-                val key = msg["@key"]
-                val k = if (key == null) type else "$type.${key.asText()}"
-                if (k in subscribedObservers.keys) {
+            val obj = SerializationUtils.jSONToAny<ObjectNode>(message)
+            val type: String = obj["@type"].asText()
+            var key: String? = null
+            when (type) {
+                MESSAGE_TYPES.MESSAGE_RECEIVED -> {
                     /**
-                     * select the first message observer from the list, which must be non-empty,
-                     * remove the observer from the queue, emit the serialized message
+                     * Object messages are routed by the object class name + sender DID
                      */
-                    val observer = subscribedObservers[k]!![0]
-                    removeObserver(k, observer)
-                    observer.onSuccess(message)
-                    return
+                    val msgReceived = SerializationUtils.jSONToAny<MessageReceived>(message)
+                    val className = msgReceived.message.content.clazz
+                    val serializedObject = msgReceived.message.content.message
+                    val fromDid = msgReceived.message.from
+                    key = "$className.$fromDid"
+                    message = SerializationUtils.anyToJSON(serializedObject)
                 }
-                receivedMessages.add(SerializationUtils.anyToJSON(msg))
+                MESSAGE_TYPES.INVITE_RECEIVED ->
+                    /**
+                     * 'invite_received' message is routed by type + public key
+                     */
+                    key = "$type.${obj["key"].asText()}"
+                MESSAGE_TYPES.RESPONSE_RECEIVED ->
+                    /**
+                     * 'response_received' message is routed by type + public key
+                     */
+                    key = "$type.${obj["history"]["connection~sig"]["signer"].asText()}"
+                MESSAGE_TYPES.RESPONSE_SENT ->
+                    /**
+                     * 'response_sent' message is routed by type + other party's DID
+                     */
+                    key = "$type.${obj["did"].asText()}"
             }
+            val k = key ?: type
+            /**
+             * select the first message observer from the list, which must be non-empty,
+             * remove the observer from the queue, emit the serialized message
+             */
+            val observer = popObserver(k)
+            if (observer != null) {
+                observer.onSuccess(message)
+                return
+            }
+            storeMessage(k, message)
         }
     }
 
@@ -170,33 +164,30 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
     inline fun <reified T : Any> sendClassObject(message: T, counterParty: IndyParty) = sendClassObject(TypedBodyMessage(message, T::class.java.canonicalName), counterParty)
 
     /**
+     * Pops message by key, subscribes on such message, if the queue is empty
+     */
+    private fun popMessage(key: String, observer: SingleSubscriber<in String>) {
+        val message = popMessage(key)
+        if (message != null) {
+            /**
+             * if found, remove it from the queue and emit the JSON-serialized message/object
+             */
+            observer.onSuccess(message)
+        } else {
+            /**
+             * otherwise, subscribe on messages with the given key
+             */
+            addObserver(key, observer)
+        }
+    }
+
+    /**
      * Subscribes on a message of the given type and key, emits a Single<> serialized message
      */
     private fun popMessageOfType(type: String, key: String? = null): Single<String> {
         return Single.create { observer ->
             try {
-                synchronized(receivedMessages) {
-                    val result = receivedMessages.find {
-                        /**
-                         * Check if there are such messages in the queue
-                         */
-                        SerializationUtils.jSONToAny<Map<String, Any>>(it)["@type"].toString().contentEquals(type) &&
-                                (key == null || SerializationUtils.jSONToAny<Map<String, Any>>(it)["@key"].toString().contentEquals(key))
-                    }
-                    if (result != null) {
-                        /**
-                         * if found, remove it from the queue and emit the JSON-serialized message
-                         */
-                        receivedMessages.remove(result)
-                        observer.onSuccess(result)
-                    } else {
-                        /**
-                         * otherwise, subscribe on messages of the given type and key
-                         */
-                        val k = if (key == null) type else "$type.$key"
-                        addObserver(k, observer)
-                    }
-                }
+                popMessage(if (key != null) "$type.$key" else type, observer)
             } catch (e: Throwable) {
                 observer.onError(e)
             }
@@ -205,36 +196,12 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
 
     /**
      * Subscribes on a message containing an object coming from another IndyParty (@from)
+     * Emits a Single<> serialized object
      */
     private fun <T : Any> popClassObject(className: Class<T>, from: IndyParty): Single<String> {
         return Single.create { observer ->
             try {
-                synchronized(receivedMessages) {
-                    val message = receivedMessages
-                            .filter { SerializationUtils.jSONToAny<Map<String, Any>>(it)["@type"].toString().contentEquals(MESSAGE_TYPES.MESSAGE_RECEIVED) }
-                            .find {
-                                /**
-                                 * Check if there are such objects in the queue
-                                 */
-                                SerializationUtils.jSONToAny<MessageReceived>(it).message.content.clazz == className.canonicalName &&
-                                        SerializationUtils.jSONToAny<MessageReceived>(it).message.from == from.did
-                            }
-                    if (message != null) {
-                        /**
-                         * if found, remove it from the queue and emit the JSON-serialized object
-                         */
-                        val result = SerializationUtils.anyToJSON(
-                                SerializationUtils.jSONToAny<MessageReceived>(message).message.content.message
-                        )
-                        receivedMessages.remove(message)
-                        observer.onSuccess(result)
-                    } else {
-                        /**
-                         * otherwise, subscribe on objects of the given class and origin
-                         */
-                        addObserver("${className.canonicalName}.${from.did}", observer)
-                    }
-                }
+                popMessage("${className.canonicalName}.${from.did}", observer)
             } catch (e: Throwable) {
                 observer.onError(e)
             }

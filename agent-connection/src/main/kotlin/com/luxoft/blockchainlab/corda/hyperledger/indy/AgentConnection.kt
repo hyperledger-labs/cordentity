@@ -22,6 +22,9 @@ interface IndyPartyConnection {
 
     fun sendProof(proof: ProofInfo)
     fun receiveProof(): Single<ProofInfo>
+
+    fun partyDID(): String
+    fun myDID(): String
 }
 
 class AgentConnectionException(obj: Any) :
@@ -33,10 +36,12 @@ interface AgentConnection {
     fun connect(url: String, login: String, password: String): Single<Unit>
     fun disconnect()
 
-    fun genInvite(): Single<String>
+    fun generateInvite(): Single<String>
     fun acceptInvite(invite: String): Single<IndyPartyConnection>
     fun waitForInvitedParty(invite: String): Single<IndyPartyConnection>
+    fun getIndyPartyConnection(partyDID: String): Single<IndyPartyConnection?>
 
     fun getConnectionStatus(): AgentConnectionStatus
+
 }
 

@@ -7,6 +7,7 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.ProofAttribute
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.ProofPredicate
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.indyUser
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.whoIsNotary
+import com.luxoft.blockchainlab.corda.hyperledger.indy.service.awaitFiber
 import com.luxoft.blockchainlab.corda.hyperledger.indy.service.connectionService
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialFieldReference
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialPredicate
@@ -25,6 +26,7 @@ object VerifyCredentialFlowB2C {
             private val identifier: String,
             private val attributes: List<ProofAttribute>,
             private val predicates: List<ProofPredicate>,
+            private val indyPartyDID: String,
             private val nonRevoked: Interval = Interval.now()
     ) : FlowLogic<Boolean>() {
 
@@ -57,9 +59,9 @@ object VerifyCredentialFlowB2C {
                         nonRevoked = nonRevoked
                 )
 
-                connectionService().sendProofRequest(proofRequest)
+                connectionService().sendProofRequest(proofRequest, indyPartyDID)
 
-                val proof = connectionService().receiveProof()
+                val proof = connectionService().receiveProof(indyPartyDID).awaitFiber()
 
                 val usedData = indyUser().getDataUsedInProof(proofRequest, proof)
                 val credentialProofOut =

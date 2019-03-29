@@ -2,7 +2,9 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy
 
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
 
-data class IndyParty(val webSocket: AgentWebSocketClient, val did: String, val endpoint: String, val verkey: String? = null) : IndyPartyConnection {
+class IndyParty(private val webSocket: AgentWebSocketClient, val did: String, val endpoint: String, val verkey: String, val myDid : String) : IndyPartyConnection {
+    override fun partyDID(): String = did
+    override fun myDID(): String = myDid
     override fun sendCredentialOffer(offer: CredentialOffer) = webSocket.sendClassObject(offer, this)
     override fun receiveCredentialOffer() = webSocket.receiveClassObject<CredentialOffer>(this)
     override fun sendCredentialRequest(request: CredentialRequestInfo) = webSocket.sendClassObject(request, this)

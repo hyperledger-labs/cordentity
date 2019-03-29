@@ -67,7 +67,7 @@ class PythonRefAgentConnectionTest {
         PythonRefAgentConnection().apply {
             connect(agentUrl1, "user95", "pass95").handle { _, ex ->
                 if (ex != null) throw AgentConnectionException(ex.message!!)
-                else genInvite().subscribe {
+                else generateInvite().subscribe {
                     inviteStr = it!!
                     waitForInvitedParty(inviteStr).subscribe { user94 ->
                         user94.receiveCredentialOffer().subscribe { proof94 ->
@@ -85,7 +85,7 @@ class PythonRefAgentConnectionTest {
                             }
                         }
                     }
-                    genInvite().subscribe { invite2 ->
+                    generateInvite().subscribe { invite2 ->
                         inviteStr2 = invite2
                         waitForInvitedParty(inviteStr2).subscribe { user96 ->
                             user96.receiveCredentialOffer().subscribe { proof96 ->
@@ -104,7 +104,7 @@ class PythonRefAgentConnectionTest {
                             }
                         }
                     }
-                    genInvite().subscribe { invite3 ->
+                    generateInvite().subscribe { invite3 ->
                         inviteStr3 = invite3
                         waitForInvitedParty(inviteStr3).subscribe { user97 ->
                             user97.receiveCredentialOffer().subscribe { proof97 ->
@@ -122,7 +122,7 @@ class PythonRefAgentConnectionTest {
                             }
                         }
                     }
-                    genInvite().subscribe { invite4 ->
+                    generateInvite().subscribe { invite4 ->
                         inviteStr4 = invite4
                         waitForInvitedParty(inviteStr4).subscribe { user98 ->
                             user98.receiveCredentialOffer().subscribe { proof98 ->
@@ -140,7 +140,7 @@ class PythonRefAgentConnectionTest {
                             }
                         }
                     }
-                    genInvite().subscribe { invite5 ->
+                    generateInvite().subscribe { invite5 ->
                         inviteStr5 = invite5
                         waitForInvitedParty(inviteStr5).subscribe { user99 ->
                             user99.receiveCredentialOffer().subscribe { proof99 ->
