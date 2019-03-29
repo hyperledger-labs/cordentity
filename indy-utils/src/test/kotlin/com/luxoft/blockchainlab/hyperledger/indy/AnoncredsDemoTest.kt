@@ -3,8 +3,8 @@ package com.luxoft.blockchainlab.hyperledger.indy
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.GenesisHelper
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.PoolHelper
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.WalletHelper
+import com.luxoft.blockchainlab.hyperledger.indy.ledger.IndyPoolLedgerService
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
-import com.luxoft.blockchainlab.hyperledger.indy.utils.StorageUtils
 import junit.framework.Assert.assertFalse
 import org.hyperledger.indy.sdk.did.Did
 import org.hyperledger.indy.sdk.did.DidResults
@@ -113,7 +113,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         issuerDidInfo: DidResults.CreateAndStoreMyDidResult
     ) {
         val target = IdentityDetails(issuerDidInfo.did, issuerDidInfo.verkey, null, "TRUSTEE")
-        LedgerService.addNym(trusteeDid, pool, issuerWallet, target)
+        IndyPoolLedgerService.addNym(trusteeDid, pool, issuerWallet, target)
     }
 
     private fun linkProverToIssuer(
@@ -122,7 +122,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         proverDidInfo: DidResults.CreateAndStoreMyDidResult
     ) {
         val target = IdentityDetails(proverDidInfo.did, proverDidInfo.verkey, null, null)
-        LedgerService.addNym(issuerDid, pool, issuerWallet, target)
+        IndyPoolLedgerService.addNym(issuerDid, pool, issuerWallet, target)
     }
 
     @Test
