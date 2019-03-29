@@ -2,19 +2,19 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy.service
 
 import co.paralleluniverse.fibers.FiberAsync
 import co.paralleluniverse.fibers.Suspendable
-import com.luxoft.blockchainlab.corda.hyperledger.indy.PythonRefAgentConnection
 import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection
+import com.luxoft.blockchainlab.corda.hyperledger.indy.PythonRefAgentConnection
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.ConfigHelper
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
 import net.corda.core.flows.FlowLogic
+import net.corda.core.node.AppServiceHub
 import net.corda.core.node.services.CordaService
 import net.corda.core.serialization.SingletonSerializeAsToken
 import rx.Single
-import java.lang.RuntimeException
 
 
 @CordaService
-class ConnectionService : SingletonSerializeAsToken() {
+class ConnectionService(serviceHub: AppServiceHub) : SingletonSerializeAsToken() {
     fun sendCredentialOffer(offer: CredentialOffer, partyDID: String) = getPartyConnection(partyDID).sendCredentialOffer(offer)
 
     fun receiveCredentialOffer(partyDID: String) = getPartyConnection(partyDID).receiveCredentialOffer()
