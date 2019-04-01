@@ -58,16 +58,14 @@ interface IndyFacade {
      * Creates [CredentialRequest] using [WalletService]
      *
      * @param proverDid: [String]
-     * @param credentialDefinitionId: [CredentialDefinitionId]
      * @param offer: [CredentialOffer]
      *
      * @return [CredentialRequestInfo] - [CredentialRequest] and all related data
      */
     fun createCredentialRequest(
         proverDid: String,
-        credentialDefinitionId: CredentialDefinitionId,
         offer: CredentialOffer,
-        masterSecretId: String
+        masterSecretId: String = "main"
     ): CredentialRequestInfo
 
     /**
@@ -143,7 +141,7 @@ interface IndyFacade {
      */
     fun createProofFromLedgerData(
         proofRequest: ProofRequest,
-        masterSecretId: String
+        masterSecretId: String = "main"
     ): ProofInfo
 
     /**

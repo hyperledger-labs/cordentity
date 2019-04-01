@@ -18,8 +18,8 @@ import java.util.concurrent.ExecutionException
 class IndySDKWalletService(
     val wallet: Wallet,
     did: String?,
-    didConfig: String?,
-    val tailsPath: String
+    didConfig: String? = null,
+    val tailsPath: String = "tails"
 ) : WalletService {
 
     var did: String
@@ -412,6 +412,10 @@ class IndySDKWalletService(
 
     override fun addKnownIdentities(identityDetails: IdentityDetails) {
         Did.storeTheirDid(wallet, SerializationUtils.anyToJSON(identityDetails)).get()
+    }
+
+    override fun getIdentityDetails(): IdentityDetails {
+        return IdentityDetails(did, verkey, null, null)
     }
 }
 

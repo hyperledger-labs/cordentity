@@ -1,3 +1,4 @@
+/*
 package com.luxoft.blockchainlab.hyperledger.indy
 
 import com.luxoft.blockchainlab.hyperledger.indy.IndyIntegrationTest.Companion.TEST_GENESIS_FILE_PATH
@@ -76,4 +77,4 @@ class IndyUserTest {
         ).get()
         assert(utilsId.toString() == credDefInfo.credDefId) { "Generated credDef ID doesn't match SDK' ID anymore" }
     }
-}
+}*/

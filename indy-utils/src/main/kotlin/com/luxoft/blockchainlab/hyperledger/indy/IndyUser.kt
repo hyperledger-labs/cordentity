@@ -57,10 +57,11 @@ class IndyUser(
 
     override fun createCredentialRequest(
         proverDid: String,
-        credentialDefinitionId: CredentialDefinitionId,
         offer: CredentialOffer,
         masterSecretId: String
     ): CredentialRequestInfo {
+        val credentialDefinitionId = offer.getCredentialDefinitionIdObject()
+
         val credentialDefinition = ledgerService.retrieveCredentialDefinition(credentialDefinitionId)
             ?: throw IndyCredentialDefinitionNotFoundException(
                 credentialDefinitionId,

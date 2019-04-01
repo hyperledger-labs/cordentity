@@ -113,7 +113,6 @@ class IndyPoolLedgerService(val pool: Pool, val wallet: Wallet, val did: String)
     }
 
     override fun retrieveSchema(id: SchemaId, delayMs: Long, retryTimes: Int): Schema? {
-        val result: Schema? = null
         val schemaReq = Ledger.buildGetSchemaRequest(did, id.toString()).get()
 
         repeat(retryTimes) {
@@ -128,7 +127,7 @@ class IndyPoolLedgerService(val pool: Pool, val wallet: Wallet, val did: String)
             }
         }
 
-        return result
+        return null
     }
 
     override fun retrieveCredentialDefinition(
@@ -136,8 +135,6 @@ class IndyPoolLedgerService(val pool: Pool, val wallet: Wallet, val did: String)
         delayMs: Long,
         retryTimes: Int
     ): CredentialDefinition? {
-        val result: CredentialDefinition? = null
-
         repeat(retryTimes) {
             try {
                 val getCredDefRequest = Ledger.buildGetCredDefRequest(did, id.toString()).get()
@@ -153,7 +150,7 @@ class IndyPoolLedgerService(val pool: Pool, val wallet: Wallet, val did: String)
             }
         }
 
-        return result
+        return null
     }
 
     override fun retrieveCredentialDefinition(
@@ -175,7 +172,6 @@ class IndyPoolLedgerService(val pool: Pool, val wallet: Wallet, val did: String)
         delayMs: Long,
         retryTimes: Int
     ): RevocationRegistryDefinition? {
-        val result: RevocationRegistryDefinition? = null
         val request = Ledger.buildGetRevocRegDefRequest(did, id.toString()).get()
 
         repeat(retryTimes) {
@@ -190,7 +186,7 @@ class IndyPoolLedgerService(val pool: Pool, val wallet: Wallet, val did: String)
             }
         }
 
-        return result
+        return null
     }
 
     override fun retrieveRevocationRegistryEntry(
@@ -199,7 +195,6 @@ class IndyPoolLedgerService(val pool: Pool, val wallet: Wallet, val did: String)
         delayMs: Long,
         retryTimes: Int
     ): Pair<Long, RevocationRegistryEntry>? {
-        val result: Pair<Long, RevocationRegistryEntry>? = null
         val request = Ledger.buildGetRevocRegRequest(did, id.toString(), timestamp).get()
 
         repeat(retryTimes) {
@@ -220,7 +215,7 @@ class IndyPoolLedgerService(val pool: Pool, val wallet: Wallet, val did: String)
             }
         }
 
-        return result
+        return null
     }
 
     override fun retrieveRevocationRegistryDelta(
@@ -229,8 +224,6 @@ class IndyPoolLedgerService(val pool: Pool, val wallet: Wallet, val did: String)
         delayMs: Long,
         retryTimes: Int
     ): Pair<Long, RevocationRegistryEntry>? {
-        val result: Pair<Long, RevocationRegistryEntry>? = null
-
         repeat(retryTimes) {
             try {
                 val from = interval.from
@@ -253,7 +246,7 @@ class IndyPoolLedgerService(val pool: Pool, val wallet: Wallet, val did: String)
             }
         }
 
-        return result
+        return null
     }
 
     override fun retrieveDataUsedInProof(

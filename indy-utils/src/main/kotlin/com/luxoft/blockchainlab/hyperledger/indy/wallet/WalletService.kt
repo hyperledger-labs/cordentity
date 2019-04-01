@@ -216,4 +216,9 @@ interface IndyWalletHolder {
      * @return                          newly created did
      */
     fun createSessionDid(identityRecord: IdentityDetails): String
+
+    /**
+     * Gets [IdentityDetails] of current user
+     */
+    fun getIdentityDetails(): IdentityDetails
 }
