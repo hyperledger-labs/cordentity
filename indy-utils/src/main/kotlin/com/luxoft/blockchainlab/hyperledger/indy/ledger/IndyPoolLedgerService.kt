@@ -1,6 +1,5 @@
 package com.luxoft.blockchainlab.hyperledger.indy.ledger
 
-import com.luxoft.blockchainlab.hyperledger.indy.IndyUser
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import mu.KotlinLogging
@@ -19,52 +18,46 @@ const val RETRY_TIMES: Int = 10
  *
  * @param pool                  indy pool handle
  */
-class IndyPoolLedgerService(private val pool: Pool) : LedgerService {
+class IndyPoolLedgerService(val pool: Pool, val wallet: Wallet, val did: String) : LedgerService {
 
     val logger = KotlinLogging.logger {}
 
-    private fun store(data: String, did: String, wallet: Wallet) {
+    private fun store(data: String) {
         val attemptId = Random().nextLong()
         logger.debug { "Trying to store data on ledger [attempt id = $attemptId]: $data" }
         val response = Ledger.signAndSubmitRequest(pool, wallet, did, data).get()
         logger.debug { "Ledger responded [attempt id = $attemptId]: $response" }
     }
 
-    override fun storeSchema(schema: Schema, did: String, wallet: Wallet) {
+    override fun storeSchema(schema: Schema) {
         val schemaJson = SerializationUtils.anyToJSON(schema)
         val schemaRequest = Ledger.buildSchemaRequest(did, schemaJson).get()
-        store(schemaRequest, did, wallet)
+        store(schemaRequest)
     }
 
-    override fun storeRevocationRegistryDefinition(
-        definition: RevocationRegistryDefinition,
-        did: String,
-        wallet: Wallet
-    ) {
+    override fun storeRevocationRegistryDefinition(definition: RevocationRegistryDefinition) {
         val defJson = SerializationUtils.anyToJSON(definition)
         val defRequest = Ledger.buildRevocRegDefRequest(did, defJson).get()
-        store(defRequest, did, wallet)
+        store(defRequest)
     }
 
     override fun storeRevocationRegistryEntry(
         entry: RevocationRegistryEntry,
         definitionId: String,
-        definitionType: String,
-        did: String,
-        wallet: Wallet
+        definitionType: String
     ) {
         val entryJson = SerializationUtils.anyToJSON(entry)
         val entryRequest = Ledger.buildRevocRegEntryRequest(did, definitionId, definitionType, entryJson).get()
-        store(entryRequest, did, wallet)
+        store(entryRequest)
     }
 
-    override fun storeCredentialDefinition(definition: CredentialDefinition, did: String, wallet: Wallet) {
+    override fun storeCredentialDefinition(definition: CredentialDefinition) {
         val credDefJson = SerializationUtils.anyToJSON(definition)
         val request = Ledger.buildCredDefRequest(did, credDefJson).get()
-        store(request, did, wallet)
+        store(request)
     }
 
-    override fun storeNym(about: IdentityDetails, did: String, wallet: Wallet) {
+    override fun storeNym(about: IdentityDetails) {
         val nymRequest = Ledger.buildNymRequest(
             did,
             about.did,
@@ -76,7 +69,7 @@ class IndyPoolLedgerService(private val pool: Pool) : LedgerService {
         Ledger.signAndSubmitRequest(pool, wallet, did, nymRequest).get()
     }
 
-    override fun schemaExists(id: SchemaId, did: String): Boolean {
+    override fun schemaExists(id: SchemaId): Boolean {
         val schemaReq = Ledger.buildGetSchemaRequest(did, id.toString()).get()
 
         return try {
@@ -91,7 +84,7 @@ class IndyPoolLedgerService(private val pool: Pool) : LedgerService {
         }
     }
 
-    override fun credentialDefinitionExists(credentialDefinitionId: CredentialDefinitionId, did: String): Boolean {
+    override fun credentialDefinitionExists(credentialDefinitionId: CredentialDefinitionId): Boolean {
         return try {
             val getCredDefRequest = Ledger.buildGetCredDefRequest(did, credentialDefinitionId.toString()).get()
             val getCredDefResponse = Ledger.submitRequest(pool, getCredDefRequest).get()
@@ -105,7 +98,7 @@ class IndyPoolLedgerService(private val pool: Pool) : LedgerService {
         }
     }
 
-    override fun revocationRegistryExists(id: RevocationRegistryDefinitionId, did: String): Boolean {
+    override fun revocationRegistryExists(id: RevocationRegistryDefinitionId): Boolean {
         return try {
             val request = Ledger.buildGetRevocRegDefRequest(did, id.toString()).get()
             val response = Ledger.submitRequest(pool, request).get()
@@ -119,7 +112,7 @@ class IndyPoolLedgerService(private val pool: Pool) : LedgerService {
         }
     }
 
-    override fun retrieveSchema(id: SchemaId, did: String, delayMs: Long, retryTimes: Int): Schema? {
+    override fun retrieveSchema(id: SchemaId, delayMs: Long, retryTimes: Int): Schema? {
         val result: Schema? = null
         val schemaReq = Ledger.buildGetSchemaRequest(did, id.toString()).get()
 
@@ -140,7 +133,6 @@ class IndyPoolLedgerService(private val pool: Pool) : LedgerService {
 
     override fun retrieveCredentialDefinition(
         id: CredentialDefinitionId,
-        did: String,
         delayMs: Long,
         retryTimes: Int
     ): CredentialDefinition? {
@@ -166,24 +158,20 @@ class IndyPoolLedgerService(private val pool: Pool) : LedgerService {
 
     override fun retrieveCredentialDefinition(
         id: SchemaId,
-        did: String,
+        tag: String,
         delayMs: Long,
         retryTimes: Int
     ): CredentialDefinition? {
-        val schema = retrieveSchema(id, did, delayMs, retryTimes)
+        val schema = retrieveSchema(id, delayMs, retryTimes)
             ?: throw RuntimeException("Schema is not found in ledger")
 
-        val credentialDefinitionId = CredentialDefinitionId(
-            did, schema.seqNo!!,
-            IndyUser.TAG
-        )
+        val credentialDefinitionId = CredentialDefinitionId(did, schema.seqNo!!, tag)
 
-        return retrieveCredentialDefinition(credentialDefinitionId, did, delayMs, retryTimes)
+        return retrieveCredentialDefinition(credentialDefinitionId, delayMs, retryTimes)
     }
 
     override fun retrieveRevocationRegistryDefinition(
         id: RevocationRegistryDefinitionId,
-        did: String,
         delayMs: Long,
         retryTimes: Int
     ): RevocationRegistryDefinition? {
@@ -208,7 +196,6 @@ class IndyPoolLedgerService(private val pool: Pool) : LedgerService {
     override fun retrieveRevocationRegistryEntry(
         id: RevocationRegistryDefinitionId,
         timestamp: Long,
-        did: String,
         delayMs: Long,
         retryTimes: Int
     ): Pair<Long, RevocationRegistryEntry>? {
@@ -239,7 +226,6 @@ class IndyPoolLedgerService(private val pool: Pool) : LedgerService {
     override fun retrieveRevocationRegistryDelta(
         id: RevocationRegistryDefinitionId,
         interval: Interval,
-        did: String,
         delayMs: Long,
         retryTimes: Int
     ): Pair<Long, RevocationRegistryEntry>? {
@@ -273,7 +259,6 @@ class IndyPoolLedgerService(private val pool: Pool) : LedgerService {
     override fun retrieveDataUsedInProof(
         proofRequest: ProofRequest,
         proof: ProofInfo,
-        did: String,
         delayMs: Long,
         retryTimes: Int
     ): DataUsedInProofJson {
@@ -281,7 +266,7 @@ class IndyPoolLedgerService(private val pool: Pool) : LedgerService {
             .map { it.getSchemaIdObject() }
             .distinct()
             .map {
-                retrieveSchema(it, did, delayMs, retryTimes)
+                retrieveSchema(it, delayMs, retryTimes)
                     ?: throw RuntimeException("Schema $it doesn't exist in ledger")
             }
             .associate { it.id to it }
@@ -291,7 +276,7 @@ class IndyPoolLedgerService(private val pool: Pool) : LedgerService {
             .map { it.getCredentialDefinitionIdObject() }
             .distinct()
             .map {
-                retrieveCredentialDefinition(it, did, delayMs, retryTimes)
+                retrieveCredentialDefinition(it, delayMs, retryTimes)
                     ?: throw RuntimeException("Credential definition $it doesn't exist in ledger")
             }
             .associate { it.id to it }
@@ -302,7 +287,7 @@ class IndyPoolLedgerService(private val pool: Pool) : LedgerService {
                 .map { it.getRevocationRegistryIdObject()!! }
                 .distinct()
                 .map {
-                    retrieveRevocationRegistryDefinition(it, did, delayMs, retryTimes)
+                    retrieveRevocationRegistryDefinition(it, delayMs, retryTimes)
                         ?: throw RuntimeException("Revocation registry definition $it doesn't exist in ledger")
                 }
                 .associate { it.id to it }
@@ -311,7 +296,7 @@ class IndyPoolLedgerService(private val pool: Pool) : LedgerService {
                 .map { Pair(it.getRevocationRegistryIdObject()!!, it.timestamp!!) }
                 .distinct()
                 .associate { (revRegId, timestamp) ->
-                    val response = retrieveRevocationRegistryEntry(revRegId, timestamp, did, delayMs, retryTimes)
+                    val response = retrieveRevocationRegistryEntry(revRegId, timestamp, delayMs, retryTimes)
                         ?: throw RuntimeException("Revocation registry for definition $revRegId at timestamp $timestamp doesn't exist in ledger")
 
                     val (tmstmp, revReg) = response

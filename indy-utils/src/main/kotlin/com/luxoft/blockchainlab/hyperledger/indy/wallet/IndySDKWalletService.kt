@@ -5,12 +5,15 @@ import com.luxoft.blockchainlab.hyperledger.indy.models.*
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import com.luxoft.blockchainlab.hyperledger.indy.utils.getRootCause
 import org.hyperledger.indy.sdk.anoncreds.Anoncreds
+import org.hyperledger.indy.sdk.anoncreds.DuplicateMasterSecretNameException
 import org.hyperledger.indy.sdk.did.Did
 import org.hyperledger.indy.sdk.pairwise.Pairwise
 import org.hyperledger.indy.sdk.pool.Pool
 import org.hyperledger.indy.sdk.wallet.Wallet
 import org.hyperledger.indy.sdk.wallet.WalletItemNotFoundException
+import org.slf4j.LoggerFactory
 import java.util.concurrent.ExecutionException
+
 
 class IndySDKWalletService(
     val wallet: Wallet,
@@ -19,8 +22,10 @@ class IndySDKWalletService(
     val tailsPath: String
 ) : WalletService {
 
-    override lateinit var did: String
-    override lateinit var verkey: String
+    var did: String
+    var verkey: String
+
+    val logger = LoggerFactory.getLogger(IndySDKWalletService::class.java)
 
     init {
         var newDid: String
@@ -53,6 +58,41 @@ class IndySDKWalletService(
     val REVOCATION_TAG = "REV_TAG_1"
     val ISSUANCE_ON_DEMAND = "ISSUANCE_ON_DEMAND"
     val EMPTY_OBJECT = "{}"
+
+    override fun createRevocationState(
+        revocationRegistryDefinition: RevocationRegistryDefinition,
+        revocationRegistryEntry: RevocationRegistryEntry,
+        credentialRevocationId: String,
+        timestamp: Long
+    ): RevocationState {
+        val tailsReaderHandle = TailsHelper.getTailsHandler(tailsPath).reader.blobStorageReaderHandle
+
+        val revRegDefJson = SerializationUtils.anyToJSON(revocationRegistryDefinition)
+        val revRegDeltaJson = SerializationUtils.anyToJSON(revocationRegistryEntry)
+
+        val revStateJson = Anoncreds.createRevocationState(
+            tailsReaderHandle,
+            revRegDefJson,
+            revRegDeltaJson,
+            timestamp,
+            credentialRevocationId
+        ).get()
+
+        val revocationState = SerializationUtils.jSONToAny<RevocationState>(revStateJson)
+        revocationState.revocationRegistryIdRaw = revocationRegistryDefinition.revocationRegistryIdRaw
+
+        return revocationState
+    }
+
+    override fun createMasterSecret(id: String) {
+        try {
+            Anoncreds.proverCreateMasterSecret(wallet, id).get()
+        } catch (e: ExecutionException) {
+            if (getRootCause(e) !is DuplicateMasterSecretNameException) throw e
+
+            logger.debug("MasterSecret already exists, who cares, continuing")
+        }
+    }
 
     override fun createSchema(name: String, version: String, attributes: List<String>): Schema {
         val attributesJson = SerializationUtils.anyToJSON(attributes)

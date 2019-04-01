@@ -1,8 +1,6 @@
 package com.luxoft.blockchainlab.hyperledger.indy.ledger
 
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
-import org.hyperledger.indy.sdk.wallet.Wallet
-import java.lang.Thread.sleep
 
 
 interface LedgerService {
@@ -11,14 +9,14 @@ interface LedgerService {
      *
      * @param schema            schema to store
      */
-    fun storeSchema(schema: Schema, did: String, wallet: Wallet)
+    fun storeSchema(schema: Schema)
 
     /**
      * Stores revocation registry definition on ledger
      *
      * @param definition        revocation registry definition to store
      */
-    fun storeRevocationRegistryDefinition(definition: RevocationRegistryDefinition, did: String, wallet: Wallet)
+    fun storeRevocationRegistryDefinition(definition: RevocationRegistryDefinition)
 
     /**
      * Stores revocation registry entry on ledger (when credential is just created)
@@ -30,9 +28,7 @@ interface LedgerService {
     fun storeRevocationRegistryEntry(
         entry: RevocationRegistryEntry,
         definitionId: String,
-        definitionType: String,
-        did: String,
-        wallet: Wallet
+        definitionType: String
     )
 
     /**
@@ -40,16 +36,14 @@ interface LedgerService {
      *
      * @param definition        credential definition to store
      */
-    fun storeCredentialDefinition(definition: CredentialDefinition, did: String, wallet: Wallet)
+    fun storeCredentialDefinition(definition: CredentialDefinition)
 
     /**
      * Adds NYM record to ledger. E.g. "I trust this person"
      *
-     * @param did           trustee did
-     * @param wallet        trustee wallet handle
      * @param about         identity details about entity that trustee wants to trust
      */
-    fun storeNym(about: IdentityDetails, did: String, wallet: Wallet)
+    fun storeNym(about: IdentityDetails)
 
     /**
      * Check if credential definition exist on ledger
@@ -58,7 +52,7 @@ interface LedgerService {
      *
      * @return                          true if exist otherwise false
      */
-    fun credentialDefinitionExists(credentialDefinitionId: CredentialDefinitionId, did: String): Boolean
+    fun credentialDefinitionExists(credentialDefinitionId: CredentialDefinitionId): Boolean
 
     /**
      * Check if schema exist on ledger
@@ -67,7 +61,7 @@ interface LedgerService {
      *
      * @return                  true if exist otherwise false
      */
-    fun schemaExists(id: SchemaId, did: String): Boolean
+    fun schemaExists(id: SchemaId): Boolean
 
     /**
      * Check if revocation registry exists on ledger
@@ -75,19 +69,17 @@ interface LedgerService {
      * @param id: [RevocationRegistryDefinitionId] - id of this registry
      * @return: [Boolean]
      */
-    fun revocationRegistryExists(id: RevocationRegistryDefinitionId, did: String): Boolean
+    fun revocationRegistryExists(id: RevocationRegistryDefinitionId): Boolean
 
     /**
      * Retrieves schema from ledger
      *
-     * @param did           indy user did
      * @param id            id of target schema
      *
      * @return              schema or null if none exists on ledger
      */
     fun retrieveSchema(
         id: SchemaId,
-        did: String,
         delayMs: Long = RETRY_DELAY_MS,
         retryTimes: Int = RETRY_TIMES
     ): Schema?
@@ -95,14 +87,12 @@ interface LedgerService {
     /**
      * Retrieves credential definition from ledger
      *
-     * @param did           indy user did
      * @param id            id of target credential definition
      *
      * @return              credential definition or null if none exists on ledger
      */
     fun retrieveCredentialDefinition(
         id: CredentialDefinitionId,
-        did: String,
         delayMs: Long = RETRY_DELAY_MS,
         retryTimes: Int = RETRY_TIMES
     ): CredentialDefinition?
@@ -110,14 +100,13 @@ interface LedgerService {
     /**
      * Retrieves credential definition from ledger by schema Id
      *
-     * @param did           indy user did
      * @param id            schema id
      *
      * @return              credential definition or null if it doesn't exist in ledger
      */
     fun retrieveCredentialDefinition(
         id: SchemaId,
-        did: String,
+        tag: String,
         delayMs: Long = RETRY_DELAY_MS,
         retryTimes: Int = RETRY_TIMES
     ): CredentialDefinition?
@@ -125,14 +114,12 @@ interface LedgerService {
     /**
      * Retrieves revocation registry definition from ledger
      *
-     * @param did           indy user did
      * @param id            target revocation registry definition id
      *
      * @return              revocation registry definition or null if none exists on ledger
      */
     fun retrieveRevocationRegistryDefinition(
         id: RevocationRegistryDefinitionId,
-        did: String,
         delayMs: Long = RETRY_DELAY_MS,
         retryTimes: Int = RETRY_TIMES
     ): RevocationRegistryDefinition?
@@ -140,7 +127,6 @@ interface LedgerService {
     /**
      * Retrieves revocation registry entry from ledger
      *
-     * @param did           indy user did
      * @param id            revocation registry id
      * @param timestamp     time from unix epoch in seconds representing time moment you are
      *                      interested in e.g. if you want to know current revocation state,
@@ -151,7 +137,6 @@ interface LedgerService {
     fun retrieveRevocationRegistryEntry(
         id: RevocationRegistryDefinitionId,
         timestamp: Long,
-        did: String,
         delayMs: Long = RETRY_DELAY_MS,
         retryTimes: Int = RETRY_TIMES
     ): Pair<Long, RevocationRegistryEntry>?
@@ -159,7 +144,6 @@ interface LedgerService {
     /**
      * Retrieves revocation registry delta from ledger
      *
-     * @param did           indy user did
      * @param id            revocation registry definition id
      * @param interval      time interval you are interested in
      *
@@ -168,7 +152,6 @@ interface LedgerService {
     fun retrieveRevocationRegistryDelta(
         id: RevocationRegistryDefinitionId,
         interval: Interval,
-        did: String,
         delayMs: Long = RETRY_DELAY_MS,
         retryTimes: Int = RETRY_TIMES
     ): Pair<Long, RevocationRegistryEntry>?
@@ -177,7 +160,6 @@ interface LedgerService {
      * Gets from ledger all data needed to verify proof. When prover creates proof he also uses this public data.
      * So prover and verifier are using the same public immutable data to generate cryptographic objects.
      *
-     * @param did               verifier did
      * @param proofRequest      proof request used by prover to create proof
      * @param proof             proof created by prover
      *
@@ -186,7 +168,6 @@ interface LedgerService {
     fun retrieveDataUsedInProof(
         proofRequest: ProofRequest,
         proof: ProofInfo,
-        did: String,
         delayMs: Long = RETRY_DELAY_MS,
         retryTimes: Int = RETRY_TIMES
     ): DataUsedInProofJson

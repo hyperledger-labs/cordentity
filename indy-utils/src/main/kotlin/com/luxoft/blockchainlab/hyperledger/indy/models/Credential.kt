@@ -1,7 +1,8 @@
 package com.luxoft.blockchainlab.hyperledger.indy.models
 
-import com.fasterxml.jackson.annotation.JsonGetter
 import com.fasterxml.jackson.annotation.JsonProperty
+import java.math.BigInteger
+import java.nio.charset.StandardCharsets
 
 /**
  * Represents credential offer structure from.
@@ -98,7 +99,12 @@ data class Credential(
     val signatureCorrectnessProof: RawJsonMap
 ) : ContainsSchemaId, ContainsCredentialDefinitionId, ContainsRevocationRegistryId
 
-data class CredentialValue(val raw: String, val encoded: String)
+data class CredentialValue(
+    val raw: String,
+    val encoded: String = if (raw.toLongOrNull() == null)
+        BigInteger(raw.toByteArray(StandardCharsets.UTF_8)).toString(10)
+    else raw
+)
 
 data class CredentialInfo(val credential: Credential, val credRevocId: String?, val revocRegDeltaJson: String?)
 
@@ -153,3 +159,15 @@ data class CredentialRequestMetadata(
     val masterSecretName: String,
     val nonce: String
 )
+
+/**
+ *   "{\n" +
+ *       \"sex\": {\"raw\": \"male\", \"encoded\": \"5944657099558967239210949258394887428692050081607692519917050\"},\n" +
+ *       \"name\": {\"raw\": \"Alex\", \"encoded\": \"1139481716457488690172217916278103335\"},\n" +
+ *       \"height\": {\"raw\": \"175\", \"encoded\": \"175\"},\n" +
+ *       \"age\": {\"raw\": \"28\", \"encoded\": \"28\"}\n" +
+ *   }"
+ */
+class CredentialProposal(vararg values: Pair<String, CredentialValue>) {
+    val map = mapOf(*values)
+}

@@ -11,42 +11,6 @@ interface WalletService : IndyIssuer, IndyProver, IndyVerifier, IndyTrustee
  * Has read/write access to public ledger.
  */
 interface IndyIssuer : IndyWalletHolder {
-    /**
-     * Creates new schema and stores it to ledger if not exists, else restores schema from ledger
-     *
-     * @param name                      new schema name
-     * @param version                   schema version (???)
-     * @param attributes                schema attributes
-     *
-     * @return                          created schema
-     */
-    fun createSchema(name: String, version: String, attributes: List<String>): Schema
-
-    /**
-     * Creates credential definition and stores it to ledger if not exists, else restores credential definition from ledger
-     *
-     * @param schema                    schema to create credential definition for
-     * @param enableRevocation          whether enable or disable revocation for this credential definition
-     *                                  (hint) turn this on by default, but just don't revoke credentials
-     *
-     * @return                          created credential definition
-     */
-    fun createCredentialDefinition(schema: Schema, enableRevocation: Boolean): CredentialDefinition
-
-    /**
-     * Creates revocation registry for credential definition if there's no one in ledger
-     * (usable only for those credential definition for which enableRevocation = true)
-     *
-     * @param credentialDefinitionId    credential definition id
-     * @param maxCredentialNumber       maximum number of credentials which can be issued for this credential definition
-     *                                  (example) driver agency can produce only 1000 driver licences per year
-     *
-     * @return                          created
-     */
-    fun createRevocationRegistry(
-        credentialDefinitionId: CredentialDefinitionId,
-        maxCredentialNumber: Int
-    ): RevocationRegistryInfo
 
     /**
      * Creates credential offer
@@ -79,7 +43,10 @@ interface IndyIssuer : IndyWalletHolder {
      * @param revocationRegistryId      revocation registry definition id
      * @param credentialRevocationId    revocation registry credential index
      */
-    fun revokeCredential(revocationRegistryId: RevocationRegistryDefinitionId, credentialRevocationId: String): RevocationRegistryEntry
+    fun revokeCredential(
+        revocationRegistryId: RevocationRegistryDefinitionId,
+        credentialRevocationId: String
+    ): RevocationRegistryEntry
 }
 
 /**
@@ -132,6 +99,21 @@ interface IndyProver : IndyWalletHolder {
         masterSecretId: String,
         revocationStateProvider: RevocationStateProvider?
     ): ProofInfo
+
+    /**
+     * Creates [RevocationState]
+     */
+    fun createRevocationState(
+        revocationRegistryDefinition: RevocationRegistryDefinition,
+        revocationRegistryEntry: RevocationRegistryEntry,
+        credentialRevocationId: String,
+        timestamp: Long
+    ): RevocationState
+
+    /**
+     * Creates master secret by id
+     */
+    fun createMasterSecret(id: String)
 }
 
 /**
@@ -146,6 +128,43 @@ interface IndyTrustee : IndyWalletHolder {
      * @param identityDetails
      */
     fun addKnownIdentities(identityDetails: IdentityDetails)
+
+    /**
+     * Creates new schema and stores it to ledger if not exists, else restores schema from ledger
+     *
+     * @param name                      new schema name
+     * @param version                   schema version (???)
+     * @param attributes                schema attributes
+     *
+     * @return                          created schema
+     */
+    fun createSchema(name: String, version: String, attributes: List<String>): Schema
+
+    /**
+     * Creates credential definition and stores it to ledger if not exists, else restores credential definition from ledger
+     *
+     * @param schema                    schema to create credential definition for
+     * @param enableRevocation          whether enable or disable revocation for this credential definition
+     *                                  (hint) turn this on by default, but just don't revoke credentials
+     *
+     * @return                          created credential definition
+     */
+    fun createCredentialDefinition(schema: Schema, enableRevocation: Boolean): CredentialDefinition
+
+    /**
+     * Creates revocation registry for credential definition if there's no one in ledger
+     * (usable only for those credential definition for which enableRevocation = true)
+     *
+     * @param credentialDefinitionId    credential definition id
+     * @param maxCredentialNumber       maximum number of credentials which can be issued for this credential definition
+     *                                  (example) driver agency can produce only 1000 driver licences per year
+     *
+     * @return                          created
+     */
+    fun createRevocationRegistry(
+        credentialDefinitionId: CredentialDefinitionId,
+        maxCredentialNumber: Int
+    ): RevocationRegistryInfo
 }
 
 /**
@@ -189,9 +208,6 @@ interface IndyVerifier {
  * Represents basic entity which has indy wallet
  */
 interface IndyWalletHolder {
-    var did: String
-    var verkey: String
-
     /**
      * Creates temporary did which can be used by identity to perform some any operations
      *
