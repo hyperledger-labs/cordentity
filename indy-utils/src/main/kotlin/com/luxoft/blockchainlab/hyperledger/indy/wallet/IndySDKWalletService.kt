@@ -10,21 +10,18 @@ import org.hyperledger.indy.sdk.did.Did
 import org.hyperledger.indy.sdk.pairwise.Pairwise
 import org.hyperledger.indy.sdk.pool.Pool
 import org.hyperledger.indy.sdk.wallet.Wallet
-import org.hyperledger.indy.sdk.wallet.WalletItemNotFoundException
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ExecutionException
 
 
 class IndySDKWalletService(
     val wallet: Wallet,
-    did: String?,
-    didConfig: String? = null,
+    didConfig: DidConfig = DidConfig(),
     val tailsPath: String = "tails"
 ) : WalletService {
 
     var did: String
     var verkey: String
-
     val logger = LoggerFactory.getLogger(IndySDKWalletService::class.java)
 
     companion object {
@@ -37,28 +34,9 @@ class IndySDKWalletService(
     }
 
     init {
-        var newDid: String
-        var newVerkey: String
-
-        if (did != null) {
-            try {
-                newDid = did
-                newVerkey = Did.keyForLocalDid(wallet, did).get()
-
-            } catch (ex: ExecutionException) {
-                if (getRootCause(ex) !is WalletItemNotFoundException) throw ex
-
-                val didResult = Did.createAndStoreMyDid(wallet, didConfig).get()
-                newDid = didResult.did
-                newVerkey = didResult.verkey
-            }
-        } else {
-            val didResult = Did.createAndStoreMyDid(wallet, didConfig).get()
-            newDid = didResult.did
-            newVerkey = didResult.verkey
-        }
-        this.did = newDid
-        this.verkey = newVerkey
+        val didResult = Did.createAndStoreMyDid(wallet, SerializationUtils.anyToJSON(didConfig)).get()
+        this.did = didResult.did
+        this.verkey = didResult.verkey
     }
 
     override fun createRevocationState(

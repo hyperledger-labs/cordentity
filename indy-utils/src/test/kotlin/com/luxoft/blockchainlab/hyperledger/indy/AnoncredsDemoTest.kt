@@ -25,15 +25,12 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
     private val proverWalletName = "proverWallet"
 
     private lateinit var issuerWallet: Wallet
-    private lateinit var issuerDidInfo: DidResults.CreateAndStoreMyDidResult
     private lateinit var issuer1: IndyFacade
 
     private lateinit var issuer2Wallet: Wallet
-    private lateinit var issuer2DidInfo: DidResults.CreateAndStoreMyDidResult
     private lateinit var issuer2: IndyFacade
 
     private lateinit var proverWallet: Wallet
-    private lateinit var proverDidInfo: DidResults.CreateAndStoreMyDidResult
     private lateinit var prover: IndyFacade
 
     companion object {
@@ -80,28 +77,25 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         WalletHelper.createOrTrunc(proverWalletName, walletPassword)
         proverWallet = WalletHelper.openExisting(proverWalletName, walletPassword)
 
-        // create did's
+        // create trustee did
         val trusteeDidInfo = createTrusteeDid(trusteeWallet)
-        issuerDidInfo = createDid(issuerWallet)
-        issuer2DidInfo = createDid(issuer2Wallet)
-        proverDidInfo = createDid(proverWallet)
 
         // create indy users
-        val issuerWalletService = IndySDKWalletService(issuerWallet, issuerDidInfo.did)
-        val issuerLedgerService = IndyPoolLedgerService(pool, issuerWallet, issuerDidInfo.did)
+        val issuerWalletService = IndySDKWalletService(issuerWallet)
+        val issuerLedgerService = IndyPoolLedgerService(pool, issuerWallet, issuerWalletService.did)
         issuer1 = IndyUser.with(issuerWalletService).with(issuerLedgerService).build()
 
-        val issuer2WalletService = IndySDKWalletService(issuer2Wallet, issuer2DidInfo.did)
-        val issuer2LedgerService = IndyPoolLedgerService(pool, issuer2Wallet, issuer2DidInfo.did)
+        val issuer2WalletService = IndySDKWalletService(issuer2Wallet)
+        val issuer2LedgerService = IndyPoolLedgerService(pool, issuer2Wallet, issuer2WalletService.did)
         issuer2 = IndyUser.with(issuer2LedgerService).with(issuer2WalletService).build()
 
-        val proverWalletService = IndySDKWalletService(proverWallet, proverDidInfo.did)
-        val proverLedgerService = IndyPoolLedgerService(pool, proverWallet, proverDidInfo.did)
+        val proverWalletService = IndySDKWalletService(proverWallet)
+        val proverLedgerService = IndyPoolLedgerService(pool, proverWallet, proverWalletService.did)
         prover = IndyUser.with(proverLedgerService).with(proverWalletService).build()
 
         // set relationships
-        linkIssuerToTrustee(trusteeWallet, trusteeDidInfo, issuerDidInfo)
-        linkIssuerToTrustee(trusteeWallet, trusteeDidInfo, issuer2DidInfo)
+        linkIssuerToTrustee(trusteeWallet, trusteeDidInfo, issuerWalletService.getIdentityDetails())
+        linkIssuerToTrustee(trusteeWallet, trusteeDidInfo, issuer2WalletService.getIdentityDetails())
 
         issuer1.addKnownIdentitiesAndStoreOnLedger(prover.walletService.getIdentityDetails())
 
@@ -111,7 +105,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
     private fun linkIssuerToTrustee(
         trusteeWallet: Wallet,
         trusteeDidInfo: DidResults.CreateAndStoreMyDidResult,
-        issuerDidInfo: DidResults.CreateAndStoreMyDidResult
+        issuerDidInfo: IdentityDetails
     ) {
         val nymRequest = Ledger.buildNymRequest(
             trusteeDidInfo.did,
@@ -136,7 +130,6 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
     }
 
     private fun createTrusteeDid(wallet: Wallet) = Did.createAndStoreMyDid(wallet, """{"seed":"$TRUSTEE_SEED"}""").get()
-    private fun createDid(wallet: Wallet) = Did.createAndStoreMyDid(wallet, "{}").get()
 
     @Test
     @Throws(Exception::class)
@@ -147,7 +140,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
             issuer1.createRevocationRegistryAndStoreOnLedger(credDef.getCredentialDefinitionIdObject(), 5)
 
         val credOffer = issuer1.createCredentialOffer(credDef.getCredentialDefinitionIdObject())
-        val credReq = prover.createCredentialRequest(proverDidInfo.did, credOffer)
+        val credReq = prover.createCredentialRequest(prover.walletService.getIdentityDetails().did, credOffer)
         val credentialInfo = issuer1.issueCredentialAndUpdateLedger(
             credReq,
             credOffer,
@@ -207,7 +200,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         val gvtSchema = issuer1.createSchemaAndStoreOnLedger(GVT_SCHEMA_NAME, SCHEMA_VERSION, GVT_SCHEMA_ATTRIBUTES)
         val credDef = issuer1.createCredentialDefinitionAndStoreOnLedger(gvtSchema.getSchemaIdObject(), false)
         val credOffer = issuer1.createCredentialOffer(credDef.getCredentialDefinitionIdObject())
-        val credReq = prover.createCredentialRequest(proverDidInfo.did, credOffer)
+        val credReq = prover.createCredentialRequest(prover.walletService.getIdentityDetails().did, credOffer)
         val credentialInfo = issuer1.issueCredentialAndUpdateLedger(
             credReq,
             credOffer,
@@ -250,7 +243,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         val gvtCredOffer = issuer1.createCredentialOffer(credDef1.getCredentialDefinitionIdObject())
         val xyzCredOffer = issuer2.createCredentialOffer(credDef2.getCredentialDefinitionIdObject())
 
-        val gvtCredReq = prover.createCredentialRequest(proverDidInfo.did, gvtCredOffer)
+        val gvtCredReq = prover.createCredentialRequest(prover.walletService.getIdentityDetails().did, gvtCredOffer)
         val gvtCredential = issuer1.issueCredentialAndUpdateLedger(gvtCredReq, gvtCredOffer, null) {
             mapOf(
                 "sex" to CredentialValue("male"),
@@ -261,7 +254,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         }
         prover.receiveCredential(gvtCredential, gvtCredReq, gvtCredOffer)
 
-        val xyzCredReq = prover.createCredentialRequest(proverDidInfo.did, xyzCredOffer)
+        val xyzCredReq = prover.createCredentialRequest(prover.walletService.getIdentityDetails().did, xyzCredOffer)
         val xyzCredential = issuer2.issueCredentialAndUpdateLedger(xyzCredReq, xyzCredOffer, null) {
             mapOf(
                 "status" to CredentialValue("partial"),
@@ -306,7 +299,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         val gvtCredOffer = issuer1.createCredentialOffer(gvtCredDef.getCredentialDefinitionIdObject())
         val xyzCredOffer = issuer1.createCredentialOffer(xyzCredDef.getCredentialDefinitionIdObject())
 
-        val gvtCredReq = prover.createCredentialRequest(proverDidInfo.did, gvtCredOffer)
+        val gvtCredReq = prover.createCredentialRequest(prover.walletService.getIdentityDetails().did, gvtCredOffer)
         val gvtCredential = issuer1.issueCredentialAndUpdateLedger(gvtCredReq, gvtCredOffer, null) {
             mapOf(
                 "sex" to CredentialValue("male"),
@@ -317,7 +310,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         }
         prover.receiveCredential(gvtCredential, gvtCredReq, gvtCredOffer)
 
-        val xyzCredReq = prover.createCredentialRequest(proverDidInfo.did, xyzCredOffer)
+        val xyzCredReq = prover.createCredentialRequest(prover.walletService.getIdentityDetails().did, xyzCredOffer)
         val xyzCredential = issuer1.issueCredentialAndUpdateLedger(xyzCredReq, xyzCredOffer, null) {
             mapOf(
                 "status" to CredentialValue("partial"),
