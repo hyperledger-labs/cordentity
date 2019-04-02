@@ -27,6 +27,15 @@ class IndySDKWalletService(
 
     val logger = LoggerFactory.getLogger(IndySDKWalletService::class.java)
 
+    companion object {
+        val SIGNATURE_TYPE = "CL"
+        val REVOCATION_REGISTRY_TYPE = "CL_ACCUM"
+        val TAG = "TAG_1"
+        val REVOCATION_TAG = "REV_TAG_1"
+        val ISSUANCE_ON_DEMAND = "ISSUANCE_ON_DEMAND"
+        val EMPTY_OBJECT = "{}"
+    }
+
     init {
         var newDid: String
         var newVerkey: String
@@ -51,13 +60,6 @@ class IndySDKWalletService(
         this.did = newDid
         this.verkey = newVerkey
     }
-
-    val SIGNATURE_TYPE = "CL"
-    val REVOCATION_REGISTRY_TYPE = "CL_ACCUM"
-    val TAG = "TAG_1"
-    val REVOCATION_TAG = "REV_TAG_1"
-    val ISSUANCE_ON_DEMAND = "ISSUANCE_ON_DEMAND"
-    val EMPTY_OBJECT = "{}"
 
     override fun createRevocationState(
         revocationRegistryDefinition: RevocationRegistryDefinition,
