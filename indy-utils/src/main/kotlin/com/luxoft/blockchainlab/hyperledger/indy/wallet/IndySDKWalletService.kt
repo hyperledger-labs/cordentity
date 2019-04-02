@@ -197,7 +197,8 @@ class IndySDKWalletService(
         val credentialJson = SerializationUtils.anyToJSON(credentialInfo.credential)
         val credentialRequestMetadataJson = SerializationUtils.anyToJSON(credentialRequest.metadata)
         val credDefJson = SerializationUtils.anyToJSON(credentialDefinition)
-        val revRegDefJson = SerializationUtils.anyToJSON(revocationRegistryDefinition)
+        val revRegDefJson = if (revocationRegistryDefinition == null) null
+        else SerializationUtils.anyToJSON(revocationRegistryDefinition)
 
         Anoncreds.proverStoreCredential(
             wallet, null, credentialRequestMetadataJson, credentialJson, credDefJson, revRegDefJson

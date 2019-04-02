@@ -118,7 +118,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
             issuerDidInfo.did,
             issuerDidInfo.verkey,
             null,
-            null
+            "TRUSTEE"
         ).get()
 
         Ledger.signAndSubmitRequest(pool, trusteeWallet, trusteeDidInfo.did, nymRequest).get()

@@ -4,6 +4,7 @@ import com.luxoft.blockchainlab.hyperledger.indy.ledger.LedgerService
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
 import com.luxoft.blockchainlab.hyperledger.indy.wallet.WalletService
 
+const val DEFAULT_MASTER_SECRET_ID = "main"
 
 interface IndyFacade {
     val walletService: WalletService
@@ -65,7 +66,7 @@ interface IndyFacade {
     fun createCredentialRequest(
         proverDid: String,
         offer: CredentialOffer,
-        masterSecretId: String = "main"
+        masterSecretId: String = DEFAULT_MASTER_SECRET_ID
     ): CredentialRequestInfo
 
     /**
@@ -141,7 +142,7 @@ interface IndyFacade {
      */
     fun createProofFromLedgerData(
         proofRequest: ProofRequest,
-        masterSecretId: String = "main"
+        masterSecretId: String = DEFAULT_MASTER_SECRET_ID
     ): ProofInfo
 
     /**

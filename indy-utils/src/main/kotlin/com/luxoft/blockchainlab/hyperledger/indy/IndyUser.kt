@@ -16,6 +16,10 @@ class IndyUser(
     override val ledgerService: LedgerService
 ) : IndyFacade {
 
+    init {
+        walletService.createMasterSecret(DEFAULT_MASTER_SECRET_ID)
+    }
+
     override fun createSchemaAndStoreOnLedger(name: String, version: String, attributes: List<String>): Schema {
         val schema = walletService.createSchema(name, version, attributes)
         ledgerService.storeSchema(schema)

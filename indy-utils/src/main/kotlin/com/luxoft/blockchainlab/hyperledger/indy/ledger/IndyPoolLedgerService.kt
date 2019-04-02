@@ -10,7 +10,7 @@ import java.lang.Thread.sleep
 import java.util.*
 
 
-const val RETRY_DELAY_MS: Long = 1000L
+const val RETRY_DELAY_MS: Long = 100L
 const val RETRY_TIMES: Int = 10
 
 /**
