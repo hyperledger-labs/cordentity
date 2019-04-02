@@ -8,7 +8,7 @@ import org.java_websocket.handshake.ServerHandshake
 import rx.*
 import java.net.URI
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ConcurrentLinkedDeque
+import java.util.concurrent.ConcurrentLinkedQueue
 
 class AgentWebSocketClient(serverUri: URI, private val socketName: String) : WebSocketClient(serverUri) {
     private val log = KotlinLogging.logger {}
@@ -22,40 +22,41 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
     }
 
     /**
-     * inbound messages list
+     * Inbound messages indexed by (subscription) key, double linked queue for each key.
      */
-    private val receivedMessages = ConcurrentHashMap<String, ConcurrentLinkedDeque<String>>()
+    private val receivedMessages = ConcurrentHashMap<String, ConcurrentLinkedQueue<String>>()
 
     /**
-     * message routing map
+     * message routing map, indexed by subscription key (message-specific), double linked queue of observers
+     * for each (message-specific) key
      */
-    private val subscribedObservers = ConcurrentHashMap<String, ConcurrentLinkedDeque<SingleSubscriber<in String>>>()
+    private val subscribedObservers = ConcurrentHashMap<String, ConcurrentLinkedQueue<SingleSubscriber<in String>>>()
 
     /**
      * Adds an observer to (FIFO) queue corresponding to the given key.
      * If the queue doesn't exist for the given key, it's been created.
      */
     private fun addObserver(key: String, observer: SingleSubscriber<in String>) =
-            subscribedObservers.getOrPut(key) { ConcurrentLinkedDeque() }.addLast(observer)
+            subscribedObservers.getOrPut(key) { ConcurrentLinkedQueue() }.add(observer)
 
     /**
      * Adds a message to the queue corresponding to the given key.
      * If the queue doesn't exist for the given key, it's been created.
      */
     private fun storeMessage(key: String, message: String) =
-            receivedMessages.getOrPut(key) { ConcurrentLinkedDeque() }.addLast(message)
+            receivedMessages.getOrPut(key) { ConcurrentLinkedQueue() }.add(message)
 
     /**
      * Removes an observer from the queue.
      */
     private fun popObserver(key: String) =
-            subscribedObservers.getOrPut(key) { ConcurrentLinkedDeque() }.pollFirst()
+            subscribedObservers.getOrPut(key) { ConcurrentLinkedQueue() }.poll()
 
     /**
      * Pops a message by key from the queue.
      */
     private fun popMessage(key: String) =
-            receivedMessages.getOrPut(key) { ConcurrentLinkedDeque() }.pollFirst()
+            receivedMessages.getOrPut(key) { ConcurrentLinkedQueue() }.poll()
 
     /**
      * Dispatches the message to an observer.
