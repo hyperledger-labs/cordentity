@@ -7,6 +7,7 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredential
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredentialDefinition
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndySchema
 import com.luxoft.blockchainlab.corda.hyperledger.indy.service.IndyService
+import com.luxoft.blockchainlab.hyperledger.indy.IndyFacade
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialDefinitionId
 import com.luxoft.blockchainlab.hyperledger.indy.IndyUser
 import com.luxoft.blockchainlab.hyperledger.indy.models.SchemaId
@@ -33,7 +34,7 @@ fun FlowLogic<Any>.whoIsNotary(): Party {
     return serviceHub.networkMapCache.notaryIdentities.single()
 }
 
-fun FlowLogic<Any>.indyUser(): IndyUser {
+fun FlowLogic<Any>.indyUser(): IndyFacade {
     return serviceHub.cordaService(IndyService::class.java).indyUser
 }
 

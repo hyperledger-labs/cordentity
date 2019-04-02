@@ -4,6 +4,7 @@ import com.luxoft.blockchainlab.hyperledger.indy.ledger.LedgerService
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import com.luxoft.blockchainlab.hyperledger.indy.wallet.WalletService
+import org.hyperledger.indy.sdk.did.Did
 
 
 /**

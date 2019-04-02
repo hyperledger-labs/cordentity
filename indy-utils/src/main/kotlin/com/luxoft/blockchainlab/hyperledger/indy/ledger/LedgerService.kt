@@ -171,4 +171,11 @@ interface LedgerService {
         delayMs: Long = RETRY_DELAY_MS,
         retryTimes: Int = RETRY_TIMES
     ): DataUsedInProofJson
+
+    /**
+     * Gets identity details for somebody by [did]
+     *
+     * @param did [String]
+     */
+    fun getIdentityDetails(did: String): IdentityDetails
 }

@@ -69,4 +69,3 @@ class IndyService(services: AppServiceHub) : SingletonSerializeAsToken() {
     }
 
 }
-

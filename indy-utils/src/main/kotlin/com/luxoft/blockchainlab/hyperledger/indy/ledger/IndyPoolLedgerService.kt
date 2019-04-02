@@ -3,6 +3,7 @@ package com.luxoft.blockchainlab.hyperledger.indy.ledger
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import mu.KotlinLogging
+import org.hyperledger.indy.sdk.did.Did
 import org.hyperledger.indy.sdk.ledger.Ledger
 import org.hyperledger.indy.sdk.pool.Pool
 import org.hyperledger.indy.sdk.wallet.Wallet
@@ -300,5 +301,9 @@ class IndyPoolLedgerService(val pool: Pool, val wallet: Wallet, val did: String)
         } else Pair("{}", "{}")
 
         return DataUsedInProofJson(usedSchemasJson, usedCredentialDefsJson, revRegDefsJson, revRegDeltasJson)
+    }
+
+    override fun getIdentityDetails(did: String): IdentityDetails {
+        return IdentityDetails(did, Did.keyForDid(pool, wallet, did).get(), null, null)
     }
 }

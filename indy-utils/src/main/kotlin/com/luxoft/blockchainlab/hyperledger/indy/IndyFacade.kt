@@ -3,6 +3,7 @@ package com.luxoft.blockchainlab.hyperledger.indy
 import com.luxoft.blockchainlab.hyperledger.indy.ledger.LedgerService
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
 import com.luxoft.blockchainlab.hyperledger.indy.wallet.WalletService
+import org.hyperledger.indy.sdk.did.Did
 
 const val DEFAULT_MASTER_SECRET_ID = "main"
 

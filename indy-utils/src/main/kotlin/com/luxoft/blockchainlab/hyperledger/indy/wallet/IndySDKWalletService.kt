@@ -400,10 +400,6 @@ class IndySDKWalletService(
     }
 }
 
-fun getIdentity(did: String, pool: Pool, wallet: Wallet): IdentityDetails {
-    return IdentityDetails(did, Did.keyForDid(pool, wallet, did).get(), null, null)
-}
-
 typealias RevocationStateProvider = (revRegId: RevocationRegistryDefinitionId, credRevId: String, interval: Interval) -> RevocationState
 typealias SchemaProvider = (id: SchemaId) -> Schema
 typealias CredentialDefinitionProvider = (id: CredentialDefinitionId) -> CredentialDefinition
