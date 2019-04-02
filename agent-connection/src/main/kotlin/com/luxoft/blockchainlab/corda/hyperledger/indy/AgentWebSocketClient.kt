@@ -65,50 +65,52 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
     override fun onMessage(msg: String?) {
         var message = msg
         log.info { "$socketName:ReceivedMessage: $message" }
-        if (message != null) {
-            val obj = SerializationUtils.jSONToAny<ObjectNode>(message)
-            val type: String = obj["@type"].asText()
-            var key: String? = null
-            when (type) {
-                MESSAGE_TYPES.MESSAGE_RECEIVED -> {
-                    /**
-                     * Object messages are routed by the object class name + sender DID
-                     */
-                    val msgReceived = SerializationUtils.jSONToAny<MessageReceived>(message)
-                    val className = msgReceived.message.content.clazz
-                    val serializedObject = msgReceived.message.content.message
-                    val fromDid = msgReceived.message.from
-                    key = "$className.$fromDid"
-                    message = SerializationUtils.anyToJSON(serializedObject)
-                }
-                MESSAGE_TYPES.INVITE_RECEIVED ->
-                    /**
-                     * 'invite_received' message is routed by type + public key
-                     */
-                    key = "$type.${obj["key"].asText()}"
-                MESSAGE_TYPES.RESPONSE_RECEIVED ->
-                    /**
-                     * 'response_received' message is routed by type + public key
-                     */
-                    key = "$type.${obj["history"]["connection~sig"]["signer"].asText()}"
-                MESSAGE_TYPES.RESPONSE_SENT ->
-                    /**
-                     * 'response_sent' message is routed by type + other party's DID
-                     */
-                    key = "$type.${obj["did"].asText()}"
-            }
-            val k = key ?: type
-            /**
-             * select the first message observer from the list, which must be non-empty,
-             * remove the observer from the queue, emit the serialized message
-             */
-            val observer = popObserver(k)
-            if (observer != null) {
-                observer.onSuccess(message)
-                return
-            }
-            storeMessage(k, message)
+        if (message == null) {
+            log.error { "$socketName: Null message received" }
+            return
         }
+        val obj = SerializationUtils.jSONToAny<ObjectNode>(message)
+        val type: String = obj["@type"].asText()
+        var key: String? = null
+        when (type) {
+            MESSAGE_TYPES.MESSAGE_RECEIVED -> {
+                /**
+                 * Object messages are routed by the object class name + sender DID
+                 */
+                val msgReceived = SerializationUtils.jSONToAny<MessageReceived>(message)
+                val className = msgReceived.message.content.clazz
+                val serializedObject = msgReceived.message.content.message
+                val fromDid = msgReceived.message.from
+                key = "$className.$fromDid"
+                message = SerializationUtils.anyToJSON(serializedObject)
+            }
+            MESSAGE_TYPES.INVITE_RECEIVED ->
+                /**
+                 * 'invite_received' message is routed by type + public key
+                 */
+                key = "$type.${obj["key"].asText()}"
+            MESSAGE_TYPES.RESPONSE_RECEIVED ->
+                /**
+                 * 'response_received' message is routed by type + public key
+                 */
+                key = "$type.${obj["history"]["connection~sig"]["signer"].asText()}"
+            MESSAGE_TYPES.RESPONSE_SENT ->
+                /**
+                 * 'response_sent' message is routed by type + other party's DID
+                 */
+                key = "$type.${obj["did"].asText()}"
+        }
+        val k = key ?: type
+        /**
+         * select the first message observer from the list, which must be non-empty,
+         * remove the observer from the queue, emit the serialized message
+         */
+        val observer = popObserver(k)
+        if (observer != null) {
+            observer.onSuccess(message)
+            return
+        }
+        storeMessage(k, message)
     }
 
     override fun onError(ex: Exception?) {
@@ -118,7 +120,7 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
     /**
      * Sends an object (JSON-serialized) to WebSocket
      */
-    fun sendJson(obj: Any) {
+    fun sendAsJson(obj: Any) {
         val message = SerializationUtils.anyToJSON(obj)
         log.info { "$socketName:SendMessage: $message" }
         send(message)
@@ -160,15 +162,15 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
 
     inline fun <reified T : Any> receiveClassObject(from: IndyParty) = receiveClassObject(T::class.java, from)
 
-    fun sendClassObject(message: TypedBodyMessage, counterParty: IndyParty) = sendJson(SendMessage(counterParty.did, message))
+    fun sendClassObject(message: TypedBodyMessage, counterParty: IndyParty) = sendAsJson(SendMessage(counterParty.did, message))
 
     inline fun <reified T : Any> sendClassObject(message: T, counterParty: IndyParty) = sendClassObject(TypedBodyMessage(message, T::class.java.canonicalName), counterParty)
 
     /**
      * Pops message by key, subscribes on such message, if the queue is empty
      */
-    private fun popMessage(key: String, observer: SingleSubscriber<in String>) {
-        val message = popMessage(key)
+    private fun popMessage(keyOrType: String, observer: SingleSubscriber<in String>) {
+        val message = popMessage(keyOrType)
         if (message != null) {
             /**
              * if found, remove it from the queue and emit the JSON-serialized message/object
@@ -178,7 +180,7 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
             /**
              * otherwise, subscribe on messages with the given key
              */
-            addObserver(key, observer)
+            addObserver(keyOrType, observer)
         }
     }
 

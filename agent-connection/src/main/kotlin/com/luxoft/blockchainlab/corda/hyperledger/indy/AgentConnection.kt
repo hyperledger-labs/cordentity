@@ -15,80 +15,70 @@ interface IndyPartyConnection {
     /**
      * Sends a credential offer message to the Indy Party represented by this connection
      *
-     * @param offer
-     *          {@code offer} - credential offer message
+     * @param offer credential offer message
      */
     fun sendCredentialOffer(offer: CredentialOffer)
 
     /**
      * Receives a credential offer from the Indy Party represented by this connection
      *
-     * @return
-     *          observable (Single<>) object emitting a single CredentialOffer upon subscription
+     * @return observable ([Single]<>) object emitting a [CredentialOffer] upon subscription
      */
     fun receiveCredentialOffer(): Single<CredentialOffer>
 
     /**
      * Sends a credential request message to the Indy Party represented by this connection
      *
-     * @param request
-     *          {@code request} - credential request message
+     * @param request credential request message (JSON-serialized [CredentialRequestInfo])
      */
     fun sendCredentialRequest(request: CredentialRequestInfo)
 
     /**
      * Receives a credential request from the Indy Party represented by this connection
      *
-     * @return
-     *          observable (Single<>) object emitting a CredentialRequestInfo upon subscription
+     * @return observable ([Single]<>) object emitting a [CredentialRequestInfo] upon subscription
      */
     fun receiveCredentialRequest(): Single<CredentialRequestInfo>
 
     /**
      * Sends a credential to Indy Party represented by this connection
      *
-     * @param credential
-     *          {@code credential} - credential message
+     * @param credential credential message
      */
     fun sendCredential(credential: CredentialInfo)
 
     /**
      * Receives a credential from the Indy Party represented by this connection
      *
-     * @return
-     *          observable (Single<>) object emitting a single CredentialRequestInfo upon subscription
+     * @return observable ([Single]<>) object emitting a [CredentialInfo] upon subscription
      */
     fun receiveCredential(): Single<CredentialInfo>
 
     /**
      * Sends a proof request message to the Indy Party represented by this connection
      *
-     * @param request
-     *          {@code request} - proof request message
+     * @param request proof request message
      */
     fun sendProofRequest(request: ProofRequest)
 
     /**
      * Receives a proof request from the Indy Party represented by this connection
      *
-     * @return
-     *          observable (Single<>) object emitting a single ProofRequest upon subscription
+     * @return observable ([Single]<>) object emitting a single [ProofRequest] upon subscription
      */
     fun receiveProofRequest(): Single<ProofRequest>
 
     /**
      * Sends a proof to the Indy Party represented by this connection
      *
-     * @param proof
-     *          {@code proof} - proof message
+     * @param proof proof message
      */
     fun sendProof(proof: ProofInfo)
 
     /**
      * Receives a proof from the Indy Party represented by this connection
      *
-     * @return
-     *          observable (Single<>) object emitting a single ProofInfo upon subscription
+     * @return observable ([Single]<>) object emitting a single [ProofInfo] upon subscription
      */
     fun receiveProof(): Single<ProofInfo>
 
@@ -119,14 +109,10 @@ interface AgentConnection {
     /**
      * Connects to Indy Agent's connection endpoint
      *
-     * @param url
-     *          Indy Agent's endpoint URL
-     * @param login
-     *          endpoint's login
-     * @param password
-     *          endpoints's password
-     * @return
-     *          Observable<Unit> emitting a single Unit upon a successful handshake
+     * @param url Indy Agent's endpoint URL
+     * @param login endpoint's login
+     * @param password endpoints's password
+     * @return [Single]<Unit]> emitting a Unit upon a successful handshake
      */
     fun connect(url: String, login: String, password: String): Single<Unit>
 
@@ -138,44 +124,39 @@ interface AgentConnection {
     /**
      * Requests the Agent to generate an Invite link.
      *
-     * @return
-     *          an observable (Single<>) emitting the generated invite
+     * @return observable ([Single]<>) emitting the generated invite
      */
     fun generateInvite(): Single<String>
 
     /**
      * Establishes a connection to remote Indy Party based on the given invite
      *
-     * @return
-     *          an observable (Single<>) emitting an {@code IndyPartyConnection}
+     * @return observable ([Single]<>) emitting an [IndyPartyConnection]
      */
     fun acceptInvite(invite: String): Single<IndyPartyConnection>
 
     /**
      * Wait for incoming connection from remote Indy Party that accepted the specific invite
      *
-     * @param invite
-     *          invite string
-     * @return
-     *          an observable (Single<>) emitting an {@code IndyPartyConnection}
+     * @param invite invite string
+     *
+     * @return observable ([Single]<>) emitting an [IndyPartyConnection]
      */
     fun waitForInvitedParty(invite: String): Single<IndyPartyConnection>
 
     /**
      * Recalls previously connected Indy Party by its DID and reconstructs corresponding {@code IndyPartyConnection}
      *
-     * @param partyDID
-     *          invite string
-     * @return
-     *          an observable (Single<>) emitting an {@code IndyPartyConnection}
+     * @param partyDID invite string
+     *
+     * @return observable ([Single]<>) emitting an [IndyPartyConnection]
      */
     fun getIndyPartyConnection(partyDID: String): Single<IndyPartyConnection?>
 
     /**
      * Returns Agent connection status
      *
-     * @return
-     *          current Agent connection status represented by {@code AgentConnectionStatus}
+     * @return current Agent connection status represented by [AgentConnectionStatus]
      */
     fun getConnectionStatus(): AgentConnectionStatus
 

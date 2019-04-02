@@ -7,6 +7,7 @@ import mu.KotlinLogging
 import rx.Single
 import java.net.URI
 import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 
 class PythonRefAgentConnection : AgentConnection {
     private val log = KotlinLogging.logger {}
@@ -31,20 +32,21 @@ class PythonRefAgentConnection : AgentConnection {
                     /**
                      * Check the agent's current state
                      */
-                    sendJson(StateRequest())
+                    sendAsJson(StateRequest())
                     receiveMessageOfType<State>(MESSAGE_TYPES.STATE_RESPONSE).subscribe({ stateResponse ->
-                        if (!checkState(stateResponse, login)) {
+                        if (!checkUserLoggedIn(stateResponse, login)) {
                             /**
                              * If the agent is not yet initialized, send the "connect" request
                              */
-                            sendJson(WalletConnect(login, password))
+                            sendAsJson(WalletConnect(login, password))
                             /**
                              * The agent will respond with the "state" message which again must be checked
                              */
                             receiveMessageOfType<State>(MESSAGE_TYPES.STATE_RESPONSE).subscribe({ newState ->
-                                if (!checkState(newState, login))
+                                if (!checkUserLoggedIn(newState, login)) {
+                                    log.error { "Unable to connect to Wallet" }
                                     throw AgentConnectionException("Error connecting to $url")
-                                else {
+                                } else {
                                     observer.onSuccess(Unit)
                                 }
                             }, { e: Throwable -> throw(e) })
@@ -68,7 +70,7 @@ class PythonRefAgentConnection : AgentConnection {
 
     private lateinit var webSocket : AgentWebSocketClient
 
-    private val indyParties = HashMap<String, IndyPartyConnection>()
+    private val indyParties = ConcurrentHashMap<String, IndyPartyConnection>()
 
     private fun getPubkeyFromInvite(invite: String): String {
         val invEncoded = invite.split("?c_i=")[1]
@@ -80,7 +82,7 @@ class PythonRefAgentConnection : AgentConnection {
     /**
      * Returns true, based on the "state" message returned from the agent, if the agent is already logged-in.
      */
-    private fun checkState(stateMessage: State?, userName: String) : Boolean {
+    private fun checkUserLoggedIn(stateMessage: State?, userName: String): Boolean {
         return if(stateMessage != null &&
                 stateMessage.content?.get("initialized") == true &&
                 stateMessage.content["agent_name"] == userName) {
@@ -102,23 +104,23 @@ class PythonRefAgentConnection : AgentConnection {
                     /**
                      * To accept the invite, first inform the agent with "receive_invite" message
                      */
-                    sendJson(ReceiveInviteMessage(invite))
-                    val pKey = getPubkeyFromInvite(invite)
+                    sendAsJson(ReceiveInviteMessage(invite))
+                    val pubKey = getPubkeyFromInvite(invite)
                     /**
                      * The agent must respond with "invite_received" message, containing the public key from invite
                      */
-                    webSocket.receiveMessageOfType<InviteReceivedMessage>(MESSAGE_TYPES.INVITE_RECEIVED, pKey).subscribe({ invRcv ->
+                    webSocket.receiveMessageOfType<InviteReceivedMessage>(MESSAGE_TYPES.INVITE_RECEIVED, pubKey).subscribe({ invRcv ->
                         /**
                          * Now instruct the agent to send the connection request with "send_request" message.
                          * The agent builds up the connection request and forwards it to the other IndyParty's endpoint,
                          * recalling the invite by its public key
                          */
-                        sendRequest(invRcv.key)
+                        sendRequest(pubKey)
                         /**
                          * The agent receives the response from the other party and informs the client with "response_received"
                          * message
                          */
-                        webSocket.receiveMessageOfType<ObjectNode>(MESSAGE_TYPES.RESPONSE_RECEIVED, pKey).subscribe({
+                        webSocket.receiveMessageOfType<ObjectNode>(MESSAGE_TYPES.RESPONSE_RECEIVED, pubKey).subscribe({
                             /**
                              * The "response_received" message will contain the other party's DID and endpoint
                              */
@@ -127,7 +129,7 @@ class PythonRefAgentConnection : AgentConnection {
                             /**
                              * retrieve my_did from agent's STATE
                              */
-                            sendJson(StateRequest())
+                            sendAsJson(StateRequest())
                             webSocket.receiveMessageOfType<ObjectNode>(MESSAGE_TYPES.STATE_RESPONSE).subscribe { stateResponse ->
                                 val pairwise = stateResponse["content"]["pairwise_connections"].find { node ->
                                     node["metadata"]["their_vk"].asText() == theirPubkey
@@ -149,7 +151,7 @@ class PythonRefAgentConnection : AgentConnection {
         }
     }
 
-    private fun sendJson(obj: Any) = webSocket.sendJson(obj)
+    private fun sendAsJson(obj: Any) = webSocket.sendAsJson(obj)
 
     /**
      * Retrieves a new invite from the agent
@@ -161,7 +163,7 @@ class PythonRefAgentConnection : AgentConnection {
                  * to generate the invite, send "generate_invite" message to the agent, and wait for "invite_generated"
                  * which must contain an invite
                  */
-                webSocket.sendJson(SendMessage(type = MESSAGE_TYPES.GENERATE_INVITE))
+                webSocket.sendAsJson(SendMessage(type = MESSAGE_TYPES.GENERATE_INVITE))
                 webSocket.receiveMessageOfType<ReceiveInviteMessage>(MESSAGE_TYPES.INVITE_GENERATED).subscribe({ msg ->
                     observer.onSuccess(msg.invite)
                 }, { e: Throwable -> throw(e) })
@@ -186,11 +188,11 @@ class PythonRefAgentConnection : AgentConnection {
                          * on the "request_received" message, reply with "send_response" with remote DID to any incoming connection request.
                          * at this stage it doesn't matter which party sent the connection request
                          */
-                        sendJson(RequestSendResponseMessage(it.did))
+                        sendAsJson(RequestSendResponseMessage(it.did))
                         /**
                          * Check if the STATE already has the public key ("connection_key") corresponding to the invite
                          */
-                        sendJson(StateRequest())
+                        sendAsJson(StateRequest())
                         webSocket.receiveMessageOfType<ObjectNode>(MESSAGE_TYPES.STATE_RESPONSE).subscribe { stateResponse ->
                             val pairwise = stateResponse["content"]["pairwise_connections"].find { node ->
                                 node["metadata"]["connection_key"].asText() == getPubkeyFromInvite(invite)
@@ -231,7 +233,7 @@ class PythonRefAgentConnection : AgentConnection {
                         /**
                          * If not found, query agent state for the properties of the previously set pairwise connection
                          */
-                        sendJson(StateRequest())
+                        sendAsJson(StateRequest())
                         webSocket.receiveMessageOfType<ObjectNode>(MESSAGE_TYPES.STATE_RESPONSE).subscribe { stateResponse ->
                             val pairwise = stateResponse["content"]["pairwise_connections"].find { node ->
                                 node["their_did"].asText() == partyDID
@@ -259,7 +261,7 @@ class PythonRefAgentConnection : AgentConnection {
         }
     }
 
-    private fun sendRequest(key: String) = webSocket.sendJson(SendRequestMessage(key))
+    private fun sendRequest(key: String) = webSocket.sendAsJson(SendRequestMessage(key))
 }
 
 object MESSAGE_TYPES {
