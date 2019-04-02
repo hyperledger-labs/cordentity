@@ -9,6 +9,7 @@ import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletService
 import junit.framework.Assert.assertFalse
 import org.hyperledger.indy.sdk.did.Did
 import org.hyperledger.indy.sdk.did.DidResults
+import org.hyperledger.indy.sdk.ledger.Ledger
 import org.hyperledger.indy.sdk.pool.Pool
 import org.hyperledger.indy.sdk.wallet.Wallet
 import org.junit.*
@@ -18,11 +19,6 @@ import java.io.File
 
 
 class AnoncredsDemoTest : IndyIntegrationTest() {
-    private val masterSecretId = "masterSecretId"
-    private val gvtCredentialValues = GVT_CRED_VALUES
-    private val xyzCredentialValues =
-        """{"status":{"raw":"partial","encoded":"51792877103171595686471452153480627530895"},"period":{"raw":"8","encoded":"8"}}"""
-
     private val walletPassword = "password"
     private val issuerWalletName = "issuerWallet"
     private val issuer2WalletName = "issuer2Wallet"
@@ -47,6 +43,8 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         @JvmStatic
         @BeforeClass
         fun setUpTest() {
+            System.setProperty(org.slf4j.impl.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "TRACE")
+
             // Create and Open Pool
             poolName = PoolHelper.DEFAULT_POOL_NAME
             val genesisFile = File(TEST_GENESIS_FILE_PATH)
@@ -70,6 +68,9 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
     @Throws(Exception::class)
     fun setUp() {
         // create and open wallets
+        WalletHelper.createOrTrunc("Trustee", "123")
+        val trusteeWallet = WalletHelper.openExisting("Trustee", "123")
+
         WalletHelper.createOrTrunc(issuerWalletName, walletPassword)
         issuerWallet = WalletHelper.openExisting(issuerWalletName, walletPassword)
 
@@ -80,7 +81,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         proverWallet = WalletHelper.openExisting(proverWalletName, walletPassword)
 
         // create did's
-        val trusteeDidInfo = createTrusteeDid(issuerWallet)
+        val trusteeDidInfo = createTrusteeDid(trusteeWallet)
         issuerDidInfo = createDid(issuerWallet)
         issuer2DidInfo = createDid(issuer2Wallet)
         proverDidInfo = createDid(proverWallet)
@@ -99,12 +100,28 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         prover = IndyUser.with(proverLedgerService).with(proverWalletService).build()
 
         // set relationships
-        val trusteeIdentityDetails = IdentityDetails(trusteeDidInfo.did, trusteeDidInfo.verkey, null, "TRUSTEE")
+        linkIssuerToTrustee(trusteeWallet, trusteeDidInfo, issuerDidInfo)
+        linkIssuerToTrustee(trusteeWallet, trusteeDidInfo, issuer2DidInfo)
 
-        issuer1.addKnownIdentitiesAndStoreOnLedger(trusteeIdentityDetails)
-        issuer2.addKnownIdentitiesAndStoreOnLedger(trusteeIdentityDetails)
+        issuer1.addKnownIdentitiesAndStoreOnLedger(prover.walletService.getIdentityDetails())
 
-        prover.addKnownIdentitiesAndStoreOnLedger(issuer1.walletService.getIdentityDetails())
+        trusteeWallet.closeWallet().get()
+    }
+
+    private fun linkIssuerToTrustee(
+        trusteeWallet: Wallet,
+        trusteeDidInfo: DidResults.CreateAndStoreMyDidResult,
+        issuerDidInfo: DidResults.CreateAndStoreMyDidResult
+    ) {
+        val nymRequest = Ledger.buildNymRequest(
+            trusteeDidInfo.did,
+            issuerDidInfo.did,
+            issuerDidInfo.verkey,
+            null,
+            null
+        ).get()
+
+        Ledger.signAndSubmitRequest(pool, trusteeWallet, trusteeDidInfo.did, nymRequest).get()
     }
 
     @After

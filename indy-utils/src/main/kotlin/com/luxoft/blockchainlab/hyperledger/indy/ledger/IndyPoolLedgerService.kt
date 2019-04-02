@@ -10,7 +10,7 @@ import java.lang.Thread.sleep
 import java.util.*
 
 
-const val RETRY_DELAY_MS: Long = 100L
+const val RETRY_DELAY_MS: Long = 1000L
 const val RETRY_TIMES: Int = 10
 
 /**
@@ -113,10 +113,9 @@ class IndyPoolLedgerService(val pool: Pool, val wallet: Wallet, val did: String)
     }
 
     override fun retrieveSchema(id: SchemaId, delayMs: Long, retryTimes: Int): Schema? {
-        val schemaReq = Ledger.buildGetSchemaRequest(did, id.toString()).get()
-
         repeat(retryTimes) {
             try {
+                val schemaReq = Ledger.buildGetSchemaRequest(did, id.toString()).get()
                 val schemaRes = Ledger.submitRequest(pool, schemaReq).get()
                 val parsedRes = Ledger.parseGetSchemaResponse(schemaRes).get()
 
@@ -172,10 +171,9 @@ class IndyPoolLedgerService(val pool: Pool, val wallet: Wallet, val did: String)
         delayMs: Long,
         retryTimes: Int
     ): RevocationRegistryDefinition? {
-        val request = Ledger.buildGetRevocRegDefRequest(did, id.toString()).get()
-
         repeat(retryTimes) {
             try {
+                val request = Ledger.buildGetRevocRegDefRequest(did, id.toString()).get()
                 val response = Ledger.submitRequest(pool, request).get()
                 val revRegDefJson = Ledger.parseGetRevocRegDefResponse(response).get().objectJson
 
@@ -195,10 +193,9 @@ class IndyPoolLedgerService(val pool: Pool, val wallet: Wallet, val did: String)
         delayMs: Long,
         retryTimes: Int
     ): Pair<Long, RevocationRegistryEntry>? {
-        val request = Ledger.buildGetRevocRegRequest(did, id.toString(), timestamp).get()
-
         repeat(retryTimes) {
             try {
+                val request = Ledger.buildGetRevocRegRequest(did, id.toString(), timestamp).get()
                 val response = Ledger.submitRequest(pool, request).get()
                 val revReg = Ledger.parseGetRevocRegResponse(response).get()
 
