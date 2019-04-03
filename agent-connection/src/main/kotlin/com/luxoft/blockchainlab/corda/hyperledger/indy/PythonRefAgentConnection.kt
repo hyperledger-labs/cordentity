@@ -209,24 +209,33 @@ class PythonRefAgentConnection : AgentConnection {
                      * notify the observer.
                      */
                     awaitingPairwiseConnections[pubKey] = observer
+                    while (pubKey in awaitingPairwiseConnections.keys) {
+                        synchronized(currentPairwiseConnections) {
+                            /**
+                             * Do synchronized to reduce simultaneous polling from multiple callers.
+                             * One thread would send the request, process the response and notify multiple subscribers.
+                             *
+                             * When acquired the lock, check if the key is still there
+                             */
+                            if (pubKey in awaitingPairwiseConnections.keys) {
+                                sendAsJson(StateRequest())
+                                webSocket.receiveMessageOfType<ObjectNode>(MESSAGE_TYPES.STATE_RESPONSE).subscribe {
+                                    processStateResponse(it)
+                                }
+                                /**
+                                 * Sleep for a while to reduce polling and to let others do the job
+                                 *
+                                 * If a caller is locked in the loop for longer time, it's going to be interrupted after timeout.
+                                 */
+                                Thread.sleep(200)
+                            }
+                        }
+                    }
                     synchronized(currentPairwiseConnections) {
                         /**
                          * Do synchronized to reduce simultaneous polling from multiple callers.
                          * One thread would send the request, process the response and notify multiple subscribers.
                          */
-                        while (pubKey in awaitingPairwiseConnections.keys) {
-                            /**
-                             * If a caller is locked in the loop for longer time, it's going to be interrupted after timeout.
-                             */
-                            sendAsJson(StateRequest())
-                            webSocket.receiveMessageOfType<ObjectNode>(MESSAGE_TYPES.STATE_RESPONSE).subscribe {
-                                processStateResponse(it)
-                            }
-                            /**
-                             * Sleep for a while to reduce polling and to let others do the job
-                             */
-                            Thread.sleep(200)
-                        }
                     }
                 }
             } catch (e: Throwable) {
