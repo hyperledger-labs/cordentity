@@ -179,11 +179,8 @@ class PythonRefAgentConnection : AgentConnection {
     private val awaitingPairwiseConnections = ConcurrentHashMap<String, SingleSubscriber<in JsonNode>>()
     private val currentPairwiseConnections = ConcurrentHashMap<String, JsonNode>()
     private var currentStateResponse: ObjectNode? = null
+
     private fun processStateResponse(stateResponse: ObjectNode) {
-        /**
-         * Do synchronized call to reduce simultaneous polling from multiple callers.
-         * One thread would send the request, process the response and notify multiple subscribers.
-         */
         stateResponse["content"]["pairwise_connections"].forEach { node ->
             val publicKey = node["metadata"]["connection_key"].asText()
             if (publicKey in awaitingPairwiseConnections.keys)
@@ -194,7 +191,7 @@ class PythonRefAgentConnection : AgentConnection {
         currentStateResponse = stateResponse
     }
 
-    private fun unWaitState(pubKey: String) {
+    private fun removeStateObserver(pubKey: String) {
         awaitingPairwiseConnections.remove(pubKey)
     }
 
@@ -213,6 +210,10 @@ class PythonRefAgentConnection : AgentConnection {
                      */
                     awaitingPairwiseConnections[pubKey] = observer
                     synchronized(currentPairwiseConnections) {
+                        /**
+                         * Do synchronized to reduce simultaneous polling from multiple callers.
+                         * One thread would send the request, process the response and notify multiple subscribers.
+                         */
                         while (pubKey in awaitingPairwiseConnections.keys) {
                             /**
                              * If a caller is locked in the loop for longer time, it's going to be interrupted after timeout.
@@ -222,7 +223,7 @@ class PythonRefAgentConnection : AgentConnection {
                                 processStateResponse(it)
                             }
                             /**
-                             * Sleep for a while to reduce polling and to let other callers do the job
+                             * Sleep for a while to reduce polling and to let others do the job
                              */
                             Thread.sleep(200)
                         }
@@ -272,7 +273,7 @@ class PythonRefAgentConnection : AgentConnection {
                             }
                         }, { e ->
                             if (e is TimeoutException) {
-                                unWaitState(pubKey)
+                                removeStateObserver(pubKey)
                                 throw AgentConnectionException("Remote IndyParty delayed to report to the Agent. Try increasing the timeout.")
                             } else throw e
                         })
