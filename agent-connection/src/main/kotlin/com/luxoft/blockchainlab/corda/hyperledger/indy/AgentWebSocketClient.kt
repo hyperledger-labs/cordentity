@@ -6,6 +6,7 @@ import mu.KotlinLogging
 import org.java_websocket.client.WebSocketClient
 import org.java_websocket.handshake.ServerHandshake
 import rx.*
+import rx.schedulers.Schedulers
 import java.net.URI
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -30,13 +31,13 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
      * message routing map, indexed by subscription key (message-specific), double linked queue of observers
      * for each (message-specific) key
      */
-    private val subscribedObservers = ConcurrentHashMap<String, ConcurrentLinkedQueue<SingleSubscriber<in String>>>()
+    private val subscribedObservers = ConcurrentHashMap<String, ConcurrentLinkedQueue<Observer<in String>>>()
 
     /**
      * Adds an observer to (FIFO) queue corresponding to the given key.
      * If the queue doesn't exist for the given key, it's been created.
      */
-    private fun addObserver(key: String, observer: SingleSubscriber<in String>) =
+    private fun addObserver(key: String, observer: Observer<in String>) =
             subscribedObservers.getOrPut(key) { ConcurrentLinkedQueue() }.add(observer)
 
     /**
@@ -73,6 +74,8 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
         val type: String = obj["@type"].asText()
         var key: String? = null
         when (type) {
+            MESSAGE_TYPES.STATE_RESPONSE, MESSAGE_TYPES.INVITE_GENERATED, MESSAGE_TYPES.REQUEST_RECEIVED, MESSAGE_TYPES.MESSAGE_SENT, MESSAGE_TYPES.REQUEST_SENT ->
+                key = type
             MESSAGE_TYPES.MESSAGE_RECEIVED -> {
                 /**
                  * Object messages are routed by the object class name + sender DID
@@ -100,17 +103,18 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
                  */
                 key = "$type.${obj["did"].asText()}"
         }
-        val k = key ?: type
+        if (key == null)
+            throw AgentConnectionException("Unexpected message type: $type")
         /**
          * select the first message observer from the list, which must be non-empty,
          * remove the observer from the queue, emit the serialized message
          */
-        val observer = popObserver(k)
+        val observer = popObserver(key)
         if (observer != null) {
-            observer.onSuccess(message)
+            observer.onNext(message)
             return
         }
-        storeMessage(k, message)
+        storeMessage(key, message)
     }
 
     override fun onError(ex: Exception?) {
@@ -169,13 +173,13 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
     /**
      * Pops message by key, subscribes on such message, if the queue is empty
      */
-    private fun popMessage(keyOrType: String, observer: SingleSubscriber<in String>) {
+    private fun popMessage(keyOrType: String, observer: Observer<in String>) {
         val message = popMessage(keyOrType)
         if (message != null) {
             /**
              * if found, remove it from the queue and emit the JSON-serialized message/object
              */
-            observer.onSuccess(message)
+            observer.onNext(message)
         } else {
             /**
              * otherwise, subscribe on messages with the given key
@@ -187,28 +191,28 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
     /**
      * Subscribes on a message of the given type and key, emits a Single<> serialized message
      */
-    private fun popMessageOfType(type: String, key: String? = null): Single<String> {
-        return Single.create { observer ->
+    private fun popMessageOfType(type: String, key: String? = null): Observable<String> {
+        return Observable.create({ observer: Observer<String> ->
             try {
                 popMessage(if (key != null) "$type.$key" else type, observer)
             } catch (e: Throwable) {
                 observer.onError(e)
             }
-        }
+        }, Emitter.BackpressureMode.BUFFER).observeOn(Schedulers.newThread())
     }
 
     /**
      * Subscribes on a message containing an object coming from another IndyParty (@from)
      * Emits a Single<> serialized object
      */
-    private fun <T : Any> popClassObject(className: Class<T>, from: IndyParty): Single<String> {
-        return Single.create { observer ->
+    private fun <T : Any> popClassObject(className: Class<T>, from: IndyParty): Observable<String> {
+        return Observable.create({ observer: Observer<String> ->
             try {
                 popMessage("${className.canonicalName}.${from.did}", observer)
             } catch (e: Throwable) {
                 observer.onError(e)
             }
-        }
+        }, Emitter.BackpressureMode.BUFFER).observeOn(Schedulers.newThread())
     }
 }
 

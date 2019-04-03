@@ -112,7 +112,7 @@ interface AgentConnection {
      * @param url Indy Agent's endpoint URL
      * @param login endpoint's login
      * @param password endpoints's password
-     * @return [Single]<Unit]> emitting a Unit upon a successful handshake
+     * @return [Single]<Unit> emitting a Unit upon a successful handshake
      */
     fun connect(url: String, login: String, password: String): Single<Unit>
 
