@@ -3,9 +3,7 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy
 
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.*
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.*
-import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialDefinitionId
-import com.luxoft.blockchainlab.hyperledger.indy.models.Interval
-import com.luxoft.blockchainlab.hyperledger.indy.models.SchemaId
+import com.luxoft.blockchainlab.hyperledger.indy.models.*
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.utilities.getOrThrow
 import net.corda.node.internal.StartedNode
@@ -62,8 +60,9 @@ class CordentityE2E : CordaTestBase() {
     private fun issueCredential(
         credentialProver: StartedNode<MockNode>,
         credentialIssuer: StartedNode<MockNode>,
-        credentialProposal: String,
-        credentialDefId: CredentialDefinitionId
+        credentialDefId: CredentialDefinitionId,
+        revocationRegistryId: RevocationRegistryDefinitionId?,
+        credentialProposalProvider: () -> Map<String, CredentialValue>
     ): String {
 
         val identifier = UUID.randomUUID().toString()
@@ -71,9 +70,10 @@ class CordentityE2E : CordaTestBase() {
         val credentialFuture = credentialIssuer.services.startFlow(
             IssueCredentialFlowB2B.Issuer(
                 identifier,
-                credentialProposal,
                 credentialDefId,
-                credentialProver.getName()
+                revocationRegistryId,
+                credentialProver.getName(),
+                credentialProposalProvider
             )
         ).resultFuture
 

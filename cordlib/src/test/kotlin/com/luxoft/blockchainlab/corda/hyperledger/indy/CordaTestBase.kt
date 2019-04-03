@@ -6,6 +6,8 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.IssueCredentialF
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.VerifyCredentialFlowB2B
 import com.luxoft.blockchainlab.corda.hyperledger.indy.service.IndyService
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.ConfigHelper
+import com.luxoft.blockchainlab.hyperledger.indy.ledger.IndyPoolLedgerService
+import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletService
 import io.mockk.every
 import io.mockk.mockkObject
 import net.corda.core.concurrent.CordaFuture
@@ -160,8 +162,9 @@ open class CordaTestBase {
         try {
             for (party in parties) {
                 val indyUser = party.services.cordaService(IndyService::class.java).indyUser
-                indyUser.wallet.closeWallet().get()
-                indyUser.pool.closePoolLedger().get()
+                // TODO: get rid of casts
+                (indyUser.walletService as IndySDKWalletService).wallet.closeWallet().get()
+                (indyUser.ledgerService as IndyPoolLedgerService).pool.closePoolLedger().get()
             }
 
             parties.clear()
