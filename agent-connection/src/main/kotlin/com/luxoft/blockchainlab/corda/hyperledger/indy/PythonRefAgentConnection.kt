@@ -180,23 +180,21 @@ class PythonRefAgentConnection : AgentConnection {
     private val currentPairwiseConnections = ConcurrentHashMap<String, JsonNode>()
     private var currentStateResponse: ObjectNode? = null
     private fun processStateResponse(stateResponse: ObjectNode) {
-        synchronized(currentPairwiseConnections) {
-            /**
-             * Do synchronized call to reduce simultaneous polling from multiple callers.
-             * One thread would send the request, process the response and notify multiple subscribers.
-             */
-            stateResponse["content"]["pairwise_connections"].forEach { node ->
-                val publicKey = node["metadata"]["connection_key"].asText()
-                if (publicKey in awaitingPairwiseConnections.keys)
-                    awaitingPairwiseConnections.remove(publicKey)?.onSuccess(node)
-                else
-                    currentPairwiseConnections[publicKey] = node
-            }
-            currentStateResponse = stateResponse
+        /**
+         * Do synchronized call to reduce simultaneous polling from multiple callers.
+         * One thread would send the request, process the response and notify multiple subscribers.
+         */
+        stateResponse["content"]["pairwise_connections"].forEach { node ->
+            val publicKey = node["metadata"]["connection_key"].asText()
+            if (publicKey in awaitingPairwiseConnections.keys)
+                awaitingPairwiseConnections.remove(publicKey)?.onSuccess(node)
+            else
+                currentPairwiseConnections[publicKey] = node
         }
+        currentStateResponse = stateResponse
     }
 
-    private fun unWaitStatus(pubKey: String) {
+    private fun unWaitState(pubKey: String) {
         awaitingPairwiseConnections.remove(pubKey)
     }
 
@@ -214,18 +212,20 @@ class PythonRefAgentConnection : AgentConnection {
                      * notify the observer.
                      */
                     awaitingPairwiseConnections[pubKey] = observer
-                    while (pubKey in awaitingPairwiseConnections.keys) {
-                        /**
-                         * If a caller is locked in the loop for longer time, it's going to be interrupted after timeout.
-                         */
-                        sendAsJson(StateRequest())
-                        webSocket.receiveMessageOfType<ObjectNode>(MESSAGE_TYPES.STATE_RESPONSE).subscribe {
-                            processStateResponse(it)
+                    synchronized(currentPairwiseConnections) {
+                        while (pubKey in awaitingPairwiseConnections.keys) {
+                            /**
+                             * If a caller is locked in the loop for longer time, it's going to be interrupted after timeout.
+                             */
+                            sendAsJson(StateRequest())
+                            webSocket.receiveMessageOfType<ObjectNode>(MESSAGE_TYPES.STATE_RESPONSE).subscribe {
+                                processStateResponse(it)
+                            }
+                            /**
+                             * Sleep for a while to reduce polling and to let other callers do the job
+                             */
+                            Thread.sleep(200)
                         }
-                        /**
-                         * Sleep for a while to reduce polling and to let other callers do the job
-                         */
-                        Thread.sleep(200)
                     }
                 }
             } catch (e: Throwable) {
@@ -272,7 +272,7 @@ class PythonRefAgentConnection : AgentConnection {
                             }
                         }, { e ->
                             if (e is TimeoutException) {
-                                unWaitStatus(pubKey)
+                                unWaitState(pubKey)
                                 throw AgentConnectionException("Remote IndyParty delayed to report to the Agent. Try increasing the timeout.")
                             } else throw e
                         })

@@ -65,13 +65,13 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
      */
     override fun onMessage(msg: String?) {
         var message = msg
-        log.info { "$socketName:ReceivedMessage: $message" }
         if (message == null) {
             log.error { "$socketName: Null message received" }
             return
         }
         val obj = SerializationUtils.jSONToAny<ObjectNode>(message)
         val type: String = obj["@type"].asText()
+        log.info { "$socketName:ReceivedMessage: $type" }
         var key: String? = null
         when (type) {
             MESSAGE_TYPES.STATE_RESPONSE, MESSAGE_TYPES.INVITE_GENERATED, MESSAGE_TYPES.REQUEST_RECEIVED, MESSAGE_TYPES.MESSAGE_SENT, MESSAGE_TYPES.REQUEST_SENT ->
