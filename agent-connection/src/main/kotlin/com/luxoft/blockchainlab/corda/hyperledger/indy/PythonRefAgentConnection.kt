@@ -231,12 +231,6 @@ class PythonRefAgentConnection : AgentConnection {
                             }
                         }
                     }
-                    synchronized(currentPairwiseConnections) {
-                        /**
-                         * Do synchronized to reduce simultaneous polling from multiple callers.
-                         * One thread would send the request, process the response and notify multiple subscribers.
-                         */
-                    }
                 }
             } catch (e: Throwable) {
                 observer.onError(e)
