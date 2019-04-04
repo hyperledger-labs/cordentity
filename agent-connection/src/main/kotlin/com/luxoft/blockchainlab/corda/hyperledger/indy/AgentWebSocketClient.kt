@@ -84,9 +84,6 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
                 /**
                  * Object messages are routed by the object class name + sender DID
                  */
-                /**
-                 * Object messages are routed by the object class name + sender DID
-                 */
                 val msgReceived = SerializationUtils.jSONToAny<MessageReceived>(message)
                 val className = msgReceived.message.content.clazz
                 val serializedObject = msgReceived.message.content.message
@@ -98,26 +95,20 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
                 /**
                  * 'invite_received' message is routed by type + public key
                  */
-                /**
-                 * 'invite_received' message is routed by type + public key
-                 */
                 "$type.${obj["key"].asText()}"
+
             MESSAGE_TYPES.RESPONSE_RECEIVED ->
                 /**
                  * 'response_received' message is routed by type + public key
                  */
-                /**
-                 * 'response_received' message is routed by type + public key
-                 */
                 "$type.${obj["history"]["connection~sig"]["signer"].asText()}"
+
             MESSAGE_TYPES.RESPONSE_SENT ->
                 /**
                  * 'response_sent' message is routed by type + other party's DID
                  */
-                /**
-                 * 'response_sent' message is routed by type + other party's DID
-                 */
                 "$type.${obj["did"].asText()}"
+
             else -> null
         } ?: throw AgentConnectionException("Unexpected message type: $type")
 
