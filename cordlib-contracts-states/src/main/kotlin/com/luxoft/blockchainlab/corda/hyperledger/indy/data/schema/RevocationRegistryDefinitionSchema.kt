@@ -24,5 +24,7 @@ object RevocationRegistryDefinitionSchemaV1 : MappedSchema(
             revocationRegistryDefinition.credentialDefinitionId.toString(),
             revocationRegistryDefinition.currentCredNumber
         )
+
+        constructor() : this("", "", 0)
     }
 }

@@ -32,7 +32,7 @@ object RevokeCredentialFlow {
                 val credRevId = credential.credentialInfo.credRevocId!!
 
                 // revoke that credential
-                indyUser().revokeCredential(revRegId, credRevId)
+                indyUser().revokeCredentialAndUpdateLedger(revRegId, credRevId)
 
                 val commandType = IndyCredentialContract.Command.Revoke()
                 val signers = listOf(ourIdentity.owningKey)

@@ -46,7 +46,7 @@ object GetDidFlowB2B {
         @Suspendable
         override fun call() {
             try {
-                val identityDetails = indyUser().getIdentity()
+                val identityDetails = indyUser().walletService.getIdentityDetails()
 
                 flowSession.send(identityDetails)
             } catch (e: Exception) {

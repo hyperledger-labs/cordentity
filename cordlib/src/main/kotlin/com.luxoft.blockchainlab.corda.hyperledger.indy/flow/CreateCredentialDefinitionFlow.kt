@@ -7,6 +7,7 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredential
 import com.luxoft.blockchainlab.hyperledger.indy.*
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialDefinitionId
 import com.luxoft.blockchainlab.hyperledger.indy.models.SchemaId
+import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletService
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndContract
 import net.corda.core.flows.*
@@ -20,34 +21,30 @@ object CreateCredentialDefinitionFlow {
 
     /**
      * @param schemaId             Id of target schema
-     * @param credentialsLimit     Maximum number of possible credentials issued per definition
      *
      * @returns                    credential definition persistent id
      * */
     @InitiatingFlow
     @StartableByRPC
-    class Authority(private val schemaId: SchemaId, private val credentialsLimit: Int = 100) :
-            FlowLogic<CredentialDefinitionId>() {
+    class Authority(
+        private val schemaId: SchemaId,
+        private val enableRevocation: Boolean
+    ) : FlowLogic<CredentialDefinitionId>() {
 
         @Suspendable
         override fun call(): CredentialDefinitionId {
             try {
-                checkNoCredentialDefinitionOnCorda()
-                checkNoCredentialDefinitionOnIndy()
-
                 // create indy stuff
-                val credentialDefinitionObj = indyUser().createCredentialDefinition(schemaId, true)
+                val credentialDefinitionObj = indyUser().createCredentialDefinitionAndStoreOnLedger(schemaId, enableRevocation)
                 val credentialDefinitionId = credentialDefinitionObj.getCredentialDefinitionIdObject()
 
-                indyUser().createRevocationRegistry(credentialDefinitionId, credentialsLimit)
-
                 val signers = listOf(ourIdentity.owningKey)
+
                 // create new credential definition state
                 val credentialDefinition = IndyCredentialDefinition(
-                        schemaId,
-                        credentialDefinitionId,
-                        credentialsLimit,
-                        listOf(ourIdentity)
+                    credentialDefinitionId,
+                    schemaId,
+                    listOf(ourIdentity)
                 )
                 val credentialDefinitionOut =
                         StateAndContract(credentialDefinition, IndyCredentialDefinitionContract::class.java.name)
@@ -85,26 +82,6 @@ object CreateCredentialDefinitionFlow {
                 logger.error("New credential definition has been failed", t)
                 throw FlowException(t.message)
             }
-        }
-
-        private fun checkNoCredentialDefinitionOnCorda() {
-            getSchemaById(schemaId)
-                ?: throw IndySchemaNotFoundException(schemaId, "Corda does't have proper states")
-
-            if (getCredentialDefinitionBySchemaId(schemaId) != null) {
-                throw IndyCredentialDefinitionAlreadyExistsException(
-                    schemaId,
-                    "Credential definition already exist on Corda ledger"
-                )
-            }
-        }
-
-        private fun checkNoCredentialDefinitionOnIndy() {
-            if (indyUser().ledgerService.isCredentialDefinitionExist(schemaId))
-                throw IndyCredentialDefinitionAlreadyExistsException(
-                    schemaId,
-                    "Credential definition already exist on Indy ledger"
-                )
         }
     }
 }

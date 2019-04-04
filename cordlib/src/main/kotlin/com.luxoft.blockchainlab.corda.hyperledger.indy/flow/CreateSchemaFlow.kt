@@ -35,12 +35,13 @@ object CreateSchemaFlow {
         override fun call(): SchemaId {
             try {
                 // check if schema already exists
-                if (indyUser().ledgerService.isSchemaExist(schemaName, schemaVersion))
+                val schemaId = SchemaId(indyUser().walletService.getIdentityDetails().did, schemaName, schemaVersion)
+                if (indyUser().ledgerService.schemaExists(schemaId))
                     throw IndySchemaAlreadyExistsException(schemaName, schemaVersion)
 
                 // create schema
-                val schemaObj = indyUser().createSchema(schemaName, schemaVersion, schemaAttributes)
-                val schema = IndySchema(schemaObj.id, listOf(ourIdentity))
+                val schemaObj = indyUser().createSchemaAndStoreOnLedger(schemaName, schemaVersion, schemaAttributes)
+                val schema = IndySchema(schemaObj.getSchemaIdObject(), listOf(ourIdentity))
                 val schemaOut = StateAndContract(schema, IndySchemaContract::class.java.name)
 
                 val newSchemaCmdType = IndySchemaContract.Command.Create()

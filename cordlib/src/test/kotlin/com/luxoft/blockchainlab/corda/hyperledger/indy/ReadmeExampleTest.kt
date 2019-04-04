@@ -4,6 +4,7 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.CreateCredentialDefi
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.CreateSchemaFlow
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.ProofPredicate
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.*
+import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialValue
 import net.corda.core.identity.CordaX500Name
 import net.corda.node.internal.StartedNode
 import net.corda.testing.core.singleIdentity
@@ -64,25 +65,21 @@ class ReadmeExampleTest : CordaTestBase() {
         // Ministry creates a credential definition for the shopping scheme:
 
         val credentialDefinitionId = ministry.services.startFlow(
-            CreateCredentialDefinitionFlow.Authority(schemaId)
+            CreateCredentialDefinitionFlow.Authority(schemaId, false)
         ).resultFuture.get()
 
         // Ministry verifies Alice's legal status and issues her a shopping credential:
 
-        val credentialProposal = """
-        {
-        "NAME":{"raw":"Alice", "encoded":"119191919"},
-        "BORN":{"raw":"2000",  "encoded":"2000"}
-        }
-        """
-
         ministry.services.startFlow(
             IssueCredentialFlowB2B.Issuer(
                 UUID.randomUUID().toString(),
-                credentialProposal,
                 credentialDefinitionId,
+                null,
                 aliceX500
-            )
+            ) { mapOf(
+                "NAME" to CredentialValue("Alice"),
+                "BORN" to CredentialValue("2000")
+            ) }
         ).resultFuture.get()
 
         // When Alice comes to grocery store, the store asks Alice to verify that she is legally allowed to buy drinks:
@@ -97,7 +94,8 @@ class ReadmeExampleTest : CordaTestBase() {
                 UUID.randomUUID().toString(),
                 emptyList(),
                 listOf(legalAgePredicate),
-                aliceX500
+                aliceX500,
+                null
             )
         ).resultFuture.get()
 

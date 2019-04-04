@@ -48,13 +48,38 @@ class CordentityE2E : CordaTestBase() {
 
     private fun issueCredentialDefinition(
         credentialDefOwner: StartedNode<MockNode>,
-        schemaId: SchemaId
+        schemaId: SchemaId,
+        enableRevocation: Boolean
     ): CredentialDefinitionId {
         val credentialDefFuture = credentialDefOwner.services.startFlow(
-            CreateCredentialDefinitionFlow.Authority(schemaId)
+            CreateCredentialDefinitionFlow.Authority(schemaId, enableRevocation)
         ).resultFuture
 
         return credentialDefFuture.getOrThrow(Duration.ofSeconds(30))
+    }
+
+    private fun issueRevocationRegistry(
+        revocationRegistryOwner: StartedNode<MockNode>,
+        credentialDefId: CredentialDefinitionId,
+        credMaxNumber: Int = 5
+    ): RevocationRegistryDefinitionId {
+        val revocationRegistryFuture = revocationRegistryOwner.services.startFlow(
+            CreateRevocationRegistryFlow.Authority(credentialDefId, credMaxNumber)
+        ).resultFuture
+
+        return revocationRegistryFuture.getOrThrow(Duration.ofSeconds(30))
+    }
+
+    private fun issueMetadata(
+        metadataOwner: StartedNode<MockNode>,
+        schema: Schema,
+        credMaxNumber: Int = 5
+    ): Triple<SchemaId, CredentialDefinitionId, RevocationRegistryDefinitionId> {
+        val metadataFuture = metadataOwner.services.startFlow(
+            CreateCredentialMetadataFlow.Authority(schema.schemaName, schema.schemaVersion, schema.schemaAttrs, credMaxNumber)
+        ).resultFuture
+
+        return metadataFuture.getOrThrow(Duration.ofSeconds(90))
     }
 
     private fun issueCredential(
@@ -98,7 +123,7 @@ class CordentityE2E : CordaTestBase() {
             prover: StartedNode<MockNode>,
             attributes: List<ProofAttribute>,
             predicates: List<ProofPredicate>,
-            nonRevoked: Interval = Interval.now()
+            nonRevoked: Interval?
     ): Boolean {
         val identifier = UUID.randomUUID().toString()
 
@@ -127,18 +152,23 @@ class CordentityE2E : CordaTestBase() {
         val personSchemaId = issueSchema(issuer, schemaPerson)
         val educationSchemaId = issueSchema(bob, schemaEducation)
 
-        val personCredentialDefId = issueCredentialDefinition(issuer, personSchemaId)
-        val educationCredentialDefId = issueCredentialDefinition(bob, educationSchemaId)
+        val personCredentialDefId = issueCredentialDefinition(issuer, personSchemaId, true)
+        val educationCredentialDefId = issueCredentialDefinition(bob, educationSchemaId, true)
+
+        val personRevocationRegistryId = issueRevocationRegistry(issuer, personCredentialDefId)
+        val educationRevocationRegistryId = issueRevocationRegistry(bob, educationCredentialDefId)
 
         // Issue credential #1
-        var credentialProposal = schemaPerson.formatProposal(attr1.key, "119191919", pred1.key, pred1.key)
-
-        issueCredential(alice, issuer, credentialProposal, personCredentialDefId)
+        issueCredential(alice, issuer, personCredentialDefId, personRevocationRegistryId) { mapOf(
+            "attr1" to CredentialValue(attr1.key),
+            "attr2" to CredentialValue(pred1.key)
+        ) }
 
         // Issue credential #2
-        credentialProposal = schemaEducation.formatProposal(attr2.key, "119191918", pred2.key, pred2.key)
-
-        issueCredential(alice, bob, credentialProposal, educationCredentialDefId)
+        issueCredential(alice, bob, educationCredentialDefId, educationRevocationRegistryId) { mapOf(
+            "attrX" to CredentialValue(attr2.key),
+            "attrY" to CredentialValue(pred2.key)
+        ) }
 
         // Verify credentials
         val attributes = listOf(
@@ -175,7 +205,7 @@ class CordentityE2E : CordaTestBase() {
     }
 
     @Test
-    fun `2 issuers 1 prover 2 credentials setup works fine`() {
+    fun `2 issuers 1 prover 2 credentials with revocation setup works fine`() {
         val attributes = mapOf(
             "John Smith" to "John Smith",
             "University" to "University"
@@ -190,7 +220,7 @@ class CordentityE2E : CordaTestBase() {
     }
 
     @Test
-    fun `2 issuers 1 prover 2 credentials invalid predicates setup works fine`() {
+    fun `2 issuers 1 prover 2 credentials with revocation invalid predicates setup works fine`() {
         val attributes = mapOf(
             "John Smith" to "John Smith",
             "University" to "University"
@@ -205,7 +235,7 @@ class CordentityE2E : CordaTestBase() {
     }
 
     @Test
-    fun `2 issuers 1 prover 2 credentials invalid attributes setup works fine`() {
+    fun `2 issuers 1 prover 2 credentials with revocation invalid attributes setup works fine`() {
         val attributes = mapOf(
             "John Smith" to "Vanga",
             "University" to "University"
@@ -220,7 +250,7 @@ class CordentityE2E : CordaTestBase() {
     }
 
     @Test
-    fun `1 credential 1 prover setup works fine`() {
+    fun `1 credential 1 prover without revocation setup works fine`() {
 
         val schemaPerson = SchemaPerson()
 
@@ -228,13 +258,15 @@ class CordentityE2E : CordaTestBase() {
         val schemaId = issueSchema(issuer, schemaPerson)
 
         // issuer credential definition
-        val credentialDefId = issueCredentialDefinition(issuer, schemaId)
+        val credentialDefId = issueCredentialDefinition(issuer, schemaId, false)
 
         // Issue credential
         val schemaAttrInt = "1988"
-        val credentialProposal = schemaPerson.formatProposal("John Smith", "119191919", schemaAttrInt, schemaAttrInt)
 
-        issueCredential(alice, issuer, credentialProposal, credentialDefId)
+        issueCredential(alice, issuer, credentialDefId, null) { mapOf(
+            "attr1" to CredentialValue("John Smith"),
+            "attr2" to CredentialValue(schemaAttrInt)
+        ) }
 
         // Verify credential
         val attributes = listOf(
@@ -256,7 +288,7 @@ class CordentityE2E : CordaTestBase() {
             )
         )
 
-        val credentialVerified = verifyCredential(bob, alice, attributes, predicates, Interval.allTime())
+        val credentialVerified = verifyCredential(bob, alice, attributes, predicates, null)
         assertTrue(credentialVerified)
     }
 
@@ -265,18 +297,15 @@ class CordentityE2E : CordaTestBase() {
 
         val schemaPerson = SchemaPerson()
 
-        // issue schema
-        val schemaId = issueSchema(issuer, schemaPerson)
-
-        // issuer credential definition
-        val credentialDefinitionId = issueCredentialDefinition(issuer, schemaId)
+        val (schemaId, credentialDefinitionId, revocationRegistryId) = issueMetadata(issuer, schemaPerson)
 
         // Issue credential
         val schemaAttrInt = "1988"
-        val credentialProposal = schemaPerson.formatProposal("John Smith", "119191919", schemaAttrInt, schemaAttrInt)
 
-        val credentialId =
-            issueCredential(alice, issuer, credentialProposal, credentialDefinitionId)
+        val credentialId = issueCredential(alice, issuer, credentialDefinitionId, revocationRegistryId) { mapOf(
+            "attr1" to CredentialValue("John Smith"),
+            "attr2" to CredentialValue(schemaAttrInt)
+        ) }
 
         // Verify credential
         val attributes = listOf(
@@ -305,12 +334,12 @@ class CordentityE2E : CordaTestBase() {
 
         Thread.sleep(3000)
 
-        val credentialAfterRevocationVerified = verifyCredential(bob, alice, attributes, predicates)
+        val credentialAfterRevocationVerified = verifyCredential(bob, alice, attributes, predicates, Interval.now())
         assertFalse(credentialAfterRevocationVerified)
     }
 
     @Test
-    fun `2 credentials 1 issuer 1 prover setup works fine`() {
+    fun `2 credentials 1 issuer 1 prover without revocation setup works fine`() {
 
         val schemaPerson = SchemaPerson()
         val schemaEducation = SchemaEducation()
@@ -318,26 +347,24 @@ class CordentityE2E : CordaTestBase() {
         val personSchemaId = issueSchema(issuer, schemaPerson)
         val educationSchemaId = issueSchema(issuer, schemaEducation)
 
-        val personCredentialDefId = issueCredentialDefinition(issuer, personSchemaId)
-        val educationCredentialDefId = issueCredentialDefinition(issuer, educationSchemaId)
+        val personCredentialDefId = issueCredentialDefinition(issuer, personSchemaId, false)
+        val educationCredentialDefId = issueCredentialDefinition(issuer, educationSchemaId, false)
 
         // Issue credential #1
         val schemaPersonAttrInt = "1988"
-        var credentialProposal =
-            schemaPerson.formatProposal("John Smith", "119191919", schemaPersonAttrInt, schemaPersonAttrInt)
 
-        issueCredential(alice, issuer, credentialProposal, personCredentialDefId)
+        issueCredential(alice, issuer, personCredentialDefId, null) { mapOf(
+            "attr1" to CredentialValue("John Smith"),
+            "attr2" to CredentialValue(schemaPersonAttrInt)
+        ) }
 
         // Issue credential #2
         val schemaEducationAttrInt = "2016"
-        credentialProposal = schemaEducation.formatProposal(
-            "University",
-            "119191918",
-            schemaEducationAttrInt,
-            schemaEducationAttrInt
-        )
 
-        issueCredential(alice, issuer, credentialProposal, educationCredentialDefId)
+        issueCredential(alice, issuer, educationCredentialDefId, null) { mapOf(
+            "attrX" to CredentialValue("University"),
+            "attrY" to CredentialValue(schemaEducationAttrInt)
+        ) }
 
         // Verify credentials
         val attributes = listOf(
@@ -371,23 +398,24 @@ class CordentityE2E : CordaTestBase() {
             )
         )
 
-        val credentialVerified = verifyCredential(bob, alice, attributes, predicates, Interval.allTime())
+        val credentialVerified = verifyCredential(issuer, alice, attributes, predicates, null)
         assertTrue(credentialVerified)
     }
 
     @Test
-    fun `1 credential 1 prover without predicates setup works fine`() {
+    fun `1 credential 1 prover without predicates and revocation setup works fine`() {
 
         val schemaPerson = SchemaPerson()
 
         val schemaId = issueSchema(issuer, schemaPerson)
-        val credentialDefId = issueCredentialDefinition(issuer, schemaId)
+        val credentialDefId = issueCredentialDefinition(issuer, schemaId, false)
 
         // Issue credential
         val schemaAttrInt = "1988"
-        val credentialProposal = schemaPerson.formatProposal("John Smith", "119191919", schemaAttrInt, schemaAttrInt)
-
-        issueCredential(alice, issuer, credentialProposal, credentialDefId)
+        issueCredential(alice, issuer, credentialDefId, null) { mapOf(
+            "attr1" to CredentialValue("John Smith"),
+            "attr2" to CredentialValue(schemaAttrInt)
+        ) }
 
         // Verify credential
         val attributes = listOf(
@@ -399,23 +427,25 @@ class CordentityE2E : CordaTestBase() {
             )
         )
 
-        val credentialVerified = verifyCredential(bob, alice, attributes, emptyList(), Interval.allTime())
+        val credentialVerified = verifyCredential(bob, alice, attributes, emptyList(), null)
         assertTrue(credentialVerified)
     }
 
     @Test
-    fun `1 credential 1 prover not all attributes to verify setup works fine`() {
+    fun `1 credential 1 prover without revocation not all attributes to verify setup works fine`() {
 
         val schemaPerson = SchemaPerson()
 
         val schemaId = issueSchema(issuer, schemaPerson)
-        val credentialDefId = issueCredentialDefinition(issuer, schemaId)
+        val credentialDefId = issueCredentialDefinition(issuer, schemaId, false)
 
         // Issue credential
         val schemaAttrInt = "1988"
-        val credentialProposal = schemaPerson.formatProposal("John Smith", "119191919", schemaAttrInt, schemaAttrInt)
 
-        issueCredential(alice, issuer, credentialProposal, credentialDefId)
+        issueCredential(alice, issuer, credentialDefId, null) { mapOf(
+            "attr1" to CredentialValue("John Smith"),
+            "attr2" to CredentialValue(schemaAttrInt)
+        ) }
 
         // Verify credential
         val attributes = listOf(
@@ -433,7 +463,7 @@ class CordentityE2E : CordaTestBase() {
             )
         )
 
-        val credentialVerified = verifyCredential(bob, alice, attributes, emptyList(), Interval.allTime())
+        val credentialVerified = verifyCredential(bob, alice, attributes, emptyList(), null)
         assertTrue(credentialVerified)
     }
 }

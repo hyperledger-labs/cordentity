@@ -49,7 +49,7 @@ object VerifyCredentialFlowB2C {
                     CredentialPredicate(fieldRef, it.value)
                 } //com.fasterxml.jackson.databind.ObjectMapper@548ccc41
 
-                val proofRequest = IndyUser.createProofRequest(
+                val proofRequest = indyUser().createProofRequest(
                         version = "0.1",
                         name = "proof_req_0.1",
                         attributes = fieldRefAttr,
@@ -61,16 +61,12 @@ object VerifyCredentialFlowB2C {
 
                 val proof = connectionService().receiveProof()
 
-                val usedData = indyUser().getDataUsedInProof(proofRequest, proof)
+                val usedData = indyUser().ledgerService.retrieveDataUsedInProof(proofRequest, proof)
                 val credentialProofOut =
                         IndyCredentialProof(identifier, proofRequest, proof, usedData, listOf(ourIdentity))
 
-                if (!indyUser().verifyProof(
-                                credentialProofOut.proofReq,
-                                proof,
-                                usedData
-                        )
-                ) throw FlowException("Proof verification failed")
+                if (!indyUser().verifyProofWithLedgerData(credentialProofOut.proofReq, proof))
+                    throw FlowException("Proof verification failed")
 
                 val verifyCredentialOut = StateAndContract(credentialProofOut, IndyCredentialContract::class.java.name)
 

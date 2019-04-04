@@ -3,16 +3,15 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b
 import co.paralleluniverse.fibers.Suspendable
 import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialContract
 import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialDefinitionContract
+import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyRevocationRegistryContract
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredential
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredentialDefinition
-import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.getCredentialDefinitionById
-import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.indyUser
-import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.whoIs
-import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.whoIsNotary
-import com.luxoft.blockchainlab.hyperledger.indy.*
-import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialDefinitionId
-import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialOffer
-import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialRequestInfo
+import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyRevocationRegistryDefinition
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.*
+import com.luxoft.blockchainlab.hyperledger.indy.IndyCredentialDefinitionNotFoundException
+import com.luxoft.blockchainlab.hyperledger.indy.IndyCredentialMaximumReachedException
+import com.luxoft.blockchainlab.hyperledger.indy.models.*
+import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletService
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndContract
 import net.corda.core.flows.*
@@ -56,9 +55,10 @@ object IssueCredentialFlowB2B {
     @StartableByRPC
     open class Issuer(
         private val identifier: String,
-        private val credentialProposal: String,
         private val credentialDefinitionId: CredentialDefinitionId,
-        private val proverName: CordaX500Name
+        private val revocationRegistryDefinitionId: RevocationRegistryDefinitionId?,
+        private val proverName: CordaX500Name,
+        private val credentialProposalProvider: () -> Map<String, CredentialValue>
     ) : FlowLogic<Unit>() {
 
         @Suspendable
@@ -67,20 +67,12 @@ object IssueCredentialFlowB2B {
             val flowSession: FlowSession = initiateFlow(prover)
 
             try {
-                // checking if cred def exists and can produce new credentials
-                val originalCredentialDefIn = getCredentialDefinitionById(credentialDefinitionId)
-                    ?: throw IndyCredentialDefinitionNotFoundException(
-                        credentialDefinitionId,
-                        "State doesn't exist in Corda vault"
-                    )
-                val originalCredentialDef = originalCredentialDefIn.state.data
+                val revocationRegistryDefinition = if (revocationRegistryDefinitionId == null) null
+                else getRevocationRegistryDefinitionById(revocationRegistryDefinitionId)
 
-                if (!originalCredentialDef.canProduceCredentials())
-                    throw IndyCredentialMaximumReachedException(
-                        originalCredentialDef.credentialDefinitionId.getPossibleRevocationRegistryDefinitionId(
-                            IndyUser.REVOCATION_TAG
-                        )
-                    )
+                if (revocationRegistryDefinition != null)
+                    if (!revocationRegistryDefinition.state.data.canProduceCredentials())
+                        throw IndyCredentialMaximumReachedException(revocationRegistryDefinition.state.data.id)
 
                 // issue credential
                 val offer = indyUser().createCredentialOffer(credentialDefinitionId)
@@ -88,16 +80,17 @@ object IssueCredentialFlowB2B {
                 val signers = listOf(ourIdentity.owningKey, prover.owningKey)
                 val newCredentialOut =
                     flowSession.sendAndReceive<CredentialRequestInfo>(offer).unwrap { credentialReq ->
-                        val credential = indyUser().issueCredential(
+                        val credential = indyUser().issueCredentialAndUpdateLedger(
                             credentialReq,
-                            credentialProposal,
-                            offer
+                            offer,
+                            revocationRegistryDefinitionId,
+                            credentialProposalProvider
                         )
                         val credentialOut = IndyCredential(
                             identifier,
                             credentialReq,
                             credential,
-                            indyUser().did,
+                            indyUser().walletService.getIdentityDetails().did,
                             listOf(ourIdentity, prover)
                         )
                         StateAndContract(credentialOut, IndyCredentialContract::class.java.name)
@@ -105,21 +98,50 @@ object IssueCredentialFlowB2B {
                 val newCredentialCmdType = IndyCredentialContract.Command.Issue()
                 val newCredentialCmd = Command(newCredentialCmdType, signers)
 
-                // consume credential definition
-                val credentialDefinition = originalCredentialDef.requestNewCredential()
-                val credentialDefinitionOut =
-                    StateAndContract(credentialDefinition, IndyCredentialDefinitionContract::class.java.name)
-                val credentialDefinitionCmdType = IndyCredentialDefinitionContract.Command.Consume()
+                // checking if cred def exists and can produce new credentials
+                val originalCredentialDefIn = getCredentialDefinitionById(credentialDefinitionId)
+                    ?: throw IndyCredentialDefinitionNotFoundException(
+                        credentialDefinitionId,
+                        "State doesn't exist in Corda vault"
+                    )
+
+                val credentialDefinitionOut = StateAndContract(
+                    originalCredentialDefIn.state.data,
+                    IndyCredentialDefinitionContract::class.java.name
+                )
+                val credentialDefinitionCmdType = IndyCredentialDefinitionContract.Command.Issue()
                 val credentialDefinitionCmd = Command(credentialDefinitionCmdType, signers)
 
-                // do stuff
-                val trxBuilder = TransactionBuilder(whoIsNotary()).withItems(
-                    originalCredentialDefIn,
-                    newCredentialOut,
-                    newCredentialCmd,
-                    credentialDefinitionOut,
-                    credentialDefinitionCmd
-                )
+                val trxBuilder = if (revocationRegistryDefinition != null) {
+                    // consume credential definition
+                    val revocationRegistryDefinitionState = revocationRegistryDefinition.state.data.requestNewCredential()
+                    val revocationRegistryDefinitionOut = StateAndContract(
+                        revocationRegistryDefinitionState,
+                        IndyRevocationRegistryContract::class.java.name
+                    )
+                    val revocationRegistryDefinitionCmdType = IndyRevocationRegistryContract.Command.Issue()
+                    val revocationRegistryDefinitionCmd = Command(revocationRegistryDefinitionCmdType, signers)
+
+                    // do stuff
+                    TransactionBuilder(whoIsNotary()).withItems(
+                        originalCredentialDefIn,
+                        credentialDefinitionOut,
+                        credentialDefinitionCmd,
+                        newCredentialOut,
+                        newCredentialCmd,
+                        revocationRegistryDefinition,
+                        revocationRegistryDefinitionOut,
+                        revocationRegistryDefinitionCmd
+                    )
+                } else {
+                    TransactionBuilder(whoIsNotary()).withItems(
+                        originalCredentialDefIn,
+                        credentialDefinitionOut,
+                        credentialDefinitionCmd,
+                        newCredentialOut,
+                        newCredentialCmd
+                    )
+                }
 
                 trxBuilder.toWireTransaction(serviceHub)
                     .toLedgerTransaction(serviceHub)
@@ -169,7 +191,8 @@ object IssueCredentialFlowB2B {
                                     )
                                 }
                                 is IndyCredentialDefinition -> logger.info("Got indy credential definition")
-                                else -> throw FlowException("invalid output state. IndyCredential is expected")
+                                is IndyRevocationRegistryDefinition -> logger.info("Got indy revocation registry")
+                                else -> throw FlowException("Invalid output state. Only IndyCredential, IndyCredentialDefinition and IndyRevocationRegistryDefinition supported")
                             }
                         }
                     }

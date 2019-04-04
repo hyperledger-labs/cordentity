@@ -3,13 +3,16 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy.flow
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.schema.CredentialDefinitionSchemaV1
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.schema.CredentialSchemaV1
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.schema.IndySchemaSchemaV1
+import com.luxoft.blockchainlab.corda.hyperledger.indy.data.schema.RevocationRegistryDefinitionSchemaV1
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredential
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredentialDefinition
+import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyRevocationRegistryDefinition
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndySchema
 import com.luxoft.blockchainlab.corda.hyperledger.indy.service.IndyService
 import com.luxoft.blockchainlab.hyperledger.indy.IndyFacade
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialDefinitionId
 import com.luxoft.blockchainlab.hyperledger.indy.IndyUser
+import com.luxoft.blockchainlab.hyperledger.indy.models.RevocationRegistryDefinitionId
 import com.luxoft.blockchainlab.hyperledger.indy.models.SchemaId
 import net.corda.core.contracts.StateAndRef
 import net.corda.core.flows.FlowLogic
@@ -91,6 +94,30 @@ fun FlowLogic<Any>.getSchemaById(schemaId: SchemaId): StateAndRef<IndySchema>? {
 
     val criteria = generalCriteria.and(id)
     val result = serviceHub.vaultService.queryBy<IndySchema>(criteria)
+
+    return result.states.firstOrNull()
+}
+
+fun FlowLogic<Any>.getRevocationRegistryDefinitionById(id: RevocationRegistryDefinitionId): StateAndRef<IndyRevocationRegistryDefinition>? {
+    val generalCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+    val id = QueryCriteria.VaultCustomQueryCriteria(
+        RevocationRegistryDefinitionSchemaV1.PersistentRevocationRegistryDefinition::id.equal(id.toString())
+    )
+
+    val criteria = generalCriteria.and(id)
+    val result = serviceHub.vaultService.queryBy<IndyRevocationRegistryDefinition>(criteria)
+
+    return result.states.firstOrNull()
+}
+
+fun FlowLogic<Any>.getRevocationRegistryDefinitionByCredentialDefinitionId(id: CredentialDefinitionId): StateAndRef<IndyRevocationRegistryDefinition>? {
+    val generalCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+    val id = QueryCriteria.VaultCustomQueryCriteria(
+        RevocationRegistryDefinitionSchemaV1.PersistentRevocationRegistryDefinition::credentialDefinitionId.equal(id.toString())
+    )
+
+    val criteria = generalCriteria.and(id)
+    val result = serviceHub.vaultService.queryBy<IndyRevocationRegistryDefinition>(criteria)
 
     return result.states.firstOrNull()
 }
