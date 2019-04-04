@@ -7,6 +7,10 @@ import org.hyperledger.indy.sdk.did.Did
 
 const val DEFAULT_MASTER_SECRET_ID = "main"
 
+/**
+ * This is the top-level interface that encapsulates work that should be done by [WalletService] and [LedgerService]
+ *  cooperatively. Everything is abstracted as much as possible, so every valid service implementation should work.
+ */
 interface IndyFacade {
     val walletService: WalletService
     val ledgerService: LedgerService
@@ -14,9 +18,9 @@ interface IndyFacade {
     /**
      * Creates [Schema] using [WalletService] and stores it using [LedgerService]
      *
-     * @param name: [String] - schema name
-     * @param version: [String] - schema version in format "d.d.d"
-     * @param attributes: [List] of [String] - list of schema's attribute names
+     * @param name [String] - schema name
+     * @param version [String] - schema version in format "d.d.d"
+     * @param attributes [List] of [String] - list of schema's attribute names
      *
      * @return [Schema]
      */
@@ -25,8 +29,8 @@ interface IndyFacade {
     /**
      * Creates [CredentialDefinition] using [WalletService] and stores it using [LedgerService]
      *
-     * @param schemaId: [SchemaId] - id of schema paired with this credential definition
-     * @param enableRevocation: [Boolean] - flag if you need revocation be enabled
+     * @param schemaId [SchemaId] - id of schema paired with this credential definition
+     * @param enableRevocation [Boolean] - flag if you need revocation be enabled
      *
      * @return [CredentialDefinition]
      */
@@ -36,9 +40,9 @@ interface IndyFacade {
      * Creates [RevocationRegistryDefinition] and first [RevocationRegistryEntry] using [WalletService] and stores it
      * using [LedgerService]
      *
-     * @param credentialDefinitionId: [CredentialDefinitionId] - id of credential definition paired with this revocation
+     * @param credentialDefinitionId [CredentialDefinitionId] - id of credential definition paired with this revocation
      *  registry
-     * @param maxCredentialNumber: [Int] - maximum credential count that this revocation registry can hold
+     * @param maxCredentialNumber [Int] - maximum credential count that this revocation registry can hold
      *
      * @return [RevocationRegistryInfo] - combination of [RevocationRegistryDefinition] and [RevocationRegistryEntry]
      */
@@ -50,7 +54,7 @@ interface IndyFacade {
     /**
      * Creates [CredentialOffer] using [WalletService]
      *
-     * @param credentialDefinitionId: [CredentialDefinitionId]
+     * @param credentialDefinitionId [CredentialDefinitionId]
      *
      * @return [CredentialOffer]
      */
@@ -59,8 +63,9 @@ interface IndyFacade {
     /**
      * Creates [CredentialRequest] using [WalletService]
      *
-     * @param proverDid: [String]
-     * @param offer: [CredentialOffer]
+     * @param proverDid [String]
+     * @param offer [CredentialOffer]
+     * @param masterSecretId [String]
      *
      * @return [CredentialRequestInfo] - [CredentialRequest] and all related data
      */
@@ -74,10 +79,10 @@ interface IndyFacade {
      * Issues [Credential] by [CredentialRequest] and [CredentialOffer] using [WalletService].
      * If revocation is enabled it will hold one of [maxCredentialNumber].
      *
-     * @param credentialRequest: [CredentialRequestInfo] - [CredentialRequest] and all reliable info
-     * @param offer: [CredentialOffer] - credential offer
-     * @param revocationRegistryId: [RevocationRegistryDefinitionId]
-     * @param proposalProvider: lambda returning [Map] of [String] to [CredentialValue] - credential proposal
+     * @param credentialRequest [CredentialRequestInfo] - [CredentialRequest] and all reliable info
+     * @param offer [CredentialOffer] - credential offer
+     * @param revocationRegistryId [RevocationRegistryDefinitionId] or [null] - revocation registry definition id
+     * @param proposalProvider lambda returning [Map] of [String] to [CredentialValue] - credential proposal
      *
      * @return [CredentialInfo] - credential and all reliable data
      */
@@ -85,15 +90,15 @@ interface IndyFacade {
         credentialRequest: CredentialRequestInfo,
         offer: CredentialOffer,
         revocationRegistryId: RevocationRegistryDefinitionId?,
-        proposalProvider: () -> Map<String, CredentialValue>
+        proposalProvider: () -> CredentialProposal
     ): CredentialInfo
 
     /**
      * Stores [Credential] in prover's wallet gathering data using [LedgerService]
      *
-     * @param credentialInfo: [CredentialInfo] - credential and all reliable data
-     * @param credentialRequest: [CredentialRequestInfo] - credential request and all reliable data
-     * @param offer: [CredentialOffer]
+     * @param credentialInfo [CredentialInfo] - credential and all reliable data
+     * @param credentialRequest [CredentialRequestInfo] - credential request and all reliable data
+     * @param offer [CredentialOffer]
      */
     fun receiveCredential(
         credentialInfo: CredentialInfo,
@@ -104,8 +109,8 @@ interface IndyFacade {
     /**
      * Revokes previously issued [Credential] using [WalletService] and [LedgerService]
      *
-     * @param revocationRegistryId      revocation registry definition id
-     * @param credentialRevocationId    revocation registry credential index
+     * @param revocationRegistryId [RevocationRegistryDefinitionId] - revocation registry definition id
+     * @param credentialRevocationId [String] - revocation registry credential index
      */
     fun revokeCredentialAndUpdateLedger(
         revocationRegistryId: RevocationRegistryDefinitionId,
@@ -115,14 +120,14 @@ interface IndyFacade {
     /**
      * Creates [ProofRequest]. This function has nothing to do with Indy API, it is used just to produce well-shaped data.
      *
-     * @param version           (???)
-     * @param name              name of this proof request
-     * @param attributes        attributes which prover needs to reveal
-     * @param predicates        predicates which prover should answer
-     * @param nonRevoked        time interval of [attributes] and [predicates] non-revocation
-     * @param nonce             random value to distinct identical proofs
+     * @param version [String] - ???
+     * @param name [String] - name of this proof request
+     * @param attributes [List] of [CredentialFieldReference] - attributes which prover needs to reveal
+     * @param predicates [List] of [CredentialPredicate] - predicates which prover should answer
+     * @param nonRevoked [Interval] or [null] - time interval of [attributes] and [predicates] non-revocation
+     * @param nonce [String] - random value to distinct identical proofs
      *
-     * @return                  [ProofRequest]
+     * @return [ProofRequest]
      */
     fun createProofRequest(
         version: String,
@@ -136,10 +141,10 @@ interface IndyFacade {
     /**
      * Creates [ProofInfo] for provided [ProofRequest].
      *
-     * @param proofRequest              proof request created by verifier
-     * @param masterSecretId            master secret id
+     * @param proofRequest [ProofRequest] - proof request created by verifier
+     * @param masterSecretId [String]
      *
-     * @return                          proof and all reliable data
+     * @return [ProofInfo] - proof and all reliable data
      */
     fun createProofFromLedgerData(
         proofRequest: ProofRequest,
@@ -149,21 +154,24 @@ interface IndyFacade {
     /**
      * Verifies [ProofInfo] produced by prover
      *
-     * @param proofReq          proof request used by prover to create proof
-     * @param proof             proof created by prover
+     * @param proofReq [ProofRequest] - proof request used by prover to create proof
+     * @param proof [ProofInfo] - proof created by prover
      *
-     * @return true/false       does proof valid?
+     * @return [Boolean] - is proof valid?
      */
     fun verifyProofWithLedgerData(proofReq: ProofRequest, proof: ProofInfo): Boolean
 
     /**
-     * Adds provided identity to whitelist
+     * Adds provided identity to whitelist and stores this info on ledger
      *
-     * @param identityDetails
+     * @param identityDetails [IdentityDetails]
      */
     fun addKnownIdentitiesAndStoreOnLedger(identityDetails: IdentityDetails)
 }
 
+/**
+ * Builder for some [IndyFacade] implementation
+ */
 abstract class IndyFacadeBuilder {
     var builderWalletService: WalletService? = null
     var builderLedgerService: LedgerService? = null
@@ -178,5 +186,8 @@ abstract class IndyFacadeBuilder {
         return this
     }
 
+    /**
+     * Implement this method, but be sure that you've checked presence of [WalletService] and [LedgerService]
+     */
     abstract fun build(): IndyFacade
 }

@@ -9,8 +9,8 @@ import org.hyperledger.indy.sdk.did.Did
 
 /**
  * The central class that encapsulates Indy SDK calls and keeps the corresponding state.
- *
- * Create one instance per each server node that deals with Indy Ledger.
+ * This is implementation of [IndyFacade] so it should support every valid [LedgerService] and [WalletService]
+ *  implementation.
  */
 class IndyUser(
     override val walletService: WalletService,
@@ -18,6 +18,7 @@ class IndyUser(
 ) : IndyFacade {
 
     init {
+        // we create some master secret by default, but user can create and manage them manually
         walletService.createMasterSecret(DEFAULT_MASTER_SECRET_ID)
     }
 
@@ -80,7 +81,7 @@ class IndyUser(
         credentialRequest: CredentialRequestInfo,
         offer: CredentialOffer,
         revocationRegistryId: RevocationRegistryDefinitionId?,
-        proposalProvider: () -> Map<String, CredentialValue>
+        proposalProvider: () -> CredentialProposal
     ): CredentialInfo {
         val proposalJson = SerializationUtils.anyToJSON(proposalProvider())
         val credentialInfo = walletService.issueCredential(credentialRequest, proposalJson, offer, revocationRegistryId)

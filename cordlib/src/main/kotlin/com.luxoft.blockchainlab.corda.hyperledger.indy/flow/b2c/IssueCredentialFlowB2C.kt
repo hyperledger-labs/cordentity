@@ -14,6 +14,7 @@ import com.luxoft.blockchainlab.hyperledger.indy.IndyCredentialDefinitionNotFoun
 import com.luxoft.blockchainlab.hyperledger.indy.IndyCredentialMaximumReachedException
 import com.luxoft.blockchainlab.hyperledger.indy.IndyUser
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialDefinitionId
+import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialProposal
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialValue
 import com.luxoft.blockchainlab.hyperledger.indy.models.RevocationRegistryDefinitionId
 import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletService
@@ -30,7 +31,7 @@ object IssueCredentialFlowB2C {
         private val identifier: String,
         private val credentialDefinitionId: CredentialDefinitionId,
         private val revocationRegistryDefinitionId: RevocationRegistryDefinitionId?,
-        private val credentialProposalProvider: () -> Map<String, CredentialValue>
+        private val credentialProposalProvider: () -> CredentialProposal
     ) : FlowLogic<Unit>() {
 
         @Suspendable

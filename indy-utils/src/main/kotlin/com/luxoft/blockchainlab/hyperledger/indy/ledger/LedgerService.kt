@@ -3,27 +3,30 @@ package com.luxoft.blockchainlab.hyperledger.indy.ledger
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
 
 
+/**
+ * [LedgerService] is an interface that encapsulates all work related to storing and retrieving of public data
+ */
 interface LedgerService {
     /**
      * Stores schema on ledger
      *
-     * @param schema            schema to store
+     * @param schema [Schema]
      */
     fun storeSchema(schema: Schema)
 
     /**
      * Stores revocation registry definition on ledger
      *
-     * @param definition        revocation registry definition to store
+     * @param definition [RevocationRegistryDefinition] - revocation registry definition to store
      */
     fun storeRevocationRegistryDefinition(definition: RevocationRegistryDefinition)
 
     /**
      * Stores revocation registry entry on ledger (when credential is just created)
      *
-     * @param entry             revocation registry entry to store
-     * @param definitionId      id of revocation registry definition coupled with this revocation registry
-     * @param definitionType    revocation registry definition type
+     * @param entry [RevocationRegistryEntry] - revocation registry entry to store
+     * @param definitionId [String] - id of revocation registry definition coupled with this revocation registry
+     * @param definitionType [String] - revocation registry definition type
      */
     fun storeRevocationRegistryEntry(
         entry: RevocationRegistryEntry,
@@ -34,49 +37,51 @@ interface LedgerService {
     /**
      * Stores credential definition on ledger
      *
-     * @param definition        credential definition to store
+     * @param definition [CredentialDefinition] - credential definition to store
      */
     fun storeCredentialDefinition(definition: CredentialDefinition)
 
     /**
      * Adds NYM record to ledger. E.g. "I trust this person"
      *
-     * @param about         identity details about entity that trustee wants to trust
+     * @param about [IdentityDetails] - identity details about entity that trustee wants to trust
      */
     fun storeNym(about: IdentityDetails)
 
     /**
      * Check if credential definition exist on ledger
      *
-     * @param credentialDefinitionId    credential definition id
+     * @param credentialDefinitionId [CredentialDefinitionId] - credential definition id
      *
-     * @return                          true if exist otherwise false
+     * @return [Boolean] - true if exist otherwise false
      */
     fun credentialDefinitionExists(credentialDefinitionId: CredentialDefinitionId): Boolean
 
     /**
      * Check if schema exist on ledger
      *
-     * @param id                schema id
+     * @param id [SchemaId] - schema id
      *
-     * @return                  true if exist otherwise false
+     * @return [Boolean] - true if exist otherwise false
      */
     fun schemaExists(id: SchemaId): Boolean
 
     /**
      * Check if revocation registry exists on ledger
      *
-     * @param id: [RevocationRegistryDefinitionId] - id of this registry
-     * @return: [Boolean]
+     * @param id [RevocationRegistryDefinitionId] - id of this registry
+     * @return [Boolean]
      */
     fun revocationRegistryExists(id: RevocationRegistryDefinitionId): Boolean
 
     /**
      * Retrieves schema from ledger
      *
-     * @param id            id of target schema
+     * @param id [SchemaId] - id of target schema
+     * @param delayMs [Long]
+     * @param retryTimes [Int]
      *
-     * @return              schema or null if none exists on ledger
+     * @return [Schema] or [null] if none exists on ledger
      */
     fun retrieveSchema(
         id: SchemaId,
@@ -87,9 +92,11 @@ interface LedgerService {
     /**
      * Retrieves credential definition from ledger
      *
-     * @param id            id of target credential definition
+     * @param id [CredentialDefinitionId] - id of target credential definition
+     * @param delayMs [Long]
+     * @param retryTimes [Int]
      *
-     * @return              credential definition or null if none exists on ledger
+     * @return [CredentialDefinition] or [null] if none exists on ledger
      */
     fun retrieveCredentialDefinition(
         id: CredentialDefinitionId,
@@ -100,9 +107,12 @@ interface LedgerService {
     /**
      * Retrieves credential definition from ledger by schema Id
      *
-     * @param id            schema id
+     * @param id [SchemaId] - schema id
+     * @param tag [String]
+     * @param delayMs [Long]
+     * @param retryTimes [Int]
      *
-     * @return              credential definition or null if it doesn't exist in ledger
+     * @return [CredentialDefinition] or [null] if it doesn't exist in ledger
      */
     fun retrieveCredentialDefinition(
         id: SchemaId,
@@ -114,9 +124,11 @@ interface LedgerService {
     /**
      * Retrieves revocation registry definition from ledger
      *
-     * @param id            target revocation registry definition id
+     * @param id [RevocationRegistryDefinitionId] - target revocation registry definition id
+     * @param delayMs [Long]
+     * @param retryTimes [Int]
      *
-     * @return              revocation registry definition or null if none exists on ledger
+     * @return [RevocationRegistryDefinition] or [null] if none exists on ledger
      */
     fun retrieveRevocationRegistryDefinition(
         id: RevocationRegistryDefinitionId,
@@ -127,10 +139,12 @@ interface LedgerService {
     /**
      * Retrieves revocation registry entry from ledger
      *
-     * @param id            revocation registry id
-     * @param timestamp     time from unix epoch in seconds representing time moment you are
-     *                      interested in e.g. if you want to know current revocation state,
-     *                      you pass 'now' as a timestamp
+     * @param id [RevocationRegistryDefinitionId] - revocation registry id
+     * @param timestamp [Long] - time from unix epoch in seconds representing time moment you are
+     *                              interested in e.g. if you want to know current revocation state,
+     *                              you pass 'now' as a timestamp
+     * @param delayMs [Long]
+     * @param retryTimes [Int]
      *
      * @return              revocation registry entry or null if none exists on ledger
      */
@@ -144,10 +158,12 @@ interface LedgerService {
     /**
      * Retrieves revocation registry delta from ledger
      *
-     * @param id            revocation registry definition id
-     * @param interval      time interval you are interested in
+     * @param id [RevocationRegistryDefinitionId] - revocation registry definition id
+     * @param interval [Interval] - time interval you are interested in
+     * @param delayMs [Long]
+     * @param retryTimes [Int]
      *
-     * @return              revocation registry delta or null if none exists on ledger
+     * @return ([Pair] of [Long] (timestamp) and [RevocationRegistryEntry]) or [null] if none exists on ledger
      */
     fun retrieveRevocationRegistryDelta(
         id: RevocationRegistryDefinitionId,
@@ -160,10 +176,12 @@ interface LedgerService {
      * Gets from ledger all data needed to verify proof. When prover creates proof he also uses this public data.
      * So prover and verifier are using the same public immutable data to generate cryptographic objects.
      *
-     * @param proofRequest      proof request used by prover to create proof
-     * @param proof             proof created by prover
+     * @param proofRequest [ProofRequest] - proof request used by prover to create proof
+     * @param proof [ProofInfo] - proof created by prover
+     * @param delayMs [Long]
+     * @param retryTimes [Int]
      *
-     * @return                  used data in json wrapped in object
+     * @return [DataUsedInProofJson] - used data in json wrapped in object
      */
     fun retrieveDataUsedInProof(
         proofRequest: ProofRequest,
@@ -176,6 +194,8 @@ interface LedgerService {
      * Gets identity details for somebody by [did]
      *
      * @param did [String]
+     *
+     * @return [IdentityDetails]
      */
     fun getIdentityDetails(did: String): IdentityDetails
 }

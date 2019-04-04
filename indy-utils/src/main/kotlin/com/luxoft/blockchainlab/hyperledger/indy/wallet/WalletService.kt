@@ -3,6 +3,10 @@ package com.luxoft.blockchainlab.hyperledger.indy.wallet
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
 
 
+/**
+ * [WalletService] is an interface that encapsulates [org.hyperledger.indy.sdk.wallet.Wallet] operations in perspective
+ *  of doing some cryptographic work that is not related to [com.luxoft.blockchainlab.hyperledger.indy.ledger.LedgerService]
+ */
 interface WalletService : IndyIssuer, IndyProver, IndyVerifier, IndyTrustee
 
 
@@ -15,20 +19,21 @@ interface IndyIssuer : IndyWalletHolder {
     /**
      * Creates credential offer
      *
-     * @param credentialDefinitionId    credential definition id
+     * @param credentialDefinitionId [CredentialDefinitionId] - credential definition id
      *
-     * @return                          created credential offer
+     * @return [CredentialOffer] - created credential offer
      */
     fun createCredentialOffer(credentialDefinitionId: CredentialDefinitionId): CredentialOffer
 
     /**
      * Issues credential by credential request. If revocation is enabled it will hold one of [maxCredentialNumber].
      *
-     * @param credentialRequest         credential request and all reliable info
-     * @param proposal                  credential proposal
-     * @param offer                     credential offer
+     * @param credentialRequest [CredentialRequestInfo] - credential request and all reliable info
+     * @param proposal [String] - credential proposal
+     * @param offer [CredentialOffer] - credential offer
+     * @param revocationRegistryId [RevocationRegistryDefinitionId] or [null]
      *
-     * @return                          credential and all reliable info
+     * @return [CredentialInfo] - credential and all reliable info
      */
     fun issueCredential(
         credentialRequest: CredentialRequestInfo,
@@ -40,8 +45,8 @@ interface IndyIssuer : IndyWalletHolder {
     /**
      * Revokes previously issued credential
      *
-     * @param revocationRegistryId      revocation registry definition id
-     * @param credentialRevocationId    revocation registry credential index
+     * @param revocationRegistryId [RevocationRegistryDefinitionId] - revocation registry definition id
+     * @param credentialRevocationId [String] - revocation registry credential index
      */
     fun revokeCredential(
         revocationRegistryId: RevocationRegistryDefinitionId,
@@ -58,10 +63,12 @@ interface IndyProver : IndyWalletHolder {
     /**
      * Creates credential request
      *
-     * @param proverDid                 prover's did
-     * @param offer                     credential offer
+     * @param proverDid [String] - prover's did
+     * @param credentialDefinition [CredentialDefinition]
+     * @param offer [CredentialOffer] - credential offer
+     * @param masterSecretId [String]
      *
-     * @return                          credential request and all reliable data
+     * @return [CredentialRequestInfo] - credential request and all reliable data
      */
     fun createCredentialRequest(
         proverDid: String,
@@ -73,9 +80,11 @@ interface IndyProver : IndyWalletHolder {
     /**
      * Stores credential in prover's wallet
      *
-     * @param credentialInfo            credential and all reliable data
-     * @param credentialRequest         credential request and all reliable data
-     * @param offer                     credential offer
+     * @param credentialInfo [CredentialInfo] - credential and all reliable data
+     * @param credentialRequest [CredentialRequestInfo] - credential request and all reliable data
+     * @param offer [CredentialOffer] - credential offer
+     * @param credentialDefinition [CredentialDefinition]
+     * @param revocationRegistryDefinition [RevocationRegistryDefinition] on [null]
      */
     fun receiveCredential(
         credentialInfo: CredentialInfo,
@@ -88,9 +97,13 @@ interface IndyProver : IndyWalletHolder {
     /**
      * Creates proof for provided proof request
      *
-     * @param proofRequest              proof request created by verifier
+     * @param proofRequest [ProofRequest] - proof request created by verifier
+     * @param provideSchema [SchemaProvider] - provide schema for each credential
+     * @param provideCredentialDefinition [CredentialDefinitionProvider] - provide credential definition for each credential
+     * @param masterSecretId [String]
+     * @param revocationStateProvider [RevocationStateProvider] or [null] - provide [RevocationState] for each credential
      *
-     * @return                          proof and all reliable data
+     * @return [ProofInfo] - proof and all reliable data
      */
     fun createProof(
         proofRequest: ProofRequest,
@@ -102,6 +115,13 @@ interface IndyProver : IndyWalletHolder {
 
     /**
      * Creates [RevocationState]
+     *
+     * @param revocationRegistryDefinition [RevocationRegistryDefinition]
+     * @param revocationRegistryEntry [RevocationRegistryEntry]
+     * @param credentialRevocationId [String]
+     * @param timestamp [Long]
+     *
+     * @return [RevocationState]
      */
     fun createRevocationState(
         revocationRegistryDefinition: RevocationRegistryDefinition,
@@ -112,6 +132,8 @@ interface IndyProver : IndyWalletHolder {
 
     /**
      * Creates master secret by id
+     *
+     * @param id [String]
      */
     fun createMasterSecret(id: String)
 }
@@ -125,29 +147,28 @@ interface IndyTrustee : IndyWalletHolder {
     /**
      * Adds provided identity to whitelist
      *
-     * @param identityDetails
+     * @param identityDetails [IdentityDetails]
      */
     fun addKnownIdentities(identityDetails: IdentityDetails)
 
     /**
      * Creates new schema and stores it to ledger if not exists, else restores schema from ledger
      *
-     * @param name                      new schema name
-     * @param version                   schema version (???)
-     * @param attributes                schema attributes
+     * @param name [String] - new schema name
+     * @param version [String] - schema version
+     * @param attributes [List] of [String] - schema attributes
      *
-     * @return                          created schema
+     * @return [Schema]
      */
     fun createSchema(name: String, version: String, attributes: List<String>): Schema
 
     /**
      * Creates credential definition and stores it to ledger if not exists, else restores credential definition from ledger
      *
-     * @param schema                    schema to create credential definition for
-     * @param enableRevocation          whether enable or disable revocation for this credential definition
-     *                                  (hint) turn this on by default, but just don't revoke credentials
+     * @param schema [Schema] - schema to create credential definition for
+     * @param enableRevocation [Boolean] - whether enable or disable revocation for this credential definition
      *
-     * @return                          created credential definition
+     * @return [CredentialDefinition]
      */
     fun createCredentialDefinition(schema: Schema, enableRevocation: Boolean): CredentialDefinition
 
@@ -155,11 +176,11 @@ interface IndyTrustee : IndyWalletHolder {
      * Creates revocation registry for credential definition if there's no one in ledger
      * (usable only for those credential definition for which enableRevocation = true)
      *
-     * @param credentialDefinitionId    credential definition id
-     * @param maxCredentialNumber       maximum number of credentials which can be issued for this credential definition
+     * @param credentialDefinitionId [CredentialDefinitionId] - credential definition id
+     * @param maxCredentialNumber [Int] - maximum number of credentials which can be issued for this credential definition
      *                                  (example) driver agency can produce only 1000 driver licences per year
      *
-     * @return                          created
+     * @return [RevocationRegistryInfo]
      */
     fun createRevocationRegistry(
         credentialDefinitionId: CredentialDefinitionId,
@@ -175,24 +196,25 @@ interface IndyVerifier {
     /**
      * Verifies proof produced by prover
      *
-     * @param proofReq          proof request used by prover to create proof
-     * @param proof             proof created by prover
-     * @param usedData          some data from ledger needed to verify proof
+     * @param proofReq [ProofRequest] - proof request used by prover to create proof
+     * @param proof [ProofInfo] - proof created by prover
+     * @param usedData [DataUsedInProofJson] - some data from ledger needed to verify proof
      *
-     * @return true/false       does proof valid?
+     * @return [Boolean] - is proof valid?
      */
     fun verifyProof(proofReq: ProofRequest, proof: ProofInfo, usedData: DataUsedInProofJson): Boolean
 
     /**
      * Creates proof request. This function has nothing to do with Indy API, it is used just to produce well-shaped data.
      *
-     * @param version           (???)
-     * @param name              name of this proof request
-     * @param attributes        attributes which prover needs to reveal
-     * @param predicates        predicates which prover should answer
-     * @param nonRevoked        time interval of [attributes] and [predicates] non-revocation
+     * @param version [String] - ???
+     * @param name [String] - name of this proof request
+     * @param attributes [List] of [CredentialFieldReference] - attributes which prover needs to reveal
+     * @param predicates [List] of [CredentialPredicate] - predicates which prover should answer
+     * @param nonRevoked [Interval] or [null] - time interval of [attributes] and [predicates] non-revocation
+     * @param nonce [String]
      *
-     * @return                  proof request
+     * @return [ProofRequest]
      */
     fun createProofRequest(
         version: String,
@@ -211,14 +233,16 @@ interface IndyWalletHolder {
     /**
      * Creates temporary did which can be used by identity to perform some any operations
      *
-     * @param identityRecord            identity details
+     * @param identityRecord [IdentityDetails] - identity details
      *
-     * @return                          newly created did
+     * @return [String] - newly created did
      */
     fun createSessionDid(identityRecord: IdentityDetails): String
 
     /**
      * Gets [IdentityDetails] of current user
+     *
+     * @return [IdentityDetails]
      */
     fun getIdentityDetails(): IdentityDetails
 }

@@ -87,7 +87,7 @@ class CordentityE2E : CordaTestBase() {
         credentialIssuer: StartedNode<MockNode>,
         credentialDefId: CredentialDefinitionId,
         revocationRegistryId: RevocationRegistryDefinitionId?,
-        credentialProposalProvider: () -> Map<String, CredentialValue>
+        credentialProposalProvider: () -> CredentialProposal
     ): String {
 
         val identifier = UUID.randomUUID().toString()

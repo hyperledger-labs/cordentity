@@ -13,7 +13,14 @@ import org.hyperledger.indy.sdk.wallet.Wallet
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ExecutionException
 
-
+/**
+ * This is an implementation of [WalletService] which uses indy sdk standard [org.hyperledger.indy.sdk.wallet.Wallet]
+ *  and [org.hyperledger.indy.sdk.anoncreds.Anoncreds] API
+ *
+ * @param wallet [Wallet] - user's wallet
+ * @param didConfig [DidConfig] - what did we should use to perform operations
+ * @param tailsPath [String] - path to the directory with tails files (they will be generated when revocation-stuff is done)
+ */
 class IndySDKWalletService(
     val wallet: Wallet,
     didConfig: DidConfig = DidConfig(),
@@ -399,7 +406,3 @@ class IndySDKWalletService(
         return IdentityDetails(did, verkey, null, null)
     }
 }
-
-typealias RevocationStateProvider = (revRegId: RevocationRegistryDefinitionId, credRevId: String, interval: Interval) -> RevocationState
-typealias SchemaProvider = (id: SchemaId) -> Schema
-typealias CredentialDefinitionProvider = (id: CredentialDefinitionId) -> CredentialDefinition

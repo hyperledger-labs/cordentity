@@ -84,3 +84,37 @@ data class DidConfig(
     val cryptoType: String? = null,
     val cid: Boolean? = null
 )
+
+/**
+ * Lambda to provide revocation state for some credential
+ *
+ * @param revRegId [RevocationRegistryDefinitionId]
+ * @param credRevId [String]
+ * @param interval [Interval]
+ *
+ * @return [RevocationState]
+ */
+typealias RevocationStateProvider = (revRegId: RevocationRegistryDefinitionId, credRevId: String, interval: Interval) -> RevocationState
+
+/**
+ * Lambda to provide schema for some id
+ *
+ * @param id [SchemaId]
+ *
+ * @return [Schema]
+ */
+typealias SchemaProvider = (id: SchemaId) -> Schema
+
+/**
+ * Lambda to provide credential definition for some id
+ *
+ * @param id [CredentialDefinitionId]
+ *
+ * @return [CredentialDefinition]
+ */
+typealias CredentialDefinitionProvider = (id: CredentialDefinitionId) -> CredentialDefinition
+
+/**
+ * Credential proposal - [Map] of [String] (attribute name) to [CredentialValue] (attribute value)
+ */
+typealias CredentialProposal = Map<String, CredentialValue>

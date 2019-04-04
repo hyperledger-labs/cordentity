@@ -94,7 +94,7 @@ data class Credential(
     @JsonProperty("rev_reg") val revocationRegistry: RawJsonMap?,
     val witness: RawJsonMap?,
     @JsonProperty("rev_reg_id") override val revocationRegistryIdRaw: String?,
-    val values: Map<String, CredentialValue>,
+    val values: CredentialProposal,
     val signature: Map<String, RawJsonMap?>,
     val signatureCorrectnessProof: RawJsonMap
 ) : ContainsSchemaId, ContainsCredentialDefinitionId, ContainsRevocationRegistryId
@@ -159,15 +159,3 @@ data class CredentialRequestMetadata(
     val masterSecretName: String,
     val nonce: String
 )
-
-/**
- *   "{\n" +
- *       \"sex\": {\"raw\": \"male\", \"encoded\": \"5944657099558967239210949258394887428692050081607692519917050\"},\n" +
- *       \"name\": {\"raw\": \"Alex\", \"encoded\": \"1139481716457488690172217916278103335\"},\n" +
- *       \"height\": {\"raw\": \"175\", \"encoded\": \"175\"},\n" +
- *       \"age\": {\"raw\": \"28\", \"encoded\": \"28\"}\n" +
- *   }"
- */
-class CredentialProposal(vararg values: Pair<String, CredentialValue>) {
-    val map = mapOf(*values)
-}

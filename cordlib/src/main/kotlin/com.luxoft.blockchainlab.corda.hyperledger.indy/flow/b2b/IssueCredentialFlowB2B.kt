@@ -58,7 +58,7 @@ object IssueCredentialFlowB2B {
         private val credentialDefinitionId: CredentialDefinitionId,
         private val revocationRegistryDefinitionId: RevocationRegistryDefinitionId?,
         private val proverName: CordaX500Name,
-        private val credentialProposalProvider: () -> Map<String, CredentialValue>
+        private val credentialProposalProvider: () -> CredentialProposal
     ) : FlowLogic<Unit>() {
 
         @Suspendable

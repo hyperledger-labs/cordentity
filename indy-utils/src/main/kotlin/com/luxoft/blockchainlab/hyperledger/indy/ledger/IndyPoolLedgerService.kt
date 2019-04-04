@@ -15,9 +15,11 @@ const val RETRY_DELAY_MS: Long = 100L
 const val RETRY_TIMES: Int = 10
 
 /**
- * This class abstracts operations on ledger
+ * This is an implementation of [LedgerService] which uses standard indy pool as ledger.
  *
- * @param pool                  indy pool handle
+ * @param pool [Pool] - indy pool handle
+ * @param wallet [Wallet] - indy user's wallet
+ * @param did [String] - did to perform operations
  */
 class IndyPoolLedgerService(val pool: Pool, val wallet: Wallet, val did: String) : LedgerService {
 
