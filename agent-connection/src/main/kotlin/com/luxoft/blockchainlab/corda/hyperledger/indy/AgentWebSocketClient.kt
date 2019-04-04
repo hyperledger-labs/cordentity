@@ -72,11 +72,18 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
         val obj = SerializationUtils.jSONToAny<ObjectNode>(message)
         val type: String = obj["@type"].asText()
         log.info { "$socketName:ReceivedMessage: $type" }
-        var key: String? = null
-        when (type) {
-            MESSAGE_TYPES.STATE_RESPONSE, MESSAGE_TYPES.INVITE_GENERATED, MESSAGE_TYPES.REQUEST_RECEIVED, MESSAGE_TYPES.MESSAGE_SENT, MESSAGE_TYPES.REQUEST_SENT ->
-                key = type
+
+        val key = when (type) {
+            MESSAGE_TYPES.STATE_RESPONSE,
+            MESSAGE_TYPES.INVITE_GENERATED,
+            MESSAGE_TYPES.REQUEST_RECEIVED,
+            MESSAGE_TYPES.MESSAGE_SENT,
+            MESSAGE_TYPES.REQUEST_SENT ->
+                type
             MESSAGE_TYPES.MESSAGE_RECEIVED -> {
+                /**
+                 * Object messages are routed by the object class name + sender DID
+                 */
                 /**
                  * Object messages are routed by the object class name + sender DID
                  */
@@ -84,27 +91,36 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
                 val className = msgReceived.message.content.clazz
                 val serializedObject = msgReceived.message.content.message
                 val fromDid = msgReceived.message.from
-                key = "$className.$fromDid"
                 message = SerializationUtils.anyToJSON(serializedObject)
+                "$className.$fromDid"
             }
             MESSAGE_TYPES.INVITE_RECEIVED ->
                 /**
                  * 'invite_received' message is routed by type + public key
                  */
-                key = "$type.${obj["key"].asText()}"
+                /**
+                 * 'invite_received' message is routed by type + public key
+                 */
+                "$type.${obj["key"].asText()}"
             MESSAGE_TYPES.RESPONSE_RECEIVED ->
                 /**
                  * 'response_received' message is routed by type + public key
                  */
-                key = "$type.${obj["history"]["connection~sig"]["signer"].asText()}"
+                /**
+                 * 'response_received' message is routed by type + public key
+                 */
+                "$type.${obj["history"]["connection~sig"]["signer"].asText()}"
             MESSAGE_TYPES.RESPONSE_SENT ->
                 /**
                  * 'response_sent' message is routed by type + other party's DID
                  */
-                key = "$type.${obj["did"].asText()}"
-        }
-        if (key == null)
-            throw AgentConnectionException("Unexpected message type: $type")
+                /**
+                 * 'response_sent' message is routed by type + other party's DID
+                 */
+                "$type.${obj["did"].asText()}"
+            else -> null
+        } ?: throw AgentConnectionException("Unexpected message type: $type")
+
         /**
          * select the first message observer from the list, which must be non-empty,
          * remove the observer from the queue, emit the serialized message

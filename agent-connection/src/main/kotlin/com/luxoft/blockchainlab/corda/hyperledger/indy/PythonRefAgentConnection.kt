@@ -178,38 +178,41 @@ class PythonRefAgentConnection : AgentConnection {
 
     private val awaitingPairwiseConnections = ConcurrentHashMap<String, SingleSubscriber<in JsonNode>>()
     private val currentPairwiseConnections = ConcurrentHashMap<String, JsonNode>()
-    private var currentStateResponse: ObjectNode? = null
 
     private fun processStateResponse(stateResponse: ObjectNode) {
         stateResponse["content"]["pairwise_connections"].forEach { node ->
             val publicKey = node["metadata"]["connection_key"].asText()
-            if (publicKey in awaitingPairwiseConnections.keys)
-                awaitingPairwiseConnections.remove(publicKey)?.onSuccess(node)
+            val observer = awaitingPairwiseConnections.remove(publicKey)
+            if (observer != null)
+                observer.onSuccess(node)
             else
                 currentPairwiseConnections[publicKey] = node
         }
-        currentStateResponse = stateResponse
     }
 
     private fun removeStateObserver(pubKey: String) {
         awaitingPairwiseConnections.remove(pubKey)
     }
 
-    private fun waitForStateUpdate(pubKey: String): Single<JsonNode> {
+    private fun pollStatusForPairwiseConnection(pubKey: String): Single<JsonNode> {
         return Single.create { observer ->
             try {
                 /**
                  * Check if other callers already parsed the state and it has the key
                  */
-                if (pubKey in currentPairwiseConnections.keys)
-                    observer.onSuccess(currentPairwiseConnections.remove(pubKey))
-                else {
+                val connection = currentPairwiseConnections.remove(pubKey)
+                if (connection != null) {
+                    observer.onSuccess(connection)
+                } else {
                     /**
                      * Otherwise put the observer in the queue. When a caller parses the next incoming state, it would
                      * notify the observer.
                      */
                     awaitingPairwiseConnections[pubKey] = observer
                     while (pubKey in awaitingPairwiseConnections.keys) {
+                        /**
+                         * poll once a second until [observer] has left the queue
+                         */
                         synchronized(currentPairwiseConnections) {
                             /**
                              * Do synchronized to reduce simultaneous polling from multiple callers.
@@ -227,7 +230,7 @@ class PythonRefAgentConnection : AgentConnection {
                                  *
                                  * If a caller is locked in the loop for longer time, it's going to be interrupted after timeout.
                                  */
-                                Thread.sleep(200)
+                                Thread.sleep(1000)
                             }
                         }
                     }
@@ -259,10 +262,10 @@ class PythonRefAgentConnection : AgentConnection {
                          */
                         sendAsJson(RequestSendResponseMessage(it.did))
                         /**
-                         * Wait until the STATE has the public key ("connection_key") corresponding to the invite.
+                         * Wait until the STATE has pairwise connection corresponding to the invite.
                          */
                         val pubKey = getPubkeyFromInvite(invite)
-                        waitForStateUpdate(pubKey).timeout(60000, TimeUnit.MILLISECONDS).subscribe({ pairwise ->
+                        pollStatusForPairwiseConnection(pubKey).timeout(60000, TimeUnit.MILLISECONDS).subscribe({ pairwise ->
                             /**
                              * Wait for "response_sent" from DID (their_did) associated with the invite public key
                              */
