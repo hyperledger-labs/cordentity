@@ -7,7 +7,6 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredential
 import com.luxoft.blockchainlab.hyperledger.indy.*
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialDefinitionId
 import com.luxoft.blockchainlab.hyperledger.indy.models.SchemaId
-import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletService
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndContract
 import net.corda.core.flows.*
@@ -15,12 +14,13 @@ import net.corda.core.transactions.TransactionBuilder
 
 
 /**
- * Flow to create a credential definition and revocation registry for a schema
+ * Flow to create a credential definition for a schema
  * */
 object CreateCredentialDefinitionFlow {
 
     /**
      * @param schemaId             Id of target schema
+     * @param enableRevocation [Boolean]
      *
      * @returns                    credential definition persistent id
      * */

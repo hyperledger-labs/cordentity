@@ -26,18 +26,18 @@ class IndyRevocationRegistryContract : Contract {
     }
 
     private fun upgrade(tx: LedgerTransaction, signers: Set<PublicKey>) = requireThat {
-        // TODO: should contain 1 input and 1 output states of type IndyCredentialDefinition (different)
+        // TODO: should contain 1 input and 1 output states of type IndyRevocationRegistry (different)
         // TODO: input state of type IndyRevocationRegistry should have currentCredNumber == maxCredNumber
     }
 
     private fun creation(tx: LedgerTransaction, signers: Set<PublicKey>) = requireThat {
-        // TODO: should contain 1 input and 1 output states of type IndySchema (similar)
+        // TODO: should contain 1 input and 1 output states of type IndyCredentialDefinition (similar)
         // TODO: should contain 1 output state of type IndyRevocationRegistry
         // TODO: state of type IndyRevocationRegistry should have currentCredNumber == 0 and maxCredNumber > 0
     }
 
     private fun consummation(tx: LedgerTransaction, signers: Set<PublicKey>) = requireThat {
-        // TODO: should contain 1 input and 1 output states of type IndyCredentialDefinition (different)
+        // TODO: should contain 1 input and 1 output states of type IndyRevocationRegistry (different)
         // TODO: input and output state should be similar except output.currentCredNumber - input.currentCredNumber == 1
     }
 

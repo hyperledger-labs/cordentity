@@ -11,6 +11,15 @@ import net.corda.core.schemas.PersistentState
 import net.corda.core.schemas.QueryableState
 
 
+/**
+ * A corda record of revocation registry
+ *
+ * @param id [RevocationRegistryDefinitionId]
+ * @param credentialDefinitionId [CredentialDefinitionId]
+ * @param participants [List] of [AbstractParty]
+ * @param credentialsLimit [Int]
+ * @param currentCredNumber [Int]
+ */
 data class IndyRevocationRegistryDefinition(
     val id: RevocationRegistryDefinitionId,
     val credentialDefinitionId: CredentialDefinitionId,

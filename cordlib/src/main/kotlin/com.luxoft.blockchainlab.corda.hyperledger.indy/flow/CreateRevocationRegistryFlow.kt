@@ -12,11 +12,14 @@ import net.corda.core.contracts.StateAndContract
 import net.corda.core.flows.*
 import net.corda.core.transactions.TransactionBuilder
 
-
+/**
+ * Create revocation registry for some credential definition
+ */
 object CreateRevocationRegistryFlow {
 
     /**
-     * * @param credentialsLimit     Maximum number of possible credentials issued per definition
+     * @param credentialDefinitionId [CredentialDefinitionId]
+     * @param credentialLimit [Int] - Maximum number of possible credentials issued per definition
      */
     @InitiatingFlow
     @StartableByRPC

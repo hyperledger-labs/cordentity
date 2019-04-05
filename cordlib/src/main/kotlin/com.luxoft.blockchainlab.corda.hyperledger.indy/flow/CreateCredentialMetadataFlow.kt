@@ -9,7 +9,17 @@ import net.corda.core.flows.InitiatingFlow
 import net.corda.core.flows.StartableByRPC
 
 
+/**
+ * Creates schema, credential definition and revocation registry
+ */
 object CreateCredentialMetadataFlow {
+
+    /**
+     * @param schemaName [String]
+     * @param schemaVersion [String]
+     * @param schemaAttributes [List] of [String]
+     * @param credentialLimit [Int]
+     */
     @InitiatingFlow
     @StartableByRPC
     class Authority(
