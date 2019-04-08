@@ -11,6 +11,8 @@ import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.thread
 
 class PythonRefAgentConnection : AgentConnection {
     private val log = KotlinLogging.logger {}
@@ -50,6 +52,7 @@ class PythonRefAgentConnection : AgentConnection {
                                     log.error { "Unable to connect to Wallet" }
                                     throw AgentConnectionException("Error connecting to $url")
                                 } else {
+                                    pollAgentWorker.start()
                                     observer.onSuccess(Unit)
                                 }
                             }, { e: Throwable -> throw(e) })
@@ -180,13 +183,14 @@ class PythonRefAgentConnection : AgentConnection {
     private val currentPairwiseConnections = ConcurrentHashMap<String, JsonNode>()
 
     private fun processStateResponse(stateResponse: ObjectNode) {
-        stateResponse["content"]["pairwise_connections"].forEach { node ->
-            val publicKey = node["metadata"]["connection_key"].asText()
+        stateResponse["content"]["pairwise_connections"].forEach { pairwise ->
+            val publicKey = pairwise["metadata"]["connection_key"].asText()
             val observer = awaitingPairwiseConnections.remove(publicKey)
-            if (observer != null)
-                observer.onSuccess(node)
-            else
-                currentPairwiseConnections[publicKey] = node
+            if (observer != null) {
+                pollingCount.decrementAndGet()
+                observer.onSuccess(pairwise)
+            } else
+                currentPairwiseConnections[publicKey] = pairwise
         }
     }
 
@@ -194,7 +198,35 @@ class PythonRefAgentConnection : AgentConnection {
         awaitingPairwiseConnections.remove(pubKey)
     }
 
-    private fun pollStatusForPairwiseConnection(pubKey: String): Single<JsonNode> {
+    private val pollingLock = java.lang.Object()
+    private val pollingCount = AtomicInteger(0)
+    private fun AtomicInteger.increment() {
+        if (getAndIncrement() == 0)
+            synchronized(pollingLock) { pollingLock.notify() }
+    }
+    /**
+     * Agent's state polling thread. It resumes whenever [pollingLock] is being notified.
+     * It also loops by itself when
+     */
+    private val pollAgentWorker = thread {
+        while (true) {
+            /**
+             * Sleep until a pairwise connection observer is registered.
+             */
+            synchronized(pollingLock) { pollingLock.wait() }
+            /**
+             * Send the request
+             */
+            sendAsJson(StateRequest())
+            webSocket.receiveMessageOfType<ObjectNode>(MESSAGE_TYPES.STATE_RESPONSE).subscribe {
+                processStateResponse(it)
+                if (pollingCount.get() != 0)
+                    synchronized(pollingLock) { pollingLock.notify() }
+            }
+        }
+    }
+
+    private fun waitForPairwiseConnection(pubKey: String): Single<JsonNode> {
         return Single.create { observer ->
             try {
                 /**
@@ -205,38 +237,34 @@ class PythonRefAgentConnection : AgentConnection {
                     observer.onSuccess(connection)
                 } else {
                     /**
-                     * Otherwise put the observer in the queue. When a caller parses the next incoming state, it would
-                     * notify the observer.
+                     * Otherwise put the observer in the queue and notify the worker to poll the agent state.
+                     * When the worker finds the public key in the parsed state, it will notify the observer.
                      */
                     awaitingPairwiseConnections[pubKey] = observer
-                    while (pubKey in awaitingPairwiseConnections.keys) {
-                        /**
-                         * poll once a second until [observer] has left the queue
-                         */
-                        synchronized(currentPairwiseConnections) {
-                            /**
-                             * Do synchronized to reduce simultaneous polling from multiple callers.
-                             * One thread would send the request, process the response and notify multiple subscribers.
-                             *
-                             * When acquired the lock, check if the key is still there
-                             */
-                            if (pubKey in awaitingPairwiseConnections.keys) {
-                                sendAsJson(StateRequest())
-                                webSocket.receiveMessageOfType<ObjectNode>(MESSAGE_TYPES.STATE_RESPONSE).subscribe {
-                                    processStateResponse(it)
-                                }
-                                /**
-                                 * Sleep for a while to reduce polling and to let others do the job
-                                 *
-                                 * If a caller is locked in the loop for longer time, it's going to be interrupted after timeout.
-                                 */
-                                Thread.sleep(1000)
-                            }
-                        }
-                    }
+                    pollingCount.increment()
                 }
             } catch (e: Throwable) {
                 observer.onError(e)
+            }
+        }
+    }
+    private fun subscribeOnRequestReceived() {
+        /**
+         * On an incoming connection request, the agent must send the "request_received"
+         */
+        webSocket.receiveMessageOfType<RequestReceivedMessage>(MESSAGE_TYPES.REQUEST_RECEIVED).subscribe {
+            /**
+             * On the "request_received" message, reply with "send_response" with remote DID to any incoming connection request.
+             * At this stage it doesn't matter which party sent the connection request, because it's not possible to correlate
+             * "request_received" message and the invite. For the purpose of PoC we reply with "send_response"
+             * on each "request_received", no matter which party is on the other side.
+             *
+             * TODO: suggest an improvement in pythonic indy-agent that incorporates the invite's public key in the "request" message,
+             * TODO: so that it's possible to correlate "request_received" which includes "request" and the invite
+             */
+            sendAsJson(RequestSendResponseMessage(it.did))
+            webSocket.receiveMessageOfType<RequestResponseSentMessage>(MESSAGE_TYPES.RESPONSE_SENT, it.did).subscribe {
+                log.info { "Accepted connection request from ${it.did}" }
             }
         }
     }
@@ -248,42 +276,28 @@ class PythonRefAgentConnection : AgentConnection {
             try {
                 if (getConnectionStatus() == AgentConnectionStatus.AGENT_CONNECTED) {
                     /**
-                     * On an incoming connection request, the agent must send the "request_received"
+                     * Subscribe on "request_received" so to make sure the request is processed when/if it comes.
+                     * It's nothing wrong if it doesn't come (for example, it's been processed earlier).
                      */
-                    webSocket.receiveMessageOfType<RequestReceivedMessage>(MESSAGE_TYPES.REQUEST_RECEIVED).subscribe({
-                        /**
-                         * On the "request_received" message, reply with "send_response" with remote DID to any incoming connection request.
-                         * At this stage it doesn't matter which party sent the connection request, because it's not possible to correlate
-                         * "request_received" message and the invite. For the purpose of PoC we reply with "send_response"
-                         * on each "request_received", no matter which party is on the other side.
-                         *
-                         * TODO: suggest an improvement in pythonic indy-agent that incorporates the invite's public key in the "request" message,
-                         * TODO: so that it's possible to correlate "request_received" which includes "request" and the invite
-                         */
-                        sendAsJson(RequestSendResponseMessage(it.did))
-                        /**
-                         * Wait until the STATE has pairwise connection corresponding to the invite.
-                         */
-                        val pubKey = getPubkeyFromInvite(invite)
-                        pollStatusForPairwiseConnection(pubKey).timeout(60000, TimeUnit.MILLISECONDS).subscribe({ pairwise ->
-                            /**
-                             * Wait for "response_sent" from DID (their_did) associated with the invite public key
-                             */
-                            webSocket.receiveMessageOfType<RequestResponseSentMessage>(MESSAGE_TYPES.RESPONSE_SENT, pairwise["their_did"].asText()).subscribe { responseSent ->
-                                val indyParty = IndyParty(webSocket, responseSent.did,
-                                        pairwise["metadata"]["their_endpoint"].asText(),
-                                        pairwise["metadata"]["their_vk"].asText(),
-                                        pairwise["my_did"].asText())
-                                indyParties[responseSent.did] = indyParty
-                                observer.onSuccess(indyParty)
-                            }
-                        }, { e ->
-                            if (e is TimeoutException) {
-                                removeStateObserver(pubKey)
-                                throw AgentConnectionException("Remote IndyParty delayed to report to the Agent. Try increasing the timeout.")
-                            } else throw e
-                        })
-                    }, { e: Throwable -> throw(e) })
+                    subscribeOnRequestReceived()
+                    val pubKey = getPubkeyFromInvite(invite)
+                    /**
+                     * Wait until the STATE has pairwise connection corresponding to the invite.
+                     */
+                    waitForPairwiseConnection(pubKey).timeout(60000, TimeUnit.MILLISECONDS).subscribe({ pairwise ->
+                        val theirDid = pairwise["their_did"].asText()
+                        val indyParty = IndyParty(webSocket, theirDid,
+                                pairwise["metadata"]["their_endpoint"].asText(),
+                                pairwise["metadata"]["their_vk"].asText(),
+                                pairwise["my_did"].asText())
+                        indyParties[theirDid] = indyParty
+                        observer.onSuccess(indyParty)
+                    }, { e ->
+                        if (e is TimeoutException) {
+                            removeStateObserver(pubKey)
+                            throw AgentConnectionException("Remote IndyParty delayed to report to the Agent. Try increasing the timeout.")
+                        } else throw e
+                    })
                 } else {
                     throw AgentConnectionException("Agent is disconnected")
                 }
