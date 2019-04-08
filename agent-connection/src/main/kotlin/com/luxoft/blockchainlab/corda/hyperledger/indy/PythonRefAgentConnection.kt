@@ -195,7 +195,9 @@ class PythonRefAgentConnection : AgentConnection {
     }
 
     private fun removeStateObserver(pubKey: String) {
-        awaitingPairwiseConnections.remove(pubKey)
+        val observer = awaitingPairwiseConnections.remove(pubKey)
+        if( observer != null)
+            pollingCount.decrementAndGet()
     }
 
     private val pollingLock = java.lang.Object()
