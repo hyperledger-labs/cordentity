@@ -11,7 +11,6 @@ import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
-import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 
 class PythonRefAgentConnection : AgentConnection {
@@ -185,9 +184,10 @@ class PythonRefAgentConnection : AgentConnection {
     private fun processStateResponse(stateResponse: ObjectNode) {
         stateResponse["content"]["pairwise_connections"].forEach { pairwise ->
             val publicKey = pairwise["metadata"]["connection_key"].asText()
+
             val observer = awaitingPairwiseConnections.remove(publicKey)
+
             if (observer != null) {
-                pollingCount.decrementAndGet()
                 observer.onSuccess(pairwise)
             } else
                 currentPairwiseConnections[publicKey] = pairwise
@@ -195,35 +195,38 @@ class PythonRefAgentConnection : AgentConnection {
     }
 
     private fun removeStateObserver(pubKey: String) {
-        val observer = awaitingPairwiseConnections.remove(pubKey)
-        if( observer != null)
-            pollingCount.decrementAndGet()
+        synchronized(pollingLock) { awaitingPairwiseConnections.remove(pubKey) }
     }
 
     private val pollingLock = java.lang.Object()
-    private val pollingCount = AtomicInteger(0)
-    private fun AtomicInteger.increment() {
-        if (getAndIncrement() == 0)
-            synchronized(pollingLock) { pollingLock.notify() }
+    private fun ConcurrentHashMap<String, SingleSubscriber<in JsonNode>>.putAndNotify(key: String, value: SingleSubscriber<in JsonNode>) {
+        synchronized(pollingLock) {
+            val wasEmpty = isEmpty()
+            put(key, value)
+            if (wasEmpty) pollingLock.notify()
+        }
     }
     /**
      * Agent's state polling thread. It resumes whenever [pollingLock] is being notified.
      * It also loops by itself when
      */
     private val pollAgentWorker = thread {
-        while (true) {
-            /**
-             * Sleep until a pairwise connection observer is registered.
-             */
-            synchronized(pollingLock) { pollingLock.wait() }
-            /**
-             * Send the request
-             */
-            sendAsJson(StateRequest())
-            webSocket.receiveMessageOfType<ObjectNode>(MESSAGE_TYPES.STATE_RESPONSE).subscribe {
-                processStateResponse(it)
-                if (pollingCount.get() != 0)
-                    synchronized(pollingLock) { pollingLock.notify() }
+        synchronized(pollingLock) {
+            while (true) {
+                /**
+                 * Sleep until a pairwise connection observer is registered.
+                 */
+                pollingLock.wait()
+                if (awaitingPairwiseConnections.size == 0) continue
+                /**
+                 * Send the request
+                 */
+                sendAsJson(StateRequest())
+                webSocket.receiveMessageOfType<ObjectNode>(MESSAGE_TYPES.STATE_RESPONSE).subscribe {
+                    processStateResponse(it)
+                    if (awaitingPairwiseConnections.size > 0)
+                        synchronized(pollingLock) { pollingLock.notify() }
+                }
             }
         }
     }
@@ -242,8 +245,7 @@ class PythonRefAgentConnection : AgentConnection {
                      * Otherwise put the observer in the queue and notify the worker to poll the agent state.
                      * When the worker finds the public key in the parsed state, it will notify the observer.
                      */
-                    awaitingPairwiseConnections[pubKey] = observer
-                    pollingCount.increment()
+                    awaitingPairwiseConnections.putAndNotify(pubKey, observer)
                 }
             } catch (e: Throwable) {
                 observer.onError(e)
