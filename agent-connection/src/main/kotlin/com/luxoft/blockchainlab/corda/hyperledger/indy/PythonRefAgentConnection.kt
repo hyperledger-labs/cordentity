@@ -51,7 +51,6 @@ class PythonRefAgentConnection : AgentConnection {
                                     log.error { "Unable to connect to Wallet" }
                                     throw AgentConnectionException("Error connecting to $url")
                                 } else {
-                                    pollAgentWorker.start()
                                     observer.onSuccess(Unit)
                                 }
                             }, { e: Throwable -> throw(e) })
@@ -178,7 +177,7 @@ class PythonRefAgentConnection : AgentConnection {
         }
     }
 
-    private val awaitingPairwiseConnections = ConcurrentHashMap<String, SingleSubscriber<in JsonNode>>()
+    private val awaitingPairwiseConnections = HashMap<String, SingleSubscriber<in JsonNode>>()
     private val currentPairwiseConnections = ConcurrentHashMap<String, JsonNode>()
 
     private fun processStateResponse(stateResponse: ObjectNode) {
@@ -199,7 +198,7 @@ class PythonRefAgentConnection : AgentConnection {
     }
 
     private val pollingLock = java.lang.Object()
-    private fun ConcurrentHashMap<String, SingleSubscriber<in JsonNode>>.putAndNotify(key: String, value: SingleSubscriber<in JsonNode>) {
+    private fun HashMap<String, SingleSubscriber<in JsonNode>>.putAndNotify(key: String, value: SingleSubscriber<in JsonNode>) {
         synchronized(pollingLock) {
             val wasEmpty = isEmpty()
             put(key, value)
@@ -221,12 +220,19 @@ class PythonRefAgentConnection : AgentConnection {
                 /**
                  * Send the request
                  */
-                sendAsJson(StateRequest())
-                webSocket.receiveMessageOfType<ObjectNode>(MESSAGE_TYPES.STATE_RESPONSE).subscribe {
-                    processStateResponse(it)
-                    if (awaitingPairwiseConnections.size > 0)
-                        synchronized(pollingLock) { pollingLock.notify() }
+                webSocket.receiveMessageOfType<ObjectNode>(MESSAGE_TYPES.STATE_RESPONSE).subscribe {state ->
+                    synchronized(pollingLock) {
+                        processStateResponse(state)
+                        if (awaitingPairwiseConnections.size > 0) {
+                            /**
+                             * Sleep to reduce polling the (local) agent
+                             */
+                            Thread.sleep(500)
+                            pollingLock.notify()
+                        }
+                    }
                 }
+                sendAsJson(StateRequest())
             }
         }
     }

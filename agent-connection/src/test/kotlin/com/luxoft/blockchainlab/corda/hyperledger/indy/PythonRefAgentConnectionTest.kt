@@ -9,6 +9,7 @@ import java.util.concurrent.CompletableFuture
 import kotlin.test.assertEquals
 import java.net.URI
 import java.net.URL
+import java.util.*
 
 class PythonRefAgentConnectionTest {
 
@@ -64,8 +65,9 @@ class PythonRefAgentConnectionTest {
         val agent97completed = CompletableFuture<Unit>()
         val agent98completed = CompletableFuture<Unit>()
         val agent99completed = CompletableFuture<Unit>()
+        val rand = Random().nextInt()
         PythonRefAgentConnection().apply {
-            connect(agentUrl1, "user95", "pass95").handle { _, ex ->
+            connect(agentUrl1, "User${rand}_95", "pass95").handle { _, ex ->
                 if (ex != null) throw AgentConnectionException(ex.message!!)
                 else generateInvite().subscribe {
                     inviteStr = it!!
@@ -76,7 +78,7 @@ class PythonRefAgentConnectionTest {
                         }
                     }
                     PythonRefAgentConnection().apply {
-                        connect(agentUrl2, "user94", "pass94").handle { _, ex ->
+                        connect(agentUrl2, "User${rand}_94", "pass94").handle { _, ex ->
                             if (ex != null) throw AgentConnectionException(ex.message!!)
                             else acceptInvite(inviteStr).subscribe { user95 ->
                                 val offer94 = CredentialOffer("94:::1", ":::1", KeyCorrectnessProof("", "", emptyList()), "")
@@ -94,7 +96,7 @@ class PythonRefAgentConnectionTest {
                             }
                         }
                         PythonRefAgentConnection().apply {
-                            connect(agentUrl3, "user96", "pass96").handle { _, ex ->
+                            connect(agentUrl3, "User${rand}_96", "pass96").handle { _, ex ->
                                 if (ex != null) throw AgentConnectionException(ex.message!!)
                                 else acceptInvite(inviteStr2).subscribe { user95 ->
                                     val offer96 = CredentialOffer("96:::1", ":::1", KeyCorrectnessProof("", "", emptyList()), "")
@@ -113,7 +115,7 @@ class PythonRefAgentConnectionTest {
                             }
                         }
                         PythonRefAgentConnection().apply {
-                            connect(agentUrl4, "user97", "pass97").handle { _, ex ->
+                            connect(agentUrl4, "User${rand}_97", "pass97").handle { _, ex ->
                                 if (ex != null) throw AgentConnectionException(ex.message!!)
                                 else acceptInvite(inviteStr3).subscribe { user95 ->
                                     user95.sendCredentialOffer(CredentialOffer("97:::1", ":::1", KeyCorrectnessProof("", "", emptyList()), ""))
@@ -131,7 +133,7 @@ class PythonRefAgentConnectionTest {
                             }
                         }
                         PythonRefAgentConnection().apply {
-                            connect(agentUrl5, "user98", "pass98").handle { _, ex ->
+                            connect(agentUrl5, "User${rand}_98", "pass98").handle { _, ex ->
                                 if (ex != null) throw AgentConnectionException(ex.message!!)
                                 else acceptInvite(inviteStr4).subscribe { user95 ->
                                     user95.sendCredentialOffer(CredentialOffer("98:::1", ":::1", KeyCorrectnessProof("", "", emptyList()), ""))
@@ -149,7 +151,7 @@ class PythonRefAgentConnectionTest {
                             }
                         }
                         PythonRefAgentConnection().apply {
-                            connect(agentUrl6, "user99", "pass99").handle { _, ex ->
+                            connect(agentUrl6, "User${rand}_99", "pass99").handle { _, ex ->
                                 if (ex != null) throw AgentConnectionException(ex.message!!)
                                 else acceptInvite(inviteStr5).subscribe { user95 ->
                                     user95.sendCredentialOffer(CredentialOffer("99:::1", ":::1", KeyCorrectnessProof("", "", emptyList()), ""))
