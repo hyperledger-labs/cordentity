@@ -12,6 +12,10 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 
 class AgentWebSocketClient(serverUri: URI, private val socketName: String) : WebSocketClient(serverUri) {
+    companion object {
+        val scheduler: Scheduler = Schedulers.computation()
+    }
+
     private val log = KotlinLogging.logger {}
 
     override fun onOpen(handshakedata: ServerHandshake?) {
@@ -22,42 +26,64 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
         log.info { "$socketName:AgentConnection closed: $code,$reason,$remote" }
     }
 
-    /**
-     * Inbound messages indexed by (subscription) key, double linked queue for each key.
-     */
-    private val receivedMessages = ConcurrentHashMap<String, ConcurrentLinkedQueue<String>>()
+    private val dataStorage = object {
+        /**
+         * Inbound messages indexed by (subscription) key, double linked queue for each key.
+         */
+        private val receivedMessages = ConcurrentHashMap<String, ConcurrentLinkedQueue<String>>()
 
-    /**
-     * message routing map, indexed by subscription key (message-specific), double linked queue of observers
-     * for each (message-specific) key
-     */
-    private val subscribedObservers = ConcurrentHashMap<String, ConcurrentLinkedQueue<Observer<in String>>>()
+        /**
+         * message routing map, indexed by subscription key (message-specific), double linked queue of observers
+         * for each (message-specific) key
+         */
+        private val subscribedObservers = ConcurrentHashMap<String, ConcurrentLinkedQueue<Observer<in String>>>()
 
-    /**
-     * Adds an observer to (FIFO) queue corresponding to the given key.
-     * If the queue doesn't exist for the given key, it's been created.
-     */
-    private fun addObserver(key: String, observer: Observer<in String>) =
-            subscribedObservers.getOrPut(key) { ConcurrentLinkedQueue() }.add(observer)
+        /**
+         * Adds an observer to (FIFO) queue corresponding to the given key.
+         * If the queue doesn't exist for the given key, it's been created.
+         */
+        private fun addObserver(key: String, observer: Observer<in String>) =
+                subscribedObservers.getOrPut(key) { ConcurrentLinkedQueue() }.add(observer)
 
-    /**
-     * Adds a message to the queue corresponding to the given key.
-     * If the queue doesn't exist for the given key, it's been created.
-     */
-    private fun storeMessage(key: String, message: String) =
-            receivedMessages.getOrPut(key) { ConcurrentLinkedQueue() }.add(message)
+        /**
+         * Adds a message to the queue corresponding to the given key.
+         * If the queue doesn't exist for the given key, it's been created.
+         */
+        private fun storeMessage(key: String, message: String) =
+                receivedMessages.getOrPut(key) { ConcurrentLinkedQueue() }.add(message)
 
-    /**
-     * Removes an observer from the queue.
-     */
-    private fun popObserver(key: String) =
-            subscribedObservers.getOrPut(key) { ConcurrentLinkedQueue() }.poll()
+        /**
+         * Removes an observer from the queue.
+         */
+        private fun popObserver(key: String) =
+                subscribedObservers.getOrPut(key) { ConcurrentLinkedQueue() }.poll()
 
-    /**
-     * Pops a message by key from the queue.
-     */
-    private fun popMessage(key: String) =
-            receivedMessages.getOrPut(key) { ConcurrentLinkedQueue() }.poll()
+        /**
+         * Pops a message by key from the queue.
+         */
+        private fun popMessage(key: String) =
+                receivedMessages.getOrPut(key) { ConcurrentLinkedQueue() }.poll()
+
+        fun getObserverOrAddMessage(key: String, message: String) = synchronized(this) {
+            val observer = popObserver(key)
+            if (observer == null) {
+                log.warn { "Unexpected message ($key,$message)" }
+                storeMessage(key, message)
+            }
+            observer
+        }
+
+        fun getMessageOrAddObserver(keyOrType: String, observer: Observer<in String>) = synchronized(this) {
+            val message = popMessage(keyOrType)
+            if (message == null) {
+                /**
+                 * if not found, subscribe on messages with the given key
+                 */
+                addObserver(keyOrType, observer)
+            }
+            message
+        }
+    }
 
     /**
      * Dispatches the message to an observer.
@@ -95,13 +121,13 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
                 /**
                  * 'invite_received' message is routed by type + public key
                  */
-                "$type.${obj["key"].asText()}"
+                "$type.${obj["connection_key"].asText()}"
 
             MESSAGE_TYPES.RESPONSE_RECEIVED ->
                 /**
                  * 'response_received' message is routed by type + public key
                  */
-                "$type.${obj["history"]["connection~sig"]["signer"].asText()}"
+                "$type.${obj["connection_key"].asText()}"
 
             MESSAGE_TYPES.RESPONSE_SENT ->
                 /**
@@ -116,12 +142,7 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
          * select the first message observer from the list, which must be non-empty,
          * remove the observer from the queue, emit the serialized message
          */
-        val observer = popObserver(key)
-        if (observer != null) {
-            observer.onNext(message)
-            return
-        }
-        storeMessage(key, message)
+        dataStorage.getObserverOrAddMessage(key, message)?.onNext(message)
     }
 
     override fun onError(ex: Exception?) {
@@ -181,17 +202,8 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
      * Pops message by key, subscribes on such message, if the queue is empty
      */
     private fun popMessage(keyOrType: String, observer: Observer<in String>) {
-        val message = popMessage(keyOrType)
-        if (message != null) {
-            /**
-             * if found, remove it from the queue and emit the JSON-serialized message/object
-             */
-            observer.onNext(message)
-        } else {
-            /**
-             * otherwise, subscribe on messages with the given key
-             */
-            addObserver(keyOrType, observer)
+        dataStorage.getMessageOrAddObserver(keyOrType, observer)?.also {
+            observer.onNext(it)
         }
     }
 
@@ -205,7 +217,7 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
             } catch (e: Throwable) {
                 observer.onError(e)
             }
-        }, Emitter.BackpressureMode.BUFFER).observeOn(Schedulers.newThread())
+        }, Emitter.BackpressureMode.BUFFER).observeOn(scheduler)
     }
 
     /**
@@ -219,7 +231,7 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
             } catch (e: Throwable) {
                 observer.onError(e)
             }
-        }, Emitter.BackpressureMode.BUFFER).observeOn(Schedulers.newThread())
+        }, Emitter.BackpressureMode.BUFFER).observeOn(scheduler)
     }
 }
 
