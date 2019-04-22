@@ -4,7 +4,7 @@ import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialOffer
 import com.luxoft.blockchainlab.hyperledger.indy.models.KeyCorrectnessProof
 import org.junit.Ignore
 import org.junit.Test
-import java.util.concurrent.CompletableFuture
+import rx.Single
 import kotlin.test.assertEquals
 import java.net.URI
 import java.net.URL
@@ -25,8 +25,8 @@ class PythonRefAgentConnectionTest {
 
     class InvitedPartyProcess (
             private val agentUrl: String,
-            val proofSchemaId: String = "${Random().nextInt()}:::1",
-            val completed :CompletableFuture<Unit> = CompletableFuture() ) {
+            val proofSchemaId: String = "${Random().nextInt()}:::1"
+            ) {
 
         fun start(invitationString: String) {
             val rand = Random().nextInt()
@@ -34,7 +34,6 @@ class PythonRefAgentConnectionTest {
             PythonRefAgentConnection().apply {
                 connect(agentUrl, "User$rand", "pass$rand").handle { _, ex ->
                     if (ex != null) {
-                        //completed.complete(Unit)
                         throw AgentConnectionException(ex.message!!)
                     }
                     else acceptInvite(invitationString).subscribe { master ->
@@ -53,28 +52,25 @@ class PythonRefAgentConnectionTest {
 
         fun start() {
             val rand = Random().nextInt()
+            agentInitEndpoint(agentUrl)
             PythonRefAgentConnection().apply {
-                val invitedPartiesCompleted = mutableListOf<CompletableFuture<Unit>>()
-                val invitedParties = mutableListOf<InvitedPartyProcess>()
-                invitedPartyAgents.forEach {agentUrl ->
-                    val party = InvitedPartyProcess(agentUrl).apply { invitedPartiesCompleted.add(completed) }
-                    invitedParties.add(party)
-                }
-                connect(agentUrl, "User$rand", "pass$rand").handle { _, ex ->
-                    if (ex != null) throw AgentConnectionException(ex.message!!)
-                    invitedParties.forEach {party ->
+                connect(agentUrl, "User$rand", "pass$rand").toBlocking().value()
+                val invitedPartiesCompleted = mutableListOf<Single<Boolean>>()
+                invitedPartyAgents.forEach { agentUrl ->
+                    val party = InvitedPartyProcess(agentUrl)
+                    invitedPartiesCompleted.add(Single.create { observer ->
                         generateInvite().subscribe {invitation ->
                             waitForInvitedParty(invitation).subscribe { invitedParty ->
                                 invitedParty.receiveCredentialOffer().subscribe { proof ->
                                     assertEquals(proof?.schemaIdRaw, party.proofSchemaId)
-                                    party.completed.complete(Unit)
+                                    observer.onSuccess(true)
                                 }
                             }
                             party.start(invitation)
                         }
-                    }
+                    })
                 }
-                CompletableFuture.allOf(*invitedPartiesCompleted.toTypedArray()).get()
+                Single.zip(invitedPartiesCompleted) {}.toBlocking().value()
                 disconnect()
             }
         }
