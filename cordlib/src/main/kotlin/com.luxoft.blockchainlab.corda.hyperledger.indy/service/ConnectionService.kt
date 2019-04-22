@@ -51,7 +51,7 @@ class ConnectionService(serviceHub: AppServiceHub) : SingletonSerializeAsToken()
             agentLogin ?: throw RuntimeException("Agent websocket endpoint specified but agent user name is missing")
             agentPassword ?: throw RuntimeException("Agent websocket endpoint specified but agent password is missing")
 
-            PythonRefAgentConnection().apply { connect(agentWsEndpoint, agentLogin, agentPassword).awaitFiber() }
+            PythonRefAgentConnection().apply { connect(agentWsEndpoint, agentLogin, agentPassword).toBlocking().value() }
         } else
             null
     }
@@ -61,7 +61,7 @@ class ConnectionService(serviceHub: AppServiceHub) : SingletonSerializeAsToken()
                 ?: throw RuntimeException("Unable to get connection: Please specify 'agentWSEndpoint', 'agentUser', 'agentPassword' properties in config")
     }
 
-    private fun getPartyConnection(partyDID: String) = getConnection().getIndyPartyConnection(partyDID).awaitFiber()
+    private fun getPartyConnection(partyDID: String) = getConnection().getIndyPartyConnection(partyDID).toBlocking().value()
             ?: throw RuntimeException("Unable to get IndyPartyConnection for DID: $partyDID")
 }
 
