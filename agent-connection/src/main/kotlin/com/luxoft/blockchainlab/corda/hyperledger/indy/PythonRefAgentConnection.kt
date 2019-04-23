@@ -20,8 +20,8 @@ class PythonRefAgentConnection : AgentConnection {
 
     override fun disconnect() {
         if (getConnectionStatus() == AgentConnectionStatus.AGENT_CONNECTED) {
+            webSocket.closeBlocking()
             pollAgentWorker.interrupt()
-            webSocket.close()
             connectionStatus = AgentConnectionStatus.AGENT_DISCONNECTED
         }
     }
@@ -73,7 +73,16 @@ class PythonRefAgentConnection : AgentConnection {
 
     private var connectionStatus: AgentConnectionStatus = AgentConnectionStatus.AGENT_DISCONNECTED
 
-    override fun getConnectionStatus(): AgentConnectionStatus = connectionStatus
+    override fun getConnectionStatus(): AgentConnectionStatus {
+        return when {
+            connectionStatus == AgentConnectionStatus.AGENT_DISCONNECTED -> AgentConnectionStatus.AGENT_DISCONNECTED
+            webSocket.isOpen -> AgentConnectionStatus.AGENT_CONNECTED
+            else -> {
+                connectionStatus = AgentConnectionStatus.AGENT_DISCONNECTED
+                connectionStatus
+            }
+        }
+    }
 
     private lateinit var webSocket : AgentWebSocketClient
 
@@ -92,7 +101,7 @@ class PythonRefAgentConnection : AgentConnection {
     private fun checkUserLoggedIn(stateMessage: State?, userName: String): Boolean {
         return if(stateMessage != null &&
                 stateMessage.content?.get("initialized") == true &&
-                stateMessage.content["agent_name"] == userName) {
+                stateMessage.content["agent_name"] == userName && webSocket.isOpen) {
             connectionStatus = AgentConnectionStatus.AGENT_CONNECTED
             true
         } else {
