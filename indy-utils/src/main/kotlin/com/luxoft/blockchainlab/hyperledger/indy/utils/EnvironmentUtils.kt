@@ -5,9 +5,6 @@ import org.apache.commons.io.FileUtils.getUserDirectoryPath
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.Paths
-import java.util.*
-import kotlin.math.absoluteValue
 
 
 internal object EnvironmentUtils {
@@ -18,23 +15,27 @@ internal object EnvironmentUtils {
         }
 
     fun getIndyHomePath(): String {
-        return getUserDirectoryPath() + "/.indy_client/"
+        return System.getProperty("INDY_HOME") ?: "${getUserDirectoryPath()}/.indy_client"
     }
 
-    fun getIndyPoolPath(poolName: String) = getIndyHomePath() + "/pool/$poolName"
+    fun getIndyPoolPath(): String {
+        return System.getProperty("INDY_POOL_PATH") ?: "${getUserDirectoryPath()}/.indy_client"
+    }
+
+    fun getIndyPoolPath(poolName: String) = getIndyPoolPath() + "/pool/$poolName"
 
     fun getIndyWalletPath(walletName: String) = getIndyHomePath() + "/wallet/$walletName"
 
     fun getIndyHomePath(filename: String): String {
-        return getIndyHomePath() + filename
+        return "${getIndyHomePath()}/$filename"
     }
 
     internal fun getTmpPath(): String {
-        return FileUtils.getTempDirectoryPath() + "/indy/"
+        return System.getProperty("INDY_TMP") ?: FileUtils.getTempDirectoryPath() + "/indy"
     }
 
     internal fun getTmpPath(filename: String): String {
-        return getTmpPath() + filename
+        return "${getTmpPath()}/$filename"
     }
 
     @Throws(IOException::class)
