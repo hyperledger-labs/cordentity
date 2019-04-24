@@ -6,10 +6,11 @@ import mu.KotlinLogging
 import org.java_websocket.client.WebSocketClient
 import org.java_websocket.handshake.ServerHandshake
 import rx.*
+import rx.Observable
+import rx.Observer
 import rx.schedulers.Schedulers
 import java.net.URI
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.*
 
 class AgentWebSocketClient(serverUri: URI, private val socketName: String) : WebSocketClient(serverUri) {
     companion object {
@@ -30,39 +31,39 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
         /**
          * Inbound messages indexed by (subscription) key, double linked queue for each key.
          */
-        private val receivedMessages = ConcurrentHashMap<String, ConcurrentLinkedQueue<String>>()
+        private val receivedMessages = HashMap<String, Queue<String>>()
 
         /**
          * message routing map, indexed by subscription key (message-specific), double linked queue of observers
          * for each (message-specific) key
          */
-        private val subscribedObservers = ConcurrentHashMap<String, ConcurrentLinkedQueue<Observer<in String>>>()
+        private val subscribedObservers = HashMap<String, Queue<Observer<in String>>>()
 
         /**
          * Adds an observer to (FIFO) queue corresponding to the given key.
          * If the queue doesn't exist for the given key, it's been created.
          */
         private fun addObserver(key: String, observer: Observer<in String>) =
-                subscribedObservers.getOrPut(key) { ConcurrentLinkedQueue() }.add(observer)
+                subscribedObservers.getOrPut(key) { LinkedList() }.add(observer)
 
         /**
          * Adds a message to the queue corresponding to the given key.
          * If the queue doesn't exist for the given key, it's been created.
          */
         private fun storeMessage(key: String, message: String) =
-                receivedMessages.getOrPut(key) { ConcurrentLinkedQueue() }.add(message)
+                receivedMessages.getOrPut(key) { LinkedList() }.add(message)
 
         /**
          * Removes an observer from the queue.
          */
         private fun popObserver(key: String) =
-                subscribedObservers.getOrPut(key) { ConcurrentLinkedQueue() }.poll()
+                subscribedObservers.getOrPut(key) { LinkedList() }.poll()
 
         /**
          * Pops a message by key from the queue.
          */
         private fun popMessage(key: String) =
-                receivedMessages.getOrPut(key) { ConcurrentLinkedQueue() }.poll()
+                receivedMessages.getOrPut(key) { LinkedList() }.poll()
 
         fun getObserverOrAddMessage(key: String, message: String) = synchronized(this) {
             val observer = popObserver(key)
