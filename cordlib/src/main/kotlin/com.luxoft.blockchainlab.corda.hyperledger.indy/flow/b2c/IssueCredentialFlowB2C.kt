@@ -7,6 +7,7 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredential
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.getCredentialDefinitionById
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.indyUser
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.whoIsNotary
+import com.luxoft.blockchainlab.corda.hyperledger.indy.service.awaitFiber
 import com.luxoft.blockchainlab.corda.hyperledger.indy.service.connectionService
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialDefinitionId
 import com.luxoft.blockchainlab.hyperledger.indy.IndyCredentialDefinitionNotFoundException
@@ -24,7 +25,8 @@ object IssueCredentialFlowB2C {
     open class Issuer(
             private val identifier: String,
             private val credentialProposal: String,
-            private val credentialDefinitionId: CredentialDefinitionId
+            private val credentialDefinitionId: CredentialDefinitionId,
+            private val indyPartyDID: String
     ) : FlowLogic<Unit>() {
 
         @Suspendable
@@ -48,9 +50,9 @@ object IssueCredentialFlowB2C {
                 // issue credential
                 val offer = indyUser().createCredentialOffer(credentialDefinitionId)
 
-                connectionService().sendCredentialOffer(offer)
+                connectionService().sendCredentialOffer(offer, indyPartyDID)
 
-                val credentialRequest = connectionService().receiveCredentialRequest()
+                val credentialRequest = connectionService().receiveCredentialRequest(indyPartyDID).awaitFiber()
 
                 val credential = indyUser().issueCredential(
                         credentialRequest,
@@ -58,7 +60,7 @@ object IssueCredentialFlowB2C {
                         offer
                 )
 
-                connectionService().sendCredential(credential)
+                connectionService().sendCredential(credential, indyPartyDID)
 
                 val credentialOut = IndyCredential(
                         identifier,
