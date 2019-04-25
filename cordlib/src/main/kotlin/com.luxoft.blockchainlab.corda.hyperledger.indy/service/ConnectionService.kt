@@ -14,7 +14,7 @@ import rx.Single
 
 
 @CordaService
-class ConnectionService(serviceHub: AppServiceHub) : SingletonSerializeAsToken() {
+class ConnectionService (services: AppServiceHub) : SingletonSerializeAsToken() {
     fun sendCredentialOffer(offer: CredentialOffer, partyDID: String) = getPartyConnection(partyDID).sendCredentialOffer(offer)
 
     fun receiveCredentialOffer(partyDID: String) = getPartyConnection(partyDID).receiveCredentialOffer()
