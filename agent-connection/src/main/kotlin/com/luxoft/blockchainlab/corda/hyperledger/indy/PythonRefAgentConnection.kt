@@ -201,7 +201,6 @@ class PythonRefAgentConnection : AgentConnection {
     }
 
     private val toProcessPairwiseConnections = LinkedBlockingQueue<Pair<String, SingleSubscriber<in JsonNode>>>()
-    private val currentPairwiseConnections = ConcurrentHashMap<String, JsonNode>()
     private val awaitingPairwiseConnections = ConcurrentHashMap<String, SingleSubscriber<in JsonNode>>()
     /**
      * Agent's state polling thread. It resumes whenever [toProcessPairwiseConnections] is non-empty.
@@ -218,7 +217,6 @@ class PythonRefAgentConnection : AgentConnection {
                     if (observer != null) {
                         observer.onSuccess(pairwise)
                     }
-                    currentPairwiseConnections[publicKey] = pairwise
                 } catch (e: Throwable) {
                     log.warn(e) { "invalid pairwise connection (no connection key) found in the state" }
                 }
@@ -266,18 +264,10 @@ class PythonRefAgentConnection : AgentConnection {
         return Single.create { observer ->
             try {
                 /**
-                 * Check if other callers already parsed the state and it has the key
+                 * Put the observer in the queue and notify the worker to poll the agent state.
+                 * When the worker finds the public key in the parsed state, it will notify the observer.
                  */
-                val connection = currentPairwiseConnections.remove(pubKey)
-                if (connection != null) {
-                    observer.onSuccess(connection)
-                } else {
-                    /**
-                     * Otherwise put the observer in the queue and notify the worker to poll the agent state.
-                     * When the worker finds the public key in the parsed state, it will notify the observer.
-                     */
-                    toProcessPairwiseConnections.put(pubKey to observer)
-                }
+                toProcessPairwiseConnections.put(pubKey to observer)
             } catch (e: Throwable) {
                 observer.onError(e)
             }
