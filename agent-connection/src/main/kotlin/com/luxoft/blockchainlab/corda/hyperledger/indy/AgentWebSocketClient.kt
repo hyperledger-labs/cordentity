@@ -5,9 +5,10 @@ import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import mu.KotlinLogging
 import org.java_websocket.client.WebSocketClient
 import org.java_websocket.handshake.ServerHandshake
-import rx.*
 import rx.Observable
 import rx.Observer
+import rx.Scheduler
+import rx.Single
 import rx.schedulers.Schedulers
 import java.net.URI
 import java.util.*
@@ -212,13 +213,13 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
      * Subscribes on a message of the given type and key, emits a Single<> serialized message
      */
     private fun popMessageOfType(type: String, key: String? = null): Observable<String> {
-        return Observable.create({ observer: Observer<String> ->
+        return Observable.create<String> { observer ->
             try {
                 popMessage(if (key != null) "$type.$key" else type, observer)
             } catch (e: Throwable) {
                 observer.onError(e)
             }
-        }, Emitter.BackpressureMode.BUFFER).observeOn(scheduler)
+        }.observeOn(scheduler)
     }
 
     /**
@@ -226,13 +227,13 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
      * Emits a Single<> serialized object
      */
     private fun <T : Any> popClassObject(className: Class<T>, from: IndyParty): Observable<String> {
-        return Observable.create({ observer: Observer<String> ->
+        return Observable.create<String> { observer ->
             try {
                 popMessage("${className.canonicalName}.${from.did}", observer)
             } catch (e: Throwable) {
                 observer.onError(e)
             }
-        }, Emitter.BackpressureMode.BUFFER).observeOn(scheduler)
+        }.observeOn(scheduler)
     }
 }
 

@@ -2,8 +2,8 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy.service
 
 import co.paralleluniverse.fibers.FiberAsync
 import co.paralleluniverse.fibers.Suspendable
-import com.luxoft.blockchainlab.corda.hyperledger.indy.PythonRefAgentConnection
 import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection
+import com.luxoft.blockchainlab.corda.hyperledger.indy.PythonRefAgentConnection
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.ConfigHelper
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
 import net.corda.core.flows.FlowLogic
@@ -11,7 +11,6 @@ import net.corda.core.node.AppServiceHub
 import net.corda.core.node.services.CordaService
 import net.corda.core.serialization.SingletonSerializeAsToken
 import rx.Single
-import java.lang.RuntimeException
 
 
 @CordaService
@@ -52,7 +51,7 @@ class ConnectionService (services: AppServiceHub) : SingletonSerializeAsToken() 
             agentLogin ?: throw RuntimeException("Agent websocket endpoint specified but agent user name is missing")
             agentPassword ?: throw RuntimeException("Agent websocket endpoint specified but agent password is missing")
 
-            PythonRefAgentConnection().apply { connect(agentWsEndpoint, agentLogin, agentPassword).awaitFiber() }
+            PythonRefAgentConnection().apply { connect(agentWsEndpoint, agentLogin, agentPassword).toBlocking().value() }
         } else
             null
     }
@@ -62,7 +61,7 @@ class ConnectionService (services: AppServiceHub) : SingletonSerializeAsToken() 
                 ?: throw RuntimeException("Unable to get connection: Please specify 'agentWSEndpoint', 'agentUser', 'agentPassword' properties in config")
     }
 
-    private fun getPartyConnection(partyDID: String) = getConnection().getIndyPartyConnection(partyDID).awaitFiber()
+    private fun getPartyConnection(partyDID: String) = getConnection().getIndyPartyConnection(partyDID).toBlocking().value()
             ?: throw RuntimeException("Unable to get IndyPartyConnection for DID: $partyDID")
 }
 
