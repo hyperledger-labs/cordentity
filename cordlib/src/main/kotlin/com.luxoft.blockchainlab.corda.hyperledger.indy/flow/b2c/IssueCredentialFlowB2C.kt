@@ -9,6 +9,7 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.getCredentialDefinit
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.getRevocationRegistryDefinitionById
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.indyUser
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.whoIsNotary
+import com.luxoft.blockchainlab.corda.hyperledger.indy.service.awaitFiber
 import com.luxoft.blockchainlab.corda.hyperledger.indy.service.connectionService
 import com.luxoft.blockchainlab.hyperledger.indy.IndyCredentialDefinitionNotFoundException
 import com.luxoft.blockchainlab.hyperledger.indy.IndyCredentialMaximumReachedException
@@ -31,7 +32,8 @@ object IssueCredentialFlowB2C {
         private val identifier: String,
         private val credentialDefinitionId: CredentialDefinitionId,
         private val revocationRegistryDefinitionId: RevocationRegistryDefinitionId?,
-        private val credentialProposalProvider: () -> CredentialProposal
+        private val credentialProposalProvider: () -> CredentialProposal,
+        private val indyPartyDID: String
     ) : FlowLogic<Unit>() {
 
         @Suspendable
@@ -47,9 +49,9 @@ object IssueCredentialFlowB2C {
                 // issue credential
                 val offer = indyUser().createCredentialOffer(credentialDefinitionId)
 
-                connectionService().sendCredentialOffer(offer)
+                connectionService().sendCredentialOffer(offer, indyPartyDID)
 
-                val credentialRequest = connectionService().receiveCredentialRequest()
+                val credentialRequest = connectionService().receiveCredentialRequest(indyPartyDID).awaitFiber()
 
                 val credential = indyUser().issueCredentialAndUpdateLedger(
                     credentialRequest,
@@ -58,7 +60,7 @@ object IssueCredentialFlowB2C {
                     credentialProposalProvider
                 )
 
-                connectionService().sendCredential(credential)
+                connectionService().sendCredential(credential, indyPartyDID)
 
                 val credentialOut = IndyCredential(
                     identifier,

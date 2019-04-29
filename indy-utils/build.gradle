@@ -3,7 +3,6 @@ dependencies {
         exclude group: 'net.java.dev.jna', module: 'jna'
         exclude group: 'org.slf4j', module: 'slf4j-api'
     }
-    implementation group: 'commons-io', name: 'commons-io', version: '2.6'
     
     compile "com.fasterxml.jackson.core:jackson-databind:$jackson_version"
     compile "com.fasterxml.jackson.module:jackson-module-kotlin:$jackson_version"
