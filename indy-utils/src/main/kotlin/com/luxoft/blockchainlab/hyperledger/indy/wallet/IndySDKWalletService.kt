@@ -188,7 +188,7 @@ class IndySDKWalletService(
         else SerializationUtils.anyToJSON(revocationRegistryDefinition)
 
         Anoncreds.proverStoreCredential(
-            wallet, null, credentialRequestMetadataJson, credentialJson, credDefJson, revRegDefJson
+            wallet, System.currentTimeMillis().toString(), credentialRequestMetadataJson, credentialJson, credDefJson, revRegDefJson
         ).get()
     }
 
@@ -252,7 +252,7 @@ class IndySDKWalletService(
         nonRevoked: Interval?
     ): List<ProofDataEntry> {
 
-        return collectionFromCreds.map { attribute ->
+        val result = collectionFromCreds.map { attribute ->
             val credDefId = attribute.credentialInfo.getCredentialDefinitionIdObject()
 
             val keys = collectionFromRequest.entries
@@ -283,6 +283,8 @@ class IndySDKWalletService(
                 revocationStateProvider(revRegId, credRevId, nonRevoked)
             )
         }
+
+        return result
     }
 
     override fun createProof(
@@ -297,7 +299,7 @@ class IndySDKWalletService(
         val requiredCredentialsForProof =
             SerializationUtils.jSONToAny<ProofRequestCredentials>(proverGetCredsForProofReq)
 
-        val requiredAttributes = requiredCredentialsForProof.attributes.values.flatten()
+        val requiredAttributes = requiredCredentialsForProof.attributes.values.flatten().sortedBy { it.credentialInfo.referent }
         val proofRequestAttributes = proofRequest.requestedAttributes
         val attrProofData =
             parseProofData(proofRequestAttributes, requiredAttributes, revocationStateProvider, proofRequest.nonRevoked)

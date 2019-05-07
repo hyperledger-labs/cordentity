@@ -16,6 +16,7 @@ import org.junit.*
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import java.io.File
+import java.util.*
 
 
 class AnoncredsDemoTest : IndyIntegrationTest() {
@@ -40,7 +41,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         @JvmStatic
         @BeforeClass
         fun setUpTest() {
-            System.setProperty(org.slf4j.impl.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "TRACE")
+            System.setProperty(org.slf4j.impl.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "OFF")
 
             // Create and Open Pool
             poolName = PoolHelper.DEFAULT_POOL_NAME
@@ -195,6 +196,120 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
     }
 
     @Test
+    fun `issuer issues 1 credential verifier tries to verify it several times`() {
+        // init metadata and issue credential
+        val schema = issuer1.createSchemaAndStoreOnLedger(GVT_SCHEMA_NAME, SCHEMA_VERSION, GVT_SCHEMA_ATTRIBUTES)
+        val credDef = issuer1.createCredentialDefinitionAndStoreOnLedger(schema.getSchemaIdObject(), false)
+        val credOffer = issuer1.createCredentialOffer(credDef.getCredentialDefinitionIdObject())
+        val credReq = prover.createCredentialRequest(prover.walletService.getIdentityDetails().did, credOffer)
+        val credInfo = issuer1.issueCredentialAndUpdateLedger(credReq, credOffer, null) {
+            mapOf(
+                "sex" to CredentialValue("male"),
+                "name" to CredentialValue("Alex"),
+                "height" to CredentialValue("175"),
+                "age" to CredentialValue("28")
+            )
+        }
+        prover.receiveCredential(credInfo, credReq, credOffer)
+
+        val fieldName = CredentialFieldReference("name", schema.id, credDef.id)
+        val fieldSex = CredentialFieldReference("sex", schema.id, credDef.id)
+        val fieldAge = CredentialFieldReference("age", schema.id, credDef.id)
+
+        // repeating this stuff for 3 times
+        for (i in (0 until 3)) {
+            val proofReq = issuer1.createProofRequest(
+                version = "0.1",
+                name = "proof_req_0.1",
+                attributes = listOf(fieldName, fieldSex),
+                predicates = listOf(CredentialPredicate(fieldAge, 18)),
+                nonRevoked = null,
+                nonce = Random().nextLong().toString()
+            )
+
+            val proof = prover.createProofFromLedgerData(proofReq)
+
+            assertTrue(issuer1.verifyProofWithLedgerData(proofReq, proof))
+        }
+    }
+
+    @Test
+    fun `issuer issues 2 similar credentials verifier tries to verify both`() = repeat(100) {
+        tearDown()
+        setUp()
+        // init metadata and issue credential
+        val schema = issuer1.createSchemaAndStoreOnLedger(GVT_SCHEMA_NAME, SCHEMA_VERSION, GVT_SCHEMA_ATTRIBUTES)
+        val credDef = issuer1.createCredentialDefinitionAndStoreOnLedger(schema.getSchemaIdObject(), true)
+        val revReg = issuer1.createRevocationRegistryAndStoreOnLedger(credDef.getCredentialDefinitionIdObject(), 4)
+        val fieldName = CredentialFieldReference("name", schema.id, credDef.id)
+        val fieldSex = CredentialFieldReference("sex", schema.id, credDef.id)
+        val fieldAge = CredentialFieldReference("age", schema.id, credDef.id)
+        val fieldHeight = CredentialFieldReference("height", schema.id, credDef.id)
+
+        // issue first credential
+        val credOffer1 = issuer1.createCredentialOffer(credDef.getCredentialDefinitionIdObject())
+        val credReq1 = prover.createCredentialRequest(prover.walletService.getIdentityDetails().did, credOffer1)
+        val credInfo1 = issuer1.issueCredentialAndUpdateLedger(credReq1, credOffer1, revReg.definition.getRevocationRegistryIdObject()) {
+            mapOf(
+                "sex" to CredentialValue("male"),
+                "name" to CredentialValue("Alex"),
+                "height" to CredentialValue("175"),
+                "age" to CredentialValue("28")
+            )
+        }
+        prover.receiveCredential(credInfo1, credReq1, credOffer1)
+
+        // verify first credential
+        val proofReq = issuer1.createProofRequest(
+            version = "0.1",
+            name = "proof_req_0.1",
+            attributes = listOf(fieldName, fieldSex),
+            predicates = listOf(CredentialPredicate(fieldAge, 18)),
+            nonRevoked = Interval.now()
+        )
+
+        val proof = prover.createProofFromLedgerData(proofReq)
+
+        assert(proof["name"]?.raw == "Alex") { "Name is not Alex" }
+        assert(issuer1.verifyProofWithLedgerData(proofReq, proof)) { "Proof is invalid for Alex" }
+
+        //issuer1.revokeCredentialAndUpdateLedger(revReg.definition.getRevocationRegistryIdObject()!!, credInfo1.credRevocId!!)
+
+        // issue second credential
+        val credOffer2 = issuer1.createCredentialOffer(credDef.getCredentialDefinitionIdObject())
+        val credReq2 = prover.createCredentialRequest(prover.walletService.getIdentityDetails().did, credOffer2)
+        val credInfo2 = issuer1.issueCredentialAndUpdateLedger(credReq2, credOffer2, revReg.definition.getRevocationRegistryIdObject()) {
+            mapOf(
+                "sex" to CredentialValue("female"),
+                "name" to CredentialValue("Alice"),
+                "height" to CredentialValue("158"),
+                "age" to CredentialValue("17")
+            )
+        }
+        prover.receiveCredential(credInfo2, credReq2, credOffer2)
+
+        try {
+            // verify second credential
+            val proofReq1 = issuer1.createProofRequest(
+                version = "0.1",
+                name = "proof_req_0.1",
+                attributes = listOf(fieldName, fieldSex, fieldAge, fieldHeight),
+                predicates = listOf(),
+                nonRevoked = Interval.now()
+            )
+
+            val proof1 = prover.createProofFromLedgerData(proofReq1)
+
+            assert(proof1["name"]?.raw == "Alice") { "Name is not Alice" }
+
+            assert(issuer1.verifyProofWithLedgerData(proofReq1, proof1)) { "Proof is not valid for Alice" }
+            println("PASSED")
+        } catch (e: AssertionError) {
+            println("FAILED")
+        }
+    }
+
+    @Test
     @Throws(Exception::class)
     fun `1 issuer 1 prover 1 credential setup works fine`() {
         val gvtSchema = issuer1.createSchemaAndStoreOnLedger(GVT_SCHEMA_NAME, SCHEMA_VERSION, GVT_SCHEMA_ATTRIBUTES)
@@ -204,7 +319,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         val credentialInfo = issuer1.issueCredentialAndUpdateLedger(
             credReq,
             credOffer,
-           null
+            null
         ) {
             mapOf(
                 "sex" to CredentialValue("male"),

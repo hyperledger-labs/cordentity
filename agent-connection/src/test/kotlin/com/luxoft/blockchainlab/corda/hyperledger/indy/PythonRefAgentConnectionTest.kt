@@ -85,9 +85,9 @@ class PythonRefAgentConnectionTest {
             )
     private val masterAgent = "ws://127.0.0.1:8095/ws"
 
-    @Ignore("Requires external services")
+    //@Ignore("Requires external services")
     @Test
-    fun `externalTest`() = repeat(Int.MAX_VALUE) {
+    fun `externalTest`() = repeat(1) {
         MasterProcess(masterAgent, invitedPartyAgents).apply { start() }
     }
 }
