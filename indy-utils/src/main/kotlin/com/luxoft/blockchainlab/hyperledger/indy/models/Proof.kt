@@ -1,8 +1,6 @@
 package com.luxoft.blockchainlab.hyperledger.indy.models
 
-import com.fasterxml.jackson.annotation.JsonIgnore
-import com.fasterxml.jackson.annotation.JsonInclude
-import com.fasterxml.jackson.annotation.JsonProperty
+import com.fasterxml.jackson.annotation.*
 
 /**
  * Represents a particular attribute of a credential
@@ -208,15 +206,7 @@ data class RequestedPredicateInfo(
  *         "from": Optional<int>, // timestamp of interval beginning
  *         "to": Optional<int>, // timestamp of interval ending
  *     }
- *     filter:
- *     {
- *         "schema_id": string, (Optional)
- *         "schema_issuer_did": string, (Optional)
- *         "schema_name": string, (Optional)
- *         "schema_version": string, (Optional)
- *         "issuer_did": string, (Optional)
- *         "cred_def_id": string, (Optional)
- *     }
+ *
  */
 data class ProofRequest(
     val version: String,
@@ -229,20 +219,56 @@ data class ProofRequest(
 
 data class CredentialAttributeReference(
     override val name: String,
-    @JsonProperty("schema_id") override val schemaIdRaw: String
-) : AbstractCredentialReference(name, schemaIdRaw)
+    @JsonProperty("schema_id") override val schemaIdRaw: String,
+    override val restrictions: Filter? = null
+) : AbstractCredentialReference(name, restrictions, schemaIdRaw)
 
 data class CredentialPredicateReference(
     override val name: String,
-    val p_type: String,
+    @JsonProperty("schema_id") override val schemaIdRaw: String,
     val p_value: Int,
-    @JsonProperty("schema_id") override val schemaIdRaw: String
-) : AbstractCredentialReference(name, schemaIdRaw)
+    val p_type: String = ">=",
+    override val restrictions: Filter? = null
+) : AbstractCredentialReference(name, restrictions, schemaIdRaw)
 
 abstract class AbstractCredentialReference(
     open val name: String,
+    open val restrictions: Filter?,
     @JsonProperty("schema_id") override val schemaIdRaw: String
 ) : ContainsSchemaId
+
+/**
+ *     filter:
+ *     {
+ *         "schema_id": string, (Optional)
+ *         "schema_issuer_did": string, (Optional)
+ *         "schema_name": string, (Optional)
+ *         "schema_version": string, (Optional)
+ *         "issuer_did": string, (Optional)
+ *         "cred_def_id": string, (Optional)
+ *     }
+ */
+class Filter(
+    @JsonProperty("schema_id") val schemaIdRaw: String? = null,
+    val schemaIssuerDid: String? = null,
+    val schemaName: String? = null,
+    val schemaVersion: String? = null,
+    val issuerDid: String? = null,
+    val credDefId: String? = null,
+    init: Filter.() -> Unit
+) {
+    @JsonIgnore private val attributes: MutableMap<String, String> = mutableMapOf()
+
+    init {
+        init()
+    }
+
+    @JsonAnyGetter
+    fun getAttributes() = attributes
+
+    @JsonAnySetter
+    fun setAttribute(key: String, value: String) = attributes.put(key, value)
+}
 
 /**
  * Represents proof

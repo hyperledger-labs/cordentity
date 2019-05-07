@@ -153,8 +153,8 @@ class IndyUser(
     override fun createProofRequest(
         version: String,
         name: String,
-        attributes: List<CredentialFieldReference>,
-        predicates: List<CredentialPredicate>,
+        attributes: List<CredentialAttributeReference>,
+        predicates: List<CredentialPredicateReference>,
         nonRevoked: Interval?,
         nonce: String
     ): ProofRequest {

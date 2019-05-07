@@ -5,6 +5,8 @@ import com.luxoft.blockchainlab.hyperledger.indy.models.*
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import com.luxoft.blockchainlab.hyperledger.indy.utils.getRootCause
 import org.hyperledger.indy.sdk.anoncreds.Anoncreds
+import org.hyperledger.indy.sdk.anoncreds.CredentialsSearch
+import org.hyperledger.indy.sdk.anoncreds.CredentialsSearchForProofReq
 import org.hyperledger.indy.sdk.anoncreds.DuplicateMasterSecretNameException
 import org.hyperledger.indy.sdk.did.Did
 import org.hyperledger.indy.sdk.pairwise.Pairwise
@@ -188,7 +190,7 @@ class IndySDKWalletService(
         else SerializationUtils.anyToJSON(revocationRegistryDefinition)
 
         Anoncreds.proverStoreCredential(
-            wallet, System.currentTimeMillis().toString(), credentialRequestMetadataJson, credentialJson, credDefJson, revRegDefJson
+            wallet, null, credentialRequestMetadataJson, credentialJson, credDefJson, revRegDefJson
         ).get()
     }
 
@@ -210,30 +212,13 @@ class IndySDKWalletService(
     override fun createProofRequest(
         version: String,
         name: String,
-        attributes: List<CredentialFieldReference>,
-        predicates: List<CredentialPredicate>,
+        attributes: List<CredentialAttributeReference>,
+        predicates: List<CredentialPredicateReference>,
         nonRevoked: Interval?,
         nonce: String
     ): ProofRequest {
-        val requestedAttributes = attributes
-            .withIndex()
-            .associate { attr ->
-                attr.value.fieldName to CredentialAttributeReference(
-                    attr.value.fieldName,
-                    attr.value.schemaIdRaw
-                )
-            }
-
-        val requestedPredicates = predicates
-            .withIndex()
-            .associate { predicate ->
-                predicate.value.fieldReference.fieldName to CredentialPredicateReference(
-                    predicate.value.fieldReference.fieldName,
-                    predicate.value.type,
-                    predicate.value.value,
-                    predicate.value.fieldReference.schemaIdRaw
-                )
-            }
+        val requestedAttributes = attributes.associate { it.name to it }
+        val requestedPredicates = predicates.associate { it.name to it }
 
         return ProofRequest(version, name, nonce, requestedAttributes, requestedPredicates, nonRevoked)
     }
@@ -295,11 +280,17 @@ class IndySDKWalletService(
         revocationStateProvider: RevocationStateProvider?
     ): ProofInfo {
         val proofRequestJson = SerializationUtils.anyToJSON(proofRequest)
+        val searchObj = CredentialsSearchForProofReq.open(wallet, proofRequestJson, null).get()
+        val CREDS_FOR_ATTRS = proofRequest.requestedAttributes.keys.map {
+            searchObj.fetchNextCredentials(it, 1)
+        }
+        // TODO: ADD CREDS FOR PREDICATES, MATCH FORMATS
+
         val proverGetCredsForProofReq = Anoncreds.proverGetCredentialsForProofReq(wallet, proofRequestJson).get()
         val requiredCredentialsForProof =
             SerializationUtils.jSONToAny<ProofRequestCredentials>(proverGetCredsForProofReq)
 
-        val requiredAttributes = requiredCredentialsForProof.attributes.values.flatten().sortedBy { it.credentialInfo.referent }
+        val requiredAttributes = requiredCredentialsForProof.attributes.values.flatten()
         val proofRequestAttributes = proofRequest.requestedAttributes
         val attrProofData =
             parseProofData(proofRequestAttributes, requiredAttributes, revocationStateProvider, proofRequest.nonRevoked)

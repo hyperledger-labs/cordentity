@@ -132,8 +132,8 @@ interface IndyFacade {
     fun createProofRequest(
         version: String,
         name: String,
-        attributes: List<CredentialFieldReference>,
-        predicates: List<CredentialPredicate>,
+        attributes: List<CredentialAttributeReference>,
+        predicates: List<CredentialPredicateReference>,
         nonRevoked: Interval?,
         nonce: String = "123123"
     ): ProofRequest
