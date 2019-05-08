@@ -133,6 +133,37 @@ open class IndyUser(
         } else credDefFromLedger
     }
 
+    /**
+     * Returns revocation registry info ([RevocationRegistryInfo]) for credential definition if there's one on ledger.
+     * Otherwise returns null
+     *
+     * @param credentialDefinitionId    credential definition id
+     *
+     * @return                          created
+     */
+    override fun getRevocationRegistryInfo(
+            credentialDefinitionId: CredentialDefinitionId
+    ): RevocationRegistryInfo? {
+
+        val revRegId = credentialDefinitionId.getPossibleRevocationRegistryDefinitionId(REVOCATION_TAG)
+        val definitionFromLedger = ledgerService.retrieveRevocationRegistryDefinition(revRegId) ?: return null
+
+        val entryFromLedger = ledgerService.retrieveRevocationRegistryEntry(revRegId, Timestamp.now())
+                ?: throw RuntimeException("Unable to get revocation registry entry of existing definition $revRegId from ledger")
+
+        return RevocationRegistryInfo(definitionFromLedger, entryFromLedger.second)
+    }
+
+    /**
+     * Creates revocation registry for credential definition if there's no one in ledger
+     * (usable only for those credential definition for which enableRevocation = true)
+     *
+     * @param credentialDefinitionId    credential definition id
+     * @param maxCredentialNumber       maximum number of credentials which can be issued for this credential definition
+     *                                  (example) driver agency can produce only 1000 driver licences per year
+     *
+     * @return                          created
+     */
     override fun createRevocationRegistry(
         credentialDefinitionId: CredentialDefinitionId,
         maxCredentialNumber: Int

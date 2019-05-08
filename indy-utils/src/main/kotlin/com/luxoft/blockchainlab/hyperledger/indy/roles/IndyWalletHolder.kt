@@ -1,6 +1,8 @@
 package com.luxoft.blockchainlab.hyperledger.indy.roles
 
+import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialDefinitionId
 import com.luxoft.blockchainlab.hyperledger.indy.models.IdentityDetails
+import com.luxoft.blockchainlab.hyperledger.indy.models.RevocationRegistryInfo
 
 
 /**
@@ -31,4 +33,16 @@ interface IndyWalletHolder {
      * Gets identity details of this indy user
      */
     fun getIdentity() = getIdentity(did)
+
+    /**
+     * Returns revocation registry info for credential definition if there's one on ledger.
+     * Otherwise returns null
+     *
+     * @param credentialDefinitionId    credential definition id
+     *
+     * @return                          created
+     */
+    fun getRevocationRegistryInfo(
+            credentialDefinitionId: CredentialDefinitionId
+    ): RevocationRegistryInfo?
 }
