@@ -1,6 +1,7 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy
 
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
+import rx.Single
 
 /**
  * Represents remote Indy Party
@@ -86,5 +87,34 @@ class IndyParty(private val webSocket: AgentWebSocketClient, val did: String, va
      * @return observable (Single<>) object emitting a single [ProofInfo] upon subscription
      */
     override fun receiveProof() = webSocket.receiveClassObject<ProofInfo>(this)
+
+    /**
+     * Returns observable ([Single]<>) object, emitting JSON-encocoded Tails file by the given tails hash.
+     *
+     * @param tailsHash string-encocoded Tails file
+     *
+     * @return observable ([Single]<>) object emitting [TailsResponse] object
+     */
+    override fun requestTails(tailsHash: String) : Single<TailsResponse> {
+        webSocket.sendClassObject(TailsRequest(tailsHash), this)
+        return webSocket.receiveClassObject(this)
+    }
+
+    private var requestHandler: (TailsRequest) -> TailsResponse = { TailsResponse(it.tailsHash, mapOf())}
+    private var tailRequestMessageHandler: (TailsRequest) -> Unit = {}
+
+    /**
+     * Sets handler for client's tails file requests
+     *
+     * @param handler a function producing [TailsResponse] from [TailsRequest]
+     */
+    override fun handleTailsRequestsWith(handler: (TailsRequest) -> TailsResponse) {
+        requestHandler = handler
+        tailRequestMessageHandler = {
+            webSocket.sendClassObject(requestHandler(it), this)
+            webSocket.receiveClassObject<TailsRequest>(this).subscribe(tailRequestMessageHandler)
+        }
+        webSocket.receiveClassObject<TailsRequest>(this).subscribe(tailRequestMessageHandler)
+    }
 }
 

@@ -35,6 +35,8 @@ class ConnectionService (services: AppServiceHub) : SingletonSerializeAsToken() 
 
     fun receiveProof(partyDID: String) = getPartyConnection(partyDID).receiveProof()
 
+    fun handleTailsRequestsWith(handler: (TailsRequest) -> TailsResponse, partyDID: String) = getPartyConnection(partyDID).handleTailsRequestsWith(handler)
+
     /**
      * These next private values should be initialized here despite the fact they are used only in [connection] initialization.
      * This is so because we're unable to mock Kotlin-object in our case properly (several times with context save) in

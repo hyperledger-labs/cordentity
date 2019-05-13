@@ -91,6 +91,22 @@ interface IndyPartyConnection {
      * Returns self session DID
      */
     fun myDID(): String
+
+    /**
+     * Returns observable ([Single]<>) object, emitting string-encocoded Tails file by the given tails hash.
+     *
+     * @param tailsHash string-encocoded Tails file
+     *
+     * @return observable ([Single]<>) object emitting [TailsResponse] object
+     */
+    fun requestTails(tailsHash: String) : Single<TailsResponse>
+
+    /**
+     * Sets handler for client's tails file requests
+     *
+     * @param handler a function producing [TailsResponse] from [TailsRequest]
+     */
+    fun handleTailsRequestsWith(handler: (TailsRequest) -> TailsResponse)
 }
 
 class AgentConnectionException(obj: Any) :
