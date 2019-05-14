@@ -62,7 +62,7 @@ data class RevocationRegistryEntry(
  * Tails request message format. The request is sent over IndyPartyConnection between Indy parties.
  */
 data class TailsRequest(
-    val tailsHash: String
+    @JsonProperty("tails_hash") val tailsHash: String
 )
 
 /**
@@ -70,7 +70,7 @@ data class TailsRequest(
  * The message object is sent over IndyPartyConnection between Indy parties.
  */
 data class TailsResponse(
-    val tailsHash: String,
+    @JsonProperty("tails_hash") val tailsHash: String,
     val tails: RawJsonMap
 )
 

@@ -49,6 +49,8 @@ class CordentitySerializationWhitelist : SerializationWhitelist {
         SchemaId::class.java,
         ContainsSchemaId::class.java,
         ContainsCredentialDefinitionId::class.java,
-        ContainsRevocationRegistryId::class.java
+        ContainsRevocationRegistryId::class.java,
+        TailsRequest::class.java,
+        TailsResponse::class.java
     )
 }
