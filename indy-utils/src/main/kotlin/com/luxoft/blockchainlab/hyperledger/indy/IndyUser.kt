@@ -81,9 +81,12 @@ class IndyUser(
         credentialRequest: CredentialRequestInfo,
         offer: CredentialOffer,
         revocationRegistryId: RevocationRegistryDefinitionId?,
-        proposalProvider: () -> CredentialProposal
+        proposalFiller: CredentialProposal.() -> Unit
     ): CredentialInfo {
-        val proposalJson = SerializationUtils.anyToJSON(proposalProvider())
+        val proposal = CredentialProposal()
+        proposal.proposalFiller()
+
+        val proposalJson = SerializationUtils.anyToJSON(proposal.attributes)
         val credentialInfo = walletService.issueCredential(credentialRequest, proposalJson, offer, revocationRegistryId)
 
         if (revocationRegistryId == null) return credentialInfo
@@ -148,17 +151,6 @@ class IndyUser(
         )
 
         return revocationRegistryEntry
-    }
-
-    override fun createProofRequest(
-        version: String,
-        name: String,
-        attributes: List<CredentialAttributeReference>,
-        predicates: List<CredentialPredicateReference>,
-        nonRevoked: Interval?,
-        nonce: String
-    ): ProofRequest {
-        return walletService.createProofRequest(version, name, attributes, predicates, nonRevoked, nonce)
     }
 
     override fun createProofFromLedgerData(proofRequest: ProofRequest, masterSecretId: String): ProofInfo {

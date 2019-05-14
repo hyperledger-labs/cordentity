@@ -35,15 +35,10 @@ object IssueCredentialFlowB2B {
      *                                  Must be unique for the given Indy user to allow searching Credentials by `(identifier, issuerDID)`
      *
      * @param credentialDefinitionId    id of the credential definition to create new statement (credential)
-     * @param credentialProposal        credential JSON containing attribute values for each of requested attribute names.
-     *                                  Example:
-     *                                  {
-     *                                      "attr1" : {"raw": "value1", "encoded": "value1_as_int" },
-     *                                      "attr2" : {"raw": "value1", "encoded": "value1_as_int" }
-     *                                  }
-     *                                  See `credValuesJson` in [org.hyperledger.indy.sdk.anoncreds.Anoncreds.issuerCreateCredential]
      *
      * @param proverName                the node that can prove this credential
+     *
+     * @param credentialProposalFiller  special builder that allows you to specify credential attributes in a convenient way
      *
      * @return                          credential id
      *
@@ -58,7 +53,7 @@ object IssueCredentialFlowB2B {
         private val credentialDefinitionId: CredentialDefinitionId,
         private val revocationRegistryDefinitionId: RevocationRegistryDefinitionId?,
         private val proverName: CordaX500Name,
-        private val credentialProposalProvider: () -> CredentialProposal
+        private val credentialProposalFiller: CredentialProposal.() -> Unit
     ) : FlowLogic<Unit>() {
 
         @Suspendable
@@ -84,7 +79,7 @@ object IssueCredentialFlowB2B {
                             credentialReq,
                             offer,
                             revocationRegistryDefinitionId,
-                            credentialProposalProvider
+                            credentialProposalFiller
                         )
                         val credentialOut = IndyCredential(
                             identifier,

@@ -13,6 +13,7 @@ import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialFieldReference
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialPredicate
 import com.luxoft.blockchainlab.hyperledger.indy.IndyUser
 import com.luxoft.blockchainlab.hyperledger.indy.models.Interval
+import com.luxoft.blockchainlab.hyperledger.indy.models.ProofRequest
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndContract
 import net.corda.core.flows.*
@@ -24,41 +25,14 @@ object VerifyCredentialFlowB2C {
     @StartableByRPC
     open class Verifier(
             private val identifier: String,
-            private val attributes: List<ProofAttribute>,
-            private val predicates: List<ProofPredicate>,
             private val indyPartyDID: String,
-            private val nonRevoked: Interval = Interval.now()
+            private val proofRequest: ProofRequest
     ) : FlowLogic<Boolean>() {
 
         @Suspendable
         override fun call(): Boolean {
 
             try {
-                val fieldRefAttr = attributes.map {
-                    CredentialFieldReference(
-                            it.field,
-                            it.schemaId.toString(),
-                            it.credentialDefinitionId.toString()
-                    )
-                }
-
-                val fieldRefPred = predicates.map {
-                    val fieldRef = CredentialFieldReference(
-                            it.field,
-                            it.schemaId.toString(),
-                            it.credentialDefinitionId.toString()
-                    )
-                    CredentialPredicate(fieldRef, it.value)
-                } //com.fasterxml.jackson.databind.ObjectMapper@548ccc41
-
-                val proofRequest = indyUser().createProofRequest(
-                        version = "0.1",
-                        name = "proof_req_0.1",
-                        attributes = fieldRefAttr,
-                        predicates = fieldRefPred,
-                        nonRevoked = nonRevoked
-                )
-
                 connectionService().sendProofRequest(proofRequest, indyPartyDID)
 
                 val proof = connectionService().receiveProof(indyPartyDID).awaitFiber()
@@ -72,12 +46,7 @@ object VerifyCredentialFlowB2C {
 
                 val verifyCredentialOut = StateAndContract(credentialProofOut, IndyCredentialContract::class.java.name)
 
-                val expectedAttrs = attributes
-                        .filter { it.value.isNotEmpty() }
-                        .associateBy({ it.field }, { it.value })
-                        .map { IndyCredentialContract.ExpectedAttr(it.key, it.value) }
-
-                val verifyCredentialCmdType = IndyCredentialContract.Command.Verify(expectedAttrs)
+                val verifyCredentialCmdType = IndyCredentialContract.Command.Verify()
                 val verifyCredentialCmd =
                         Command(verifyCredentialCmdType, listOf(ourIdentity.owningKey))
 

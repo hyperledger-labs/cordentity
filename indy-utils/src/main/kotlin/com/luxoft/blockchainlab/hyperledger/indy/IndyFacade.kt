@@ -90,7 +90,7 @@ interface IndyFacade {
         credentialRequest: CredentialRequestInfo,
         offer: CredentialOffer,
         revocationRegistryId: RevocationRegistryDefinitionId?,
-        proposalProvider: () -> CredentialProposal
+        proposalFiller: CredentialProposal.() -> Unit
     ): CredentialInfo
 
     /**
@@ -116,27 +116,6 @@ interface IndyFacade {
         revocationRegistryId: RevocationRegistryDefinitionId,
         credentialRevocationId: String
     ): RevocationRegistryEntry
-
-    /**
-     * Creates [ProofRequest]. This function has nothing to do with Indy API, it is used just to produce well-shaped data.
-     *
-     * @param version [String] - ???
-     * @param name [String] - name of this proof request
-     * @param attributes [List] of [CredentialFieldReference] - attributes which prover needs to reveal
-     * @param predicates [List] of [CredentialPredicate] - predicates which prover should answer
-     * @param nonRevoked [Interval] or [null] - time interval of [attributes] and [predicates] non-revocation
-     * @param nonce [String] - random value to distinct identical proofs
-     *
-     * @return [ProofRequest]
-     */
-    fun createProofRequest(
-        version: String,
-        name: String,
-        attributes: List<CredentialAttributeReference>,
-        predicates: List<CredentialPredicateReference>,
-        nonRevoked: Interval?,
-        nonce: String = "123123"
-    ): ProofRequest
 
     /**
      * Creates [ProofInfo] for provided [ProofRequest].

@@ -209,68 +209,12 @@ class IndySDKWalletService(
         return SerializationUtils.jSONToAny(revRegDeltaJson)
     }
 
-    override fun createProofRequest(
-        version: String,
-        name: String,
-        attributes: List<CredentialAttributeReference>,
-        predicates: List<CredentialPredicateReference>,
-        nonRevoked: Interval?,
-        nonce: String
-    ): ProofRequest {
-        val requestedAttributes = attributes.associate { it.name to it }
-        val requestedPredicates = predicates.associate { it.name to it }
-
-        return ProofRequest(version, name, nonce, requestedAttributes, requestedPredicates, nonRevoked)
-    }
-
     private data class ProofDataEntry(
         val schemaId: SchemaId,
         val credDefId: CredentialDefinitionId,
         val referentCredentials: List<ReferentCredential>,
         val revState: RevocationState?
     )
-
-    private fun parseProofData(
-        collectionFromRequest: Map<String, AbstractCredentialReference>,
-        collectionFromCreds: List<CredentialReferenceInfo>,
-        revocationStateProvider: RevocationStateProvider?,
-        nonRevoked: Interval?
-    ): List<ProofDataEntry> {
-
-        val result = collectionFromCreds.map { attribute ->
-            val credDefId = attribute.credentialInfo.getCredentialDefinitionIdObject()
-
-            val keys = collectionFromRequest.entries
-                .filter { it.value.schemaIdRaw == attribute.credentialInfo.schemaIdRaw }
-                .map { it.key }
-            val reference = attribute.credentialInfo.referent
-            val referentCredentials = keys.map { ReferentCredential(it, reference) }
-
-            val credRevId = attribute.credentialInfo.credentialRevocationId
-            val revRegId = attribute.credentialInfo.getRevocationRegistryIdObject()
-            val schemaId = attribute.credentialInfo.getSchemaIdObject()
-
-            if (nonRevoked == null || credRevId == null || revRegId == null)
-                return@map ProofDataEntry(
-                    schemaId,
-                    credDefId,
-                    referentCredentials,
-                    null
-                )
-
-            if (revocationStateProvider == null)
-                throw RuntimeException("You should provide revocation state")
-
-            return@map ProofDataEntry(
-                schemaId,
-                credDefId,
-                referentCredentials,
-                revocationStateProvider(revRegId, credRevId, nonRevoked)
-            )
-        }
-
-        return result
-    }
 
     override fun createProof(
         proofRequest: ProofRequest,
@@ -281,65 +225,109 @@ class IndySDKWalletService(
     ): ProofInfo {
         val proofRequestJson = SerializationUtils.anyToJSON(proofRequest)
         val searchObj = CredentialsSearchForProofReq.open(wallet, proofRequestJson, null).get()
-        val CREDS_FOR_ATTRS = proofRequest.requestedAttributes.keys.map {
-            searchObj.fetchNextCredentials(it, 1)
+
+        val allSchemaIds = mutableListOf<SchemaId>()
+        val allCredentialDefinitionIds = mutableListOf<CredentialDefinitionId>()
+        val allRevStates = mutableListOf<RevocationState>()
+
+        val requestedAttributes = proofRequest.requestedAttributes.keys.associate { key ->
+            val credential = SerializationUtils.jSONToAny<Array<CredentialForTheRequest>>(searchObj.fetchNextCredentials(key, 1).get()).first()
+
+            allSchemaIds.add(SchemaId.fromString(credential.credInfo.schemaId))
+            allCredentialDefinitionIds.add(CredentialDefinitionId.fromString(credential.credInfo.credDefId))
+
+            val revStateAlreadyDone = allRevStates.find { it.revocationRegistryIdRaw == credential.credInfo.revRegId }
+
+            // if we already pulled this rev state from ledger - just use it
+            if (revStateAlreadyDone != null)
+                return@associate key to RequestedAttributeInfo(
+                    credential.credInfo.referent,
+                    timestamp = revStateAlreadyDone.timestamp
+                )
+
+            if ((credential.credInfo.credRevId == null) xor (proofRequest.nonRevoked == null))
+                throw RuntimeException("If credential is issued using some revocation registry, it should be proved to be non-revoked")
+
+            // if everything is ok and rev state is needed - pull it from ledger
+            val requestedAttributeInfo = if (
+                credential.credInfo.credRevId != null &&
+                credential.credInfo.revRegId != null &&
+                revocationStateProvider != null &&
+                proofRequest.nonRevoked != null
+            ) {
+                val revocationState = revocationStateProvider(
+                    RevocationRegistryDefinitionId.fromString(credential.credInfo.revRegId),
+                    credential.credInfo.credRevId,
+                    proofRequest.nonRevoked!!
+                )
+
+                allRevStates.add(revocationState)
+
+                RequestedAttributeInfo(
+                    credential.credInfo.referent,
+                    timestamp = revocationState.timestamp
+                )
+            } else { // else just give up
+                RequestedAttributeInfo(credential.credInfo.referent)
+            }
+
+            key to requestedAttributeInfo
         }
-        // TODO: ADD CREDS FOR PREDICATES, MATCH FORMATS
 
-        val proverGetCredsForProofReq = Anoncreds.proverGetCredentialsForProofReq(wallet, proofRequestJson).get()
-        val requiredCredentialsForProof =
-            SerializationUtils.jSONToAny<ProofRequestCredentials>(proverGetCredsForProofReq)
+        val requestedPredicates = proofRequest.requestedPredicates.keys.associate { key ->
+            val credential = SerializationUtils.jSONToAny<Array<CredentialForTheRequest>>(searchObj.fetchNextCredentials(key, 1).get()).first()
 
-        val requiredAttributes = requiredCredentialsForProof.attributes.values.flatten()
-        val proofRequestAttributes = proofRequest.requestedAttributes
-        val attrProofData =
-            parseProofData(proofRequestAttributes, requiredAttributes, revocationStateProvider, proofRequest.nonRevoked)
+            allSchemaIds.add(SchemaId.fromString(credential.credInfo.schemaId))
+            allCredentialDefinitionIds.add(CredentialDefinitionId.fromString(credential.credInfo.credDefId))
 
-        val requiredPredicates = requiredCredentialsForProof.predicates.values.flatten()
-        val proofRequestPredicates = proofRequest.requestedPredicates
-        val predProofData =
-            parseProofData(proofRequestPredicates, requiredPredicates, revocationStateProvider, proofRequest.nonRevoked)
+            val revStateAlreadyDone = allRevStates.find { it.revocationRegistryIdRaw == credential.credInfo.revRegId }
 
-        val requestedAttributes = mutableMapOf<String, RequestedAttributeInfo>()
-        attrProofData
-            .forEach { proofData ->
-                proofData.referentCredentials.forEach { credential ->
-                    requestedAttributes[credential.key] =
-                        RequestedAttributeInfo(credential.credentialUUID, true, proofData.revState?.timestamp)
-                }
+            // if we already pulled this rev state from ledger - just use it
+            if (revStateAlreadyDone != null)
+                return@associate key to RequestedPredicateInfo(
+                    credential.credInfo.referent,
+                    revStateAlreadyDone.timestamp
+                )
+
+            // if everything is ok and rev state is needed - pull it from ledger
+            val requestedPredicateInfo = if (
+                credential.credInfo.credRevId != null &&
+                credential.credInfo.revRegId != null &&
+                revocationStateProvider != null &&
+                proofRequest.nonRevoked != null
+            ) {
+                val revocationState = revocationStateProvider(
+                    RevocationRegistryDefinitionId.fromString(credential.credInfo.revRegId),
+                    credential.credInfo.credRevId,
+                    proofRequest.nonRevoked!!
+                )
+
+                allRevStates.add(revocationState)
+
+                RequestedPredicateInfo(
+                    credential.credInfo.referent,
+                    revocationState.timestamp
+                )
+            } else { // else just give up
+                RequestedPredicateInfo(credential.credInfo.referent, null)
             }
 
-        val requestedPredicates = mutableMapOf<String, RequestedPredicateInfo>()
-        predProofData
-            .forEach { proofData ->
-                proofData.referentCredentials.forEach { credential ->
-                    requestedPredicates[credential.key] =
-                        RequestedPredicateInfo(credential.credentialUUID, proofData.revState?.timestamp)
-                }
-            }
+            key to requestedPredicateInfo
+        }
+
+        searchObj.closeSearch().get()
 
         val requestedCredentials = RequestedCredentials(requestedAttributes, requestedPredicates)
 
-        val allSchemas = (attrProofData + predProofData)
-            .map { it.schemaId }
-            .distinct()
-            .map { provideSchema(it) }
-
-        val allCredentialDefs = (attrProofData + predProofData)
-            .map { it.credDefId }
-            .distinct()
-            .map { provideCredentialDefinition(it) }
-
-        val allRevStates = (attrProofData + predProofData)
-            .map { it.revState }
+        val allSchemas = allSchemaIds.distinct().map { provideSchema(it) }
+        val allCredentialDefs = allCredentialDefinitionIds.distinct().map { provideCredentialDefinition(it) }
 
         val usedSchemas = allSchemas.associate { it.id to it }
         val usedCredentialDefs = allCredentialDefs.associate { it.id to it }
         val usedRevocationStates = allRevStates
-            .filter { it != null }
             .associate {
                 val stateByTimestamp = hashMapOf<Long, RevocationState>()
-                stateByTimestamp[it!!.timestamp] = it
+                stateByTimestamp[it.timestamp] = it
 
                 it.revocationRegistryIdRaw!! to stateByTimestamp
             }

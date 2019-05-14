@@ -21,28 +21,20 @@ object VerifyCredentialFlowB2B {
 
 
     /**
-     * A flow to verify a set of predicates [predicates] on a set of attributes [attributes]
+     * A flow to verify some conditions from [proofRequest]
      *
      * @param identifier        new unique ID for the new proof to allow searching Proofs by [identifier]
-     * @param attributes        unordered list of attributes that are needed for verification
-     * @param predicates        unordered list of predicates that will be checked
      * @param proverName        node that will prove the credentials
-     *
-     * @param nonRevoked        <optional> time interval to verify non-revocation
-     *                          if not specified then revocation is not verified
+     * @param proofRequest      proof request - use [proofRequest] builder to get it
      *
      * @returns TRUE if verification succeeds
-     *
-     * TODO: make it return false in case of failed verification
      * */
     @InitiatingFlow
     @StartableByRPC
     open class Verifier(
         private val identifier: String,
-        private val attributes: List<ProofAttribute>,
-        private val predicates: List<ProofPredicate>,
         private val proverName: CordaX500Name,
-        private val nonRevoked: Interval?
+        private val proofRequest: ProofRequest
     ) : FlowLogic<Boolean>() {
 
         @Suspendable
@@ -50,31 +42,6 @@ object VerifyCredentialFlowB2B {
             try {
                 val prover: Party = whoIs(proverName)
                 val flowSession: FlowSession = initiateFlow(prover)
-
-                val fieldRefAttr = attributes.map {
-                    CredentialFieldReference(
-                        it.field,
-                        it.schemaId.toString(),
-                        it.credentialDefinitionId.toString()
-                    )
-                }
-
-                val fieldRefPred = predicates.map {
-                    val fieldRef = CredentialFieldReference(
-                        it.field,
-                        it.schemaId.toString(),
-                        it.credentialDefinitionId.toString()
-                    )
-                    CredentialPredicate(fieldRef, it.value)
-                }
-
-                val proofRequest = indyUser().createProofRequest(
-                    version = "0.1",
-                    name = "proof_req_0.1",
-                    attributes = fieldRefAttr,
-                    predicates = fieldRefPred,
-                    nonRevoked = nonRevoked
-                )
 
                 val verifyCredentialOut = flowSession.sendAndReceive<ProofInfo>(proofRequest).unwrap { proof ->
                     val usedData = indyUser().ledgerService.retrieveDataUsedInProof(proofRequest, proof)
@@ -87,12 +54,7 @@ object VerifyCredentialFlowB2B {
                     StateAndContract(credentialProofOut, IndyCredentialContract::class.java.name)
                 }
 
-                val expectedAttrs = attributes
-                    .filter { it.value.isNotEmpty() }
-                    .associateBy({ it.field }, { it.value })
-                    .map { IndyCredentialContract.ExpectedAttr(it.key, it.value) }
-
-                val verifyCredentialCmdType = IndyCredentialContract.Command.Verify(expectedAttrs)
+                val verifyCredentialCmdType = IndyCredentialContract.Command.Verify()
                 val verifyCredentialCmd =
                     Command(verifyCredentialCmdType, listOf(ourIdentity.owningKey, prover.owningKey))
 
@@ -124,7 +86,9 @@ object VerifyCredentialFlowB2B {
         override fun call() {
             try {
                 val indyProofRequest = flowSession.receive<ProofRequest>().unwrap { it }
-                flowSession.send(indyUser().createProofFromLedgerData(indyProofRequest))
+                val proof = indyUser().createProofFromLedgerData(indyProofRequest)
+
+                flowSession.send(proof)
 
                 val flow = object : SignTransactionFlow(flowSession) {
                     // TODO: Add some checks here.

@@ -1,6 +1,7 @@
 package com.luxoft.blockchainlab.hyperledger.indy.models
 
 import com.fasterxml.jackson.annotation.*
+import java.util.*
 
 /**
  * Represents a particular attribute of a credential
@@ -146,12 +147,12 @@ data class RequestedCredentials(
 data class RequestedAttributeInfo(
     @JsonProperty("cred_id") val credentialId: String,
     val revealed: Boolean = true,
-    @JsonInclude(JsonInclude.Include.NON_NULL) val timestamp: Long?
+    @JsonInclude(JsonInclude.Include.NON_NULL) val timestamp: Long = Timestamp.now()
 )
 
 data class RequestedPredicateInfo(
     @JsonProperty("cred_id") val credentialId: String,
-    @JsonInclude(JsonInclude.Include.NON_NULL) val timestamp: Long?
+    @JsonInclude(JsonInclude.Include.NON_NULL) val timestamp: Long? = null
 )
 
 /**
@@ -209,33 +210,67 @@ data class RequestedPredicateInfo(
  *
  */
 data class ProofRequest(
-    val version: String,
-    val name: String,
-    val nonce: String,
-    val requestedAttributes: Map<String, CredentialAttributeReference>,
-    val requestedPredicates: Map<String, CredentialPredicateReference>,
-    val nonRevoked: Interval? = null
-)
+    var name: String,
+    var version: String,
+    var nonce: String,
+    val requestedAttributes: MutableMap<String, CredentialAttributeReference> = mutableMapOf(),
+    val requestedPredicates: MutableMap<String, CredentialPredicateReference> = mutableMapOf(),
+    var nonRevoked: Interval? = null
+) {
+    fun reveal(attrName: String, filterFiller: (Filter.() -> Unit)? = null) {
+        val attributeReference = if (filterFiller == null) {
+            CredentialAttributeReference(attrName)
+        } else {
+            val filter = Filter(attrName)
+            filter.filterFiller()
+
+            CredentialAttributeReference(attrName, filter)
+        }
+
+        requestedAttributes[attrName] = attributeReference
+    }
+
+    fun proveGreaterThan(attrName: String, greaterThan: Int, filterFiller: (Filter.() -> Unit)? = null) {
+        val predicateReference = if (filterFiller == null) {
+            CredentialPredicateReference(attrName, greaterThan)
+        } else {
+            val filter = Filter(attrName)
+            filter.filterFiller()
+
+            CredentialPredicateReference(attrName, greaterThan, restrictions = filter)
+        }
+
+        requestedPredicates[attrName] = predicateReference
+    }
+
+    fun proveNonRevocation(interval: Interval) {
+        nonRevoked = interval
+    }
+}
+
+fun proofRequest(
+    name: String,
+    version: String,
+    nonce: String = Random().nextLong().toString(),
+    init: ProofRequest.() -> Unit
+): ProofRequest {
+    val pr = ProofRequest(name, version, nonce)
+    pr.init()
+
+    return pr
+}
 
 data class CredentialAttributeReference(
-    override val name: String,
-    @JsonProperty("schema_id") override val schemaIdRaw: String,
-    override val restrictions: Filter? = null
-) : AbstractCredentialReference(name, restrictions, schemaIdRaw)
+    val name: String,
+    val restrictions: Filter? = null
+)
 
 data class CredentialPredicateReference(
-    override val name: String,
-    @JsonProperty("schema_id") override val schemaIdRaw: String,
+    val name: String,
     val p_value: Int,
     val p_type: String = ">=",
-    override val restrictions: Filter? = null
-) : AbstractCredentialReference(name, restrictions, schemaIdRaw)
-
-abstract class AbstractCredentialReference(
-    open val name: String,
-    open val restrictions: Filter?,
-    @JsonProperty("schema_id") override val schemaIdRaw: String
-) : ContainsSchemaId
+    val restrictions: Filter? = null
+)
 
 /**
  *     filter:
@@ -248,26 +283,37 @@ abstract class AbstractCredentialReference(
  *         "cred_def_id": string, (Optional)
  *     }
  */
-class Filter(
-    @JsonProperty("schema_id") val schemaIdRaw: String? = null,
-    val schemaIssuerDid: String? = null,
-    val schemaName: String? = null,
-    val schemaVersion: String? = null,
-    val issuerDid: String? = null,
-    val credDefId: String? = null,
-    init: Filter.() -> Unit
-) {
+data class Filter(
+    @JsonIgnore val attrName: String,
+    @JsonProperty("schema_id") var schemaIdRaw: String? = null,
+    var schemaIssuerDid: String? = null,
+    var schemaName: String? = null,
+    var schemaVersion: String? = null,
+    var issuerDid: String? = null,
+    var credDefId: String? = null,
     @JsonIgnore private val attributes: MutableMap<String, String> = mutableMapOf()
-
-    init {
-        init()
-    }
-
+) {
     @JsonAnyGetter
-    fun getAttributes() = attributes
+    fun getUnknownAttributes() = attributes
 
     @JsonAnySetter
-    fun setAttribute(key: String, value: String) = attributes.put(key, value)
+    fun setUnknownAttribute(key: String, value: String) = attributes.put(key, value)
+
+    infix fun FilterProperty.shouldBe(value: String) {
+        when (this) {
+            FilterProperty.SchemaId -> schemaIdRaw = value
+            FilterProperty.SchemaIssuerDid -> schemaIssuerDid = value
+            FilterProperty.SchemaName -> schemaName = value
+            FilterProperty.SchemaVersion -> schemaVersion = value
+            FilterProperty.IssuerDid -> issuerDid = value
+            FilterProperty.CredentialDefinitionId -> credDefId = value
+            FilterProperty.Value -> attributes["attr::$attrName::value"] = value
+        }
+    }
+}
+
+enum class FilterProperty {
+    Value, SchemaId, SchemaIssuerDid, SchemaName, SchemaVersion, IssuerDid, CredentialDefinitionId
 }
 
 /**

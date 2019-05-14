@@ -87,7 +87,7 @@ class CordentityE2E : CordaTestBase() {
         credentialIssuer: StartedNode<MockNode>,
         credentialDefId: CredentialDefinitionId,
         revocationRegistryId: RevocationRegistryDefinitionId?,
-        credentialProposalProvider: () -> CredentialProposal
+        credentialProposalFiller: CredentialProposal.() -> Unit
     ): String {
 
         val identifier = UUID.randomUUID().toString()
@@ -98,7 +98,7 @@ class CordentityE2E : CordaTestBase() {
                 credentialDefId,
                 revocationRegistryId,
                 credentialProver.getName(),
-                credentialProposalProvider
+                credentialProposalFiller
             )
         ).resultFuture
 
@@ -119,22 +119,14 @@ class CordentityE2E : CordaTestBase() {
     }
 
     private fun verifyCredential(
-            verifier: StartedNode<MockNode>,
-            prover: StartedNode<MockNode>,
-            attributes: List<ProofAttribute>,
-            predicates: List<ProofPredicate>,
-            nonRevoked: Interval?
+        verifier: StartedNode<MockNode>,
+        prover: StartedNode<MockNode>,
+        proofRequest: ProofRequest
     ): Boolean {
         val identifier = UUID.randomUUID().toString()
 
         val proofCheckResultFuture = verifier.services.startFlow(
-            VerifyCredentialFlowB2B.Verifier(
-                identifier,
-                attributes,
-                predicates,
-                prover.getName(),
-                nonRevoked
-            )
+            VerifyCredentialFlowB2B.Verifier(identifier, prover.getName(), proofRequest)
         ).resultFuture
 
         return proofCheckResultFuture.getOrThrow(Duration.ofSeconds(30))
@@ -159,49 +151,45 @@ class CordentityE2E : CordaTestBase() {
         val educationRevocationRegistryId = issueRevocationRegistry(bob, educationCredentialDefId)
 
         // Issue credential #1
-        issueCredential(alice, issuer, personCredentialDefId, personRevocationRegistryId) { mapOf(
-            "attr1" to CredentialValue(attr1.key),
-            "attr2" to CredentialValue(pred1.key)
-        ) }
+        issueCredential(alice, issuer, personCredentialDefId, personRevocationRegistryId) {
+            attributes["attr1"] = CredentialValue(attr1.key)
+            attributes["attr2"] = CredentialValue(pred1.key)
+        }
 
         // Issue credential #2
-        issueCredential(alice, bob, educationCredentialDefId, educationRevocationRegistryId) { mapOf(
-            "attrX" to CredentialValue(attr2.key),
-            "attrY" to CredentialValue(pred2.key)
-        ) }
+        issueCredential(alice, bob, educationCredentialDefId, educationRevocationRegistryId) {
+            attributes["attrX"] = CredentialValue(attr2.key)
+            attributes["attrY"] = CredentialValue(pred2.key)
+        }
 
         // Verify credentials
-        val attributes = listOf(
-            ProofAttribute(
-                personSchemaId,
-                personCredentialDefId,
-                schemaPerson.schemaAttr1,
-                attr1.value
-            ),
-            ProofAttribute(
-                educationSchemaId,
-                educationCredentialDefId,
-                schemaEducation.schemaAttr1,
-                attr2.value
-            )
-        )
+        val proofRequest = proofRequest("test proof request", "0.1") {
+            reveal(schemaPerson.schemaAttr1) {
+                FilterProperty.Value shouldBe attr1.value
+                FilterProperty.SchemaId shouldBe personSchemaId.toString()
+                FilterProperty.CredentialDefinitionId shouldBe personCredentialDefId.toString()
+            }
 
-        val predicates = listOf(
-            ProofPredicate(
-                personSchemaId,
-                personCredentialDefId,
-                schemaPerson.schemaAttr2,
-                pred1.value.toInt()
-            ),
-            ProofPredicate(
-                educationSchemaId,
-                educationCredentialDefId,
-                schemaEducation.schemaAttr2,
-                pred2.value.toInt()
-            )
-        )
+            reveal(schemaEducation.schemaAttr1) {
+                FilterProperty.Value shouldBe attr2.value
+                FilterProperty.SchemaId shouldBe educationSchemaId.toString()
+                FilterProperty.CredentialDefinitionId shouldBe educationCredentialDefId.toString()
+            }
 
-        return verifyCredential(bob, alice, attributes, predicates, Interval.allTime())
+            proveGreaterThan(schemaPerson.schemaAttr2, pred1.value.toInt()) {
+                FilterProperty.SchemaId shouldBe personSchemaId.toString()
+                FilterProperty.CredentialDefinitionId shouldBe personCredentialDefId.toString()
+            }
+
+            proveGreaterThan(schemaEducation.schemaAttr2, pred2.value.toInt()) {
+                FilterProperty.SchemaId shouldBe educationSchemaId.toString()
+                FilterProperty.CredentialDefinitionId shouldBe educationCredentialDefId.toString()
+            }
+
+            proveNonRevocation(Interval.allTime())
+        }
+
+        return verifyCredential(bob, alice, proofRequest)
     }
 
     @Test
@@ -263,32 +251,26 @@ class CordentityE2E : CordaTestBase() {
         // Issue credential
         val schemaAttrInt = "1988"
 
-        issueCredential(alice, issuer, credentialDefId, null) { mapOf(
-            "attr1" to CredentialValue("John Smith"),
-            "attr2" to CredentialValue(schemaAttrInt)
-        ) }
+        issueCredential(alice, issuer, credentialDefId, null) {
+            attributes["attr1"] = CredentialValue("John Smith")
+            attributes["attr2"] = CredentialValue(schemaAttrInt)
+        }
 
         // Verify credential
-        val attributes = listOf(
-            ProofAttribute(
-                schemaId,
-                credentialDefId,
-                schemaPerson.schemaAttr1,
-                "John Smith"
-            )
-        )
+        val proofRequest = proofRequest("test proof request", "0.1") {
+            reveal(schemaPerson.schemaAttr1) {
+                FilterProperty.Value shouldBe "John Smith"
+                FilterProperty.SchemaId shouldBe schemaId.toString()
+                FilterProperty.CredentialDefinitionId shouldBe credentialDefId.toString()
+            }
 
-        val predicates = listOf(
-            // -10 to check >=
-            ProofPredicate(
-                schemaId,
-                credentialDefId,
-                schemaPerson.schemaAttr2,
-                schemaAttrInt.toInt() - 10
-            )
-        )
+            proveGreaterThan(schemaPerson.schemaAttr2, schemaAttrInt.toInt() - 10) {
+                FilterProperty.SchemaId shouldBe schemaId.toString()
+                FilterProperty.CredentialDefinitionId shouldBe credentialDefId.toString()
+            }
+        }
 
-        val credentialVerified = verifyCredential(bob, alice, attributes, predicates, null)
+        val credentialVerified = verifyCredential(bob, alice, proofRequest)
         assertTrue(credentialVerified)
     }
 
@@ -302,39 +284,37 @@ class CordentityE2E : CordaTestBase() {
         // Issue credential
         val schemaAttrInt = "1988"
 
-        val credentialId = issueCredential(alice, issuer, credentialDefinitionId, revocationRegistryId) { mapOf(
-            "attr1" to CredentialValue("John Smith"),
-            "attr2" to CredentialValue(schemaAttrInt)
-        ) }
+        val credentialId = issueCredential(alice, issuer, credentialDefinitionId, revocationRegistryId) {
+            attributes["attr1"] = CredentialValue("John Smith")
+            attributes["attr2"] = CredentialValue(schemaAttrInt)
+        }
 
         // Verify credential
-        val attributes = listOf(
-            ProofAttribute(
-                schemaId,
-                credentialDefinitionId,
-                schemaPerson.schemaAttr1,
-                "John Smith"
-            )
-        )
+        val proofRequest = proofRequest("test proof request", "0.1") {
+            reveal(schemaPerson.schemaAttr1) {
+                FilterProperty.Value shouldBe "John Smith"
+                FilterProperty.SchemaId shouldBe schemaId.toString()
+                FilterProperty.CredentialDefinitionId shouldBe credentialDefinitionId.toString()
+            }
 
-        val predicates = listOf(
-            // -10 to check >=
-            ProofPredicate(
-                schemaId,
-                credentialDefinitionId,
-                schemaPerson.schemaAttr2,
-                schemaAttrInt.toInt() - 10
-            )
-        )
+            proveGreaterThan(schemaPerson.schemaAttr2, schemaAttrInt.toInt() - 10) {
+                FilterProperty.SchemaId shouldBe schemaId.toString()
+                FilterProperty.CredentialDefinitionId shouldBe credentialDefinitionId.toString()
+            }
 
-        val credentialVerified = verifyCredential(bob, alice, attributes, predicates, Interval.allTime())
+            proveNonRevocation(Interval.allTime())
+        }
+
+        val credentialVerified = verifyCredential(bob, alice, proofRequest)
         assertTrue(credentialVerified)
 
         revokeCredential(issuer, credentialId)
 
-        Thread.sleep(3000)
+        // modifying the proof request
+        proofRequest.nonRevoked = Interval.now()
+        proofRequest.version = "0.2"
 
-        val credentialAfterRevocationVerified = verifyCredential(bob, alice, attributes, predicates, Interval.now())
+        val credentialAfterRevocationVerified = verifyCredential(bob, alice, proofRequest)
         assertFalse(credentialAfterRevocationVerified)
     }
 
@@ -353,52 +333,47 @@ class CordentityE2E : CordaTestBase() {
         // Issue credential #1
         val schemaPersonAttrInt = "1988"
 
-        issueCredential(alice, issuer, personCredentialDefId, null) { mapOf(
-            "attr1" to CredentialValue("John Smith"),
-            "attr2" to CredentialValue(schemaPersonAttrInt)
-        ) }
+        val attr1PersonValue = "John Smith"
+        issueCredential(alice, issuer, personCredentialDefId, null) {
+            attributes[schemaPerson.schemaAttr1] = CredentialValue(attr1PersonValue)
+            attributes[schemaPerson.schemaAttr2] = CredentialValue(schemaPersonAttrInt)
+        }
 
         // Issue credential #2
         val schemaEducationAttrInt = "2016"
 
-        issueCredential(alice, issuer, educationCredentialDefId, null) { mapOf(
-            "attrX" to CredentialValue("University"),
-            "attrY" to CredentialValue(schemaEducationAttrInt)
-        ) }
+        val attr1EducationValue = "KKK"
+        issueCredential(alice, issuer, educationCredentialDefId, null) {
+            attributes[schemaEducation.schemaAttr1] = CredentialValue(attr1EducationValue)
+            attributes[schemaEducation.schemaAttr2] = CredentialValue(schemaEducationAttrInt)
+        }
 
         // Verify credentials
-        val attributes = listOf(
-            ProofAttribute(
-                personSchemaId,
-                personCredentialDefId,
-                schemaPerson.schemaAttr1,
-                "John Smith"
-            ),
-            ProofAttribute(
-                educationSchemaId,
-                educationCredentialDefId,
-                schemaEducation.schemaAttr1,
-                "University"
-            )
-        )
+        val proofRequest = proofRequest("test proof request", "0.1") {
+            reveal(schemaPerson.schemaAttr1) {
+                FilterProperty.Value shouldBe attr1PersonValue
+                FilterProperty.SchemaId shouldBe personSchemaId.toString()
+                FilterProperty.CredentialDefinitionId shouldBe personCredentialDefId.toString()
+            }
 
-        val predicates = listOf(
-            // -10 to check >=
-            ProofPredicate(
-                personSchemaId,
-                personCredentialDefId,
-                schemaPerson.schemaAttr2,
-                schemaPersonAttrInt.toInt() - 10
-            ),
-            ProofPredicate(
-                educationSchemaId,
-                educationCredentialDefId,
-                schemaEducation.schemaAttr2,
-                schemaEducationAttrInt.toInt() - 10
-            )
-        )
+            reveal(schemaEducation.schemaAttr1) {
+                FilterProperty.Value shouldBe attr1EducationValue
+                FilterProperty.SchemaId shouldBe educationSchemaId.toString()
+                FilterProperty.CredentialDefinitionId shouldBe educationCredentialDefId.toString()
+            }
 
-        val credentialVerified = verifyCredential(issuer, alice, attributes, predicates, null)
+            proveGreaterThan(schemaPerson.schemaAttr2, schemaPersonAttrInt.toInt() - 10) {
+                FilterProperty.SchemaId shouldBe personSchemaId.toString()
+                FilterProperty.CredentialDefinitionId shouldBe personCredentialDefId.toString()
+            }
+
+            proveGreaterThan(schemaEducation.schemaAttr2, schemaEducationAttrInt.toInt() - 10) {
+                FilterProperty.SchemaId shouldBe educationSchemaId.toString()
+                FilterProperty.CredentialDefinitionId shouldBe educationCredentialDefId.toString()
+            }
+        }
+
+        val credentialVerified = verifyCredential(issuer, alice, proofRequest)
         assertTrue(credentialVerified)
     }
 
@@ -412,22 +387,21 @@ class CordentityE2E : CordaTestBase() {
 
         // Issue credential
         val schemaAttrInt = "1988"
-        issueCredential(alice, issuer, credentialDefId, null) { mapOf(
-            "attr1" to CredentialValue("John Smith"),
-            "attr2" to CredentialValue(schemaAttrInt)
-        ) }
+        issueCredential(alice, issuer, credentialDefId, null) {
+            attributes["attr1"] = CredentialValue("John Smith")
+            attributes["attr2"] = CredentialValue(schemaAttrInt)
+        }
 
         // Verify credential
-        val attributes = listOf(
-            ProofAttribute(
-                schemaId,
-                credentialDefId,
-                schemaPerson.schemaAttr1,
-                "John Smith"
-            )
-        )
+        val proofRequest = proofRequest("test proof request", "0.1") {
+            reveal(schemaPerson.schemaAttr1) {
+                FilterProperty.Value shouldBe "John Smith"
+                FilterProperty.SchemaId shouldBe schemaId.toString()
+                FilterProperty.CredentialDefinitionId shouldBe credentialDefId.toString()
+            }
+        }
 
-        val credentialVerified = verifyCredential(bob, alice, attributes, emptyList(), null)
+        val credentialVerified = verifyCredential(bob, alice, proofRequest)
         assertTrue(credentialVerified)
     }
 
@@ -442,28 +416,27 @@ class CordentityE2E : CordaTestBase() {
         // Issue credential
         val schemaAttrInt = "1988"
 
-        issueCredential(alice, issuer, credentialDefId, null) { mapOf(
-            "attr1" to CredentialValue("John Smith"),
-            "attr2" to CredentialValue(schemaAttrInt)
-        ) }
+        issueCredential(alice, issuer, credentialDefId, null) {
+            attributes["attr1"] = CredentialValue("John Smith")
+            attributes["attr2"] = CredentialValue(schemaAttrInt)
+        }
 
         // Verify credential
-        val attributes = listOf(
-            ProofAttribute(
-                schemaId,
-                credentialDefId,
-                schemaPerson.schemaAttr1,
-                "John Smith"
-            ),
-            ProofAttribute(
-                schemaId,
-                credentialDefId,
-                schemaPerson.schemaAttr2,
-                ""
-            )
-        )
+        val proofRequest = proofRequest("test proof request", "0.1") {
+            reveal(schemaPerson.schemaAttr1) {
+                FilterProperty.Value shouldBe "John Smith"
+                FilterProperty.SchemaId shouldBe schemaId.toString()
+                FilterProperty.CredentialDefinitionId shouldBe credentialDefId.toString()
+            }
 
-        val credentialVerified = verifyCredential(bob, alice, attributes, emptyList(), null)
+            reveal(schemaPerson.schemaAttr2) {
+                FilterProperty.Value shouldBe ""
+                FilterProperty.SchemaId shouldBe schemaId.toString()
+                FilterProperty.CredentialDefinitionId shouldBe credentialDefId.toString()
+            }
+        }
+
+        val credentialVerified = verifyCredential(bob, alice, proofRequest)
         assertTrue(credentialVerified)
     }
 }

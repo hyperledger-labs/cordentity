@@ -5,6 +5,7 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.CreateSchemaFlow
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.ProofPredicate
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.*
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialValue
+import com.luxoft.blockchainlab.hyperledger.indy.models.proofRequest
 import net.corda.core.identity.CordaX500Name
 import net.corda.node.internal.StartedNode
 import net.corda.testing.core.singleIdentity
@@ -86,17 +87,14 @@ class ReadmeExampleTest : CordaTestBase() {
 
         // Alice.BORN >= currentYear - 18
         val eighteenYearsAgo = LocalDateTime.now().minusYears(18).year
-        val legalAgePredicate =
-            ProofPredicate(schemaId, credentialDefinitionId, "BORN", eighteenYearsAgo)
+
+        // Use special proof request DSL
+        val proofRequest = proofRequest("legal age proof", "1.0") {
+            proveGreaterThan("BORN", eighteenYearsAgo)
+        }
 
         val verified = store.services.startFlow(
-            VerifyCredentialFlowB2B.Verifier(
-                UUID.randomUUID().toString(),
-                emptyList(),
-                listOf(legalAgePredicate),
-                aliceX500,
-                null
-            )
+            VerifyCredentialFlowB2B.Verifier(UUID.randomUUID().toString(), aliceX500, proofRequest)
         ).resultFuture.get()
 
         // If the verification succeeds, the store can be sure that Alice's age is above 18.

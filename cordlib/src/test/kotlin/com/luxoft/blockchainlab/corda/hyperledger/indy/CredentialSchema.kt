@@ -24,6 +24,6 @@ abstract class TwoAttrSchema(
         """ {"$schemaAttr1":{"raw":"$value1", "encoded":"$encoded1"}, "$schemaAttr2":{"raw":"$value2", "encoded":"$encoded2"} }"""
 }
 
-class SchemaPerson : TwoAttrSchema("schema_name", "1.0", "attr1", "attr2")
+class SchemaPerson : TwoAttrSchema("schema_person", "1.0", "name", "age")
 
-class SchemaEducation : TwoAttrSchema("schema_education", "1.0", "attrX", "attrY")
+class SchemaEducation : TwoAttrSchema("schema_education", "1.0", "currentPlace", "finishedYearsAgo")
