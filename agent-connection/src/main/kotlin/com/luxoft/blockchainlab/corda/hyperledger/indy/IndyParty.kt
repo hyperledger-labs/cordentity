@@ -2,6 +2,9 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy
 
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
 import rx.Single
+import java.util.concurrent.atomic.AtomicReference
+
+typealias ReqHandlerType = (TailsRequest) -> TailsResponse
 
 /**
  * Represents remote Indy Party
@@ -100,21 +103,24 @@ class IndyParty(private val webSocket: AgentWebSocketClient, val did: String, va
         return webSocket.receiveClassObject(this)
     }
 
-    private var requestHandler: (TailsRequest) -> TailsResponse = { TailsResponse(it.tailsHash, mapOf())}
-    private var tailRequestMessageHandler: (TailsRequest) -> Unit = {}
+    private val requestHandlerRef: AtomicReference<(TailsRequest)->TailsResponse> =
+        AtomicReference<(TailsRequest)->TailsResponse> { TailsResponse(it.tailsHash, mapOf())}
+
+    private lateinit var tailRequestMessageHandler: (TailsRequest) -> Unit
+
+    init {
+        tailRequestMessageHandler = {
+            webSocket.sendClassObject(requestHandlerRef.get().invoke(it), this)
+            webSocket.receiveClassObject<TailsRequest>(this).subscribe(tailRequestMessageHandler)
+        }
+        webSocket.receiveClassObject<TailsRequest>(this).subscribe { tailRequestMessageHandler }
+    }
 
     /**
      * Sets handler for client's tails file requests
      *
      * @param handler a function producing [TailsResponse] from [TailsRequest]
      */
-    override fun handleTailsRequestsWith(handler: (TailsRequest) -> TailsResponse) {
-        requestHandler = handler
-        tailRequestMessageHandler = {
-            webSocket.sendClassObject(requestHandler(it), this)
-            webSocket.receiveClassObject<TailsRequest>(this).subscribe(tailRequestMessageHandler)
-        }
-        webSocket.receiveClassObject<TailsRequest>(this).subscribe(tailRequestMessageHandler)
-    }
+    override fun handleTailsRequestsWith(handler: (TailsRequest) -> TailsResponse) = requestHandlerRef.set(handler)
 }
 
