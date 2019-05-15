@@ -5,6 +5,7 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialDe
 import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndySchemaContract
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredentialDefinition
 import com.luxoft.blockchainlab.hyperledger.indy.*
+import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialDefinition
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialDefinitionId
 import com.luxoft.blockchainlab.hyperledger.indy.models.SchemaId
 import net.corda.core.contracts.Command
@@ -29,10 +30,10 @@ object CreateCredentialDefinitionFlow {
     class Authority(
         private val schemaId: SchemaId,
         private val enableRevocation: Boolean
-    ) : FlowLogic<CredentialDefinitionId>() {
+    ) : FlowLogic<CredentialDefinition>() {
 
         @Suspendable
-        override fun call(): CredentialDefinitionId {
+        override fun call(): CredentialDefinition {
             try {
                 // create indy stuff
                 val credentialDefinitionObj = indyUser().createCredentialDefinitionAndStoreOnLedger(schemaId, enableRevocation)
@@ -76,7 +77,7 @@ object CreateCredentialDefinitionFlow {
 
                 subFlow(FinalityFlow(selfSignedTx))
 
-                return credentialDefinitionId
+                return credentialDefinitionObj
 
             } catch (t: Throwable) {
                 logger.error("New credential definition has been failed", t)

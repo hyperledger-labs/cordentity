@@ -7,6 +7,7 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyRevocation
 import com.luxoft.blockchainlab.hyperledger.indy.IndyCredentialDefinitionNotFoundException
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialDefinitionId
 import com.luxoft.blockchainlab.hyperledger.indy.models.RevocationRegistryDefinitionId
+import com.luxoft.blockchainlab.hyperledger.indy.models.RevocationRegistryInfo
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndContract
 import net.corda.core.flows.*
@@ -26,10 +27,10 @@ object CreateRevocationRegistryFlow {
     class Authority(
         private val credentialDefinitionId: CredentialDefinitionId,
         private val credentialLimit: Int
-    ) : FlowLogic<RevocationRegistryDefinitionId>() {
+    ) : FlowLogic<RevocationRegistryInfo>() {
 
         @Suspendable
-        override fun call(): RevocationRegistryDefinitionId {
+        override fun call(): RevocationRegistryInfo {
             try {
                 val revocationRegistryInfo = indyUser().createRevocationRegistryAndStoreOnLedger(
                     credentialDefinitionId,
@@ -84,7 +85,7 @@ object CreateRevocationRegistryFlow {
 
                 subFlow(FinalityFlow(selfSignedTx))
 
-                return revocationRegistryInfo.definition.getRevocationRegistryIdObject()!!
+                return revocationRegistryInfo
             } catch (t: Throwable) {
                 logger.error("Unable to create revocation registry", t)
                 throw FlowException(t.message)

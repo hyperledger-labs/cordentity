@@ -1,3 +1,4 @@
+/*
 package com.luxoft.blockchainlab.corda.hyperledger.indy
 
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.CreateCredentialDefinitionFlow
@@ -102,3 +103,4 @@ class ReadmeExampleTest : CordaTestBase() {
         println("You can buy drinks: $verified")
     }
 }
+*/

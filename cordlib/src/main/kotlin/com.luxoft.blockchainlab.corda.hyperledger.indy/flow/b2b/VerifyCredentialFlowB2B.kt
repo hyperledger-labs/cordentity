@@ -13,6 +13,7 @@ import net.corda.core.identity.Party
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
 import net.corda.core.utilities.unwrap
+import java.util.*
 
 /**
  * Flows to verify predicates on attributes
@@ -32,21 +33,22 @@ object VerifyCredentialFlowB2B {
     @InitiatingFlow
     @StartableByRPC
     open class Verifier(
-        private val identifier: String,
         private val proverName: CordaX500Name,
         private val proofRequest: ProofRequest
-    ) : FlowLogic<Boolean>() {
+    ) : FlowLogic<Pair<String?, Boolean>>() {
 
         @Suspendable
-        override fun call(): Boolean {
+        override fun call(): Pair<String?, Boolean> {
             try {
                 val prover: Party = whoIs(proverName)
                 val flowSession: FlowSession = initiateFlow(prover)
 
+                val id = UUID.randomUUID().toString()
+
                 val verifyCredentialOut = flowSession.sendAndReceive<ProofInfo>(proofRequest).unwrap { proof ->
                     val usedData = indyUser().ledgerService.retrieveDataUsedInProof(proofRequest, proof)
                     val credentialProofOut =
-                        IndyCredentialProof(identifier, proofRequest, proof, usedData, listOf(ourIdentity, prover))
+                        IndyCredentialProof(id, proofRequest, proof, usedData, listOf(ourIdentity, prover))
 
                     if (!indyUser().verifyProofWithLedgerData(credentialProofOut.proofReq, proof))
                         throw FlowException("Proof verification failed")
@@ -71,11 +73,11 @@ object VerifyCredentialFlowB2B {
                 // Notarise and record the transaction in both parties' vaults.
                 subFlow(FinalityFlow(signedTrx))
 
-                return true
+                return Pair(id, true)
 
             } catch (e: Exception) {
                 logger.error("", e)
-                return false
+                return Pair(null, false)
             }
         }
     }

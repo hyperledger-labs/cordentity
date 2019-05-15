@@ -6,6 +6,7 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.IssueCredentialF
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.VerifyCredentialFlowB2B
 import com.luxoft.blockchainlab.corda.hyperledger.indy.service.IndyService
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.ConfigHelper
+import com.luxoft.blockchainlab.hyperledger.indy.helpers.WalletHelper
 import com.luxoft.blockchainlab.hyperledger.indy.ledger.IndyPoolLedgerService
 import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletService
 import io.mockk.every
@@ -118,7 +119,7 @@ open class CordaTestBase {
 
     @Before
     fun commonSetup() {
-        System.setProperty(org.slf4j.impl.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "TRACE")
+        //System.setProperty(org.slf4j.impl.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "TRACE")
 
         net = InternalMockNetwork(
             cordappPackages = listOf("com.luxoft.blockchainlab.corda.hyperledger.indy"),
@@ -137,6 +138,7 @@ open class CordaTestBase {
 
         private val organisation: String = args.config.myLegalName.organisation
 
+        // TODO: maybe because of here?
         override fun start(): StartedNode<MockNode> {
             val sessionId = Random().nextLong().absoluteValue.toString()
             mockkObject(ConfigHelper)
