@@ -1,7 +1,6 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy
 
 
-import com.fasterxml.jackson.annotation.JsonProperty
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.*
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.*
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
@@ -10,10 +9,6 @@ import net.corda.core.identity.CordaX500Name
 import net.corda.core.utilities.getOrThrow
 import net.corda.node.internal.StartedNode
 import net.corda.testing.node.internal.InternalMockNetwork.MockNode
-import net.corda.testing.node.internal.startFlow
-import org.hyperledger.indy.sdk.wallet.Wallet
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.time.Duration
@@ -227,8 +222,16 @@ class CordentityE2E : CordaTestBase() {
         val credentialDefinition: CredentialDefinition,
         val revocationRegistryInfo: RevocationRegistryInfo?,
         val idAndValues: Pair<String, Map<String, String>>,
-        val prover: StartedNode<MockNode>
-    )
+        val prover: Pair<CordaX500Name, String>
+    ) {
+        constructor(
+            schema: Schema,
+            credentialDefinition: CredentialDefinition,
+            revocationRegistryInfo: RevocationRegistryInfo?,
+            idAndValues: Pair<String, Map<String, String>>,
+            prover: StartedNode<MockNode>
+        ) : this(schema, credentialDefinition, revocationRegistryInfo, idAndValues, Pair(prover.getName(), prover.getPartyDid()))
+    }
 
     fun StartedNode<MockNode>.issueRandomDifferentCredentials(
         provers: List<StartedNode<MockNode>>,
@@ -263,11 +266,23 @@ class CordentityE2E : CordaTestBase() {
     }
 
     data class ProofState(
-        val issuer: StartedNode<MockNode>,
-        val verifier: StartedNode<MockNode>,
+        val issuerNameAndDid: Pair<CordaX500Name, String>,
+        val verifierNameAndDid: Pair<CordaX500Name, String>,
         val credentialAndMetadata: CredentialAndMetadata,
         val proofRequest: ProofRequest
-    )
+    ) {
+        constructor(
+            issuer: StartedNode<MockNode>,
+            verifier: StartedNode<MockNode>,
+            credentialAndMetadata: CredentialAndMetadata,
+            proofRequest: ProofRequest
+        ) : this(
+            Pair(issuer.getName(), issuer.getPartyDid()),
+            Pair(verifier.getName(), verifier.getPartyDid()),
+            credentialAndMetadata,
+            proofRequest
+        )
+    }
 
     /**
      * N issuers, each issues M random credentials to each of K provers, then L verifiers try to verify these credentials randomly
@@ -281,7 +296,7 @@ class CordentityE2E : CordaTestBase() {
         credentialCount: Int,
         similarCredentials: Boolean,
         enableRevocation: Boolean
-    ) {
+    ): Boolean {
         val issuers = createIssuerNodes(trustee, issuerCount)
         val provers = createNodes("Prover", proverCount)
 
@@ -300,6 +315,8 @@ class CordentityE2E : CordaTestBase() {
 
         val unableToProve = mutableListOf<ProofState>()
 
+        val nonRevoked = if (enableRevocation) Interval.now() else null
+
         verifiers.forEach { verifier ->
             issuerToIssuedCredentials.entries.forEach { (issuer, credentialAndMetadataList) ->
                 credentialAndMetadataList.forEach { credentialAndMetadata ->
@@ -308,10 +325,11 @@ class CordentityE2E : CordaTestBase() {
                         issuer.getPartyDid(),
                         credentialAndMetadata.schema.getSchemaIdObject(),
                         credentialAndMetadata.credentialDefinition.getCredentialDefinitionIdObject(),
-                        Interval.now() // TODO: somehow fuzzy this
+                        nonRevoked
                     )
 
-                    val (proofId, proofValid) = verifier.verify(credentialAndMetadata.prover, pr)
+                    val prover = provers.first { it.getName() == credentialAndMetadata.prover.first }
+                    val (proofId, proofValid) = verifier.verify(prover, pr)
 
                     if (!proofValid)
                         unableToProve.add(ProofState(issuer, verifier, credentialAndMetadata, pr))
@@ -325,14 +343,14 @@ class CordentityE2E : CordaTestBase() {
             println("-----------------------------")
         }
 
+        val ableToProve = mutableListOf<ProofState>()
+
         if (enableRevocation) {
             issuerToIssuedCredentials.entries.forEach { (issuer, credentialAndMetadataList) ->
                 credentialAndMetadataList.forEach { credentialAndMetadata ->
                     issuer.revoke(credentialAndMetadata.idAndValues.first)
                 }
             }
-
-            val ableToProve = mutableListOf<ProofState>()
 
             verifiers.forEach { verifier ->
                 issuerToIssuedCredentials.entries.forEach { (issuer, credentialAndMetadataList) ->
@@ -345,7 +363,8 @@ class CordentityE2E : CordaTestBase() {
                             Interval.now() // TODO: somehow fuzzy this
                         )
 
-                        val (proofId, proofValid) = verifier.verify(credentialAndMetadata.prover, pr)
+                        val prover = provers.first { it.getName() == credentialAndMetadata.prover.first }
+                        val (proofId, proofValid) = verifier.verify(prover, pr)
 
                         if (proofValid)
                             ableToProve.add(ProofState(issuer, verifier, credentialAndMetadata, pr))
@@ -359,35 +378,49 @@ class CordentityE2E : CordaTestBase() {
                 println("----------------------------------------------")
             }
         }
+
+        return unableToProve.isEmpty() && ableToProve.isEmpty()
     }
 
     @Test
     fun `1 issuer 1 prover 1 verifier 1 credential without revocation`() {
-        constructTypicalFlow(1, 1, 1, 1, true, false)
+        assert(
+            constructTypicalFlow(1, 1, 1, 1, true, false)
+        )
     }
 
     @Test
     fun `1 issuer 1 prover 1 verifier 1 credential with revocation`() {
-        constructTypicalFlow(1, 1, 1, 1, true, true)
+        assert(
+            constructTypicalFlow(1, 1, 1, 1, true, true)
+        )
     }
 
     @Test
     fun `1 issuer 1 prover 1 verifier 2 similar credentials without revocation`() {
-        constructTypicalFlow(1, 1, 1, 2, true, false)
+        assert(
+            constructTypicalFlow(1, 1, 1, 2, true, false)
+        )
     }
 
     @Test
     fun `1 issuer 1 prover 1 verifier 2 different credentials without revocation`() {
-        constructTypicalFlow(1, 1, 1, 2, false, false)
+        assert(
+            constructTypicalFlow(1, 1, 1, 2, false, false)
+        )
     }
 
     @Test
     fun `1 issuer 1 prover 1 verifier 2 similar credentials with revocation`() {
-        constructTypicalFlow(1, 1, 1, 2, true, true)
+        assert(
+            constructTypicalFlow(1, 1, 1, 2, true, true)
+        )
     }
 
     @Test
     fun `1 issuer 1 prover 1 verifier 2 different credentials with revocation`() {
-        constructTypicalFlow(1, 1, 1, 2, false, true)
+        assert(
+            constructTypicalFlow(1, 1, 1, 2, false, true)
+        )
     }
 }

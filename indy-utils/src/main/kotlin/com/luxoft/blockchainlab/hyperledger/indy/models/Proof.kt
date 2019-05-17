@@ -221,8 +221,10 @@ data class ProofRequest(
         val attributeReference = if (filterFiller == null) {
             CredentialAttributeReference(attrName)
         } else {
-            val filter = Filter(attrName)
-            filter.filterFiller()
+            var filter: Filter? = Filter(attrName)
+            filter!!.filterFiller()
+            if (filter.isEmpty())
+               filter = null
 
             CredentialAttributeReference(attrName, filter)
         }
@@ -234,8 +236,10 @@ data class ProofRequest(
         val predicateReference = if (filterFiller == null) {
             CredentialPredicateReference(attrName, greaterThan)
         } else {
-            val filter = Filter(attrName)
-            filter.filterFiller()
+            var filter: Filter? = Filter(attrName)
+            filter!!.filterFiller()
+            if (filter.isEmpty())
+                filter = null
 
             CredentialPredicateReference(attrName, greaterThan, restrictions = filter)
         }
@@ -298,6 +302,10 @@ data class Filter(
 
     @JsonAnySetter
     fun setUnknownAttribute(key: String, value: String) = attributes.put(key, value)
+
+    @JsonIgnore
+    fun isEmpty() = schemaIdRaw == null && schemaIssuerDid == null && schemaName == null && schemaVersion == null
+                && issuerDid == null && credDefId == null && attributes.isEmpty()
 
     infix fun FilterProperty.shouldBe(value: String) {
         when (this) {
