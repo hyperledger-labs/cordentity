@@ -38,6 +38,10 @@ object TailsHelper {
             if (!dir.exists())
                 dir.mkdirs()
             tailsResponse.tails.forEach { name, content ->
+                /**
+                 * Non-alphanumeric symbols are not allowed (files are named by tailsHash)
+                 */
+                if (name.toCharArray().any { !it.isLetterOrDigit() }) return@forEach
                 val file = Paths.get(path, name).toFile()
                 if (file.exists())
                     file.delete()
@@ -49,8 +53,10 @@ object TailsHelper {
     class DefaultReader(private val path: String) {
         fun read(tailsRequest: TailsRequest) : TailsResponse {
             val file = Paths.get(path, tailsRequest.tailsHash).toFile()
-            return if (file.exists()) TailsResponse(tailsRequest.tailsHash, mapOf(tailsRequest.tailsHash to file.readText()))
-            else TailsResponse(tailsRequest.tailsHash, mapOf())
+            return if (tailsRequest.tailsHash.toCharArray().any { !it.isLetterOrDigit() } || !file.exists())
+                TailsResponse(tailsRequest.tailsHash, mapOf())
+            else
+                TailsResponse(tailsRequest.tailsHash, mapOf(tailsRequest.tailsHash to file.readText()))
         }
     }
 }

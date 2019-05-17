@@ -1,5 +1,6 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy
 
+import com.luxoft.blockchainlab.hyperledger.indy.helpers.TailsHelper
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialOffer
 import com.luxoft.blockchainlab.hyperledger.indy.models.KeyCorrectnessProof
 import org.junit.Ignore
@@ -8,6 +9,7 @@ import rx.Single
 import kotlin.test.assertEquals
 import java.net.URI
 import java.net.URL
+import java.nio.file.Paths
 import java.util.*
 
 fun agentInitEndpoint(agentUrl: String) {
@@ -25,7 +27,8 @@ class PythonRefAgentConnectionTest {
 
     class InvitedPartyProcess (
             private val agentUrl: String,
-            val proofSchemaId: String = "${Random().nextInt()}:::1"
+            val proofSchemaId: String = "${Random().nextInt()}:::1",
+            val tailsHash: String = "${Random().nextInt(0x7fffffff)}"
             ) {
 
         fun start(invitationString: String) {
@@ -37,6 +40,9 @@ class PythonRefAgentConnectionTest {
                         throw AgentConnectionException(ex.message!!)
                     }
                     else acceptInvite(invitationString).subscribe { master ->
+                        val tails = master.requestTails(tailsHash).toBlocking().value().tails[tailsHash]
+                        if (tails != tailsHash)
+                            throw AgentConnectionException("Tails are wrong!!! hash $tailsHash, received $tails")
                         val offer = CredentialOffer(proofSchemaId, ":::1", KeyCorrectnessProof("", "", emptyList()), "")
                         master.sendCredentialOffer(offer)
                         disconnect()
@@ -52,15 +58,22 @@ class PythonRefAgentConnectionTest {
 
         fun start() {
             val rand = Random().nextInt()
+            val tailsDir = Paths.get(System.getProperty("user.home"),"tails").toFile()
+            if (!tailsDir.exists())
+                tailsDir.mkdirs()
             agentInitEndpoint(agentUrl)
             PythonRefAgentConnection().apply {
                 connect(agentUrl, "User$rand", "pass$rand").toBlocking().value()
                 val invitedPartiesCompleted = mutableListOf<Single<Boolean>>()
                 invitedPartyAgents.forEach { agentUrl ->
                     val party = InvitedPartyProcess(agentUrl)
+                    Paths.get(System.getProperty("user.home"), "tails", party.tailsHash).toFile().writeText(party.tailsHash)
                     invitedPartiesCompleted.add(Single.create { observer ->
                         generateInvite().subscribe {invitation ->
                             waitForInvitedParty(invitation).subscribe { invitedParty ->
+                                invitedParty.handleTailsRequestsWith {
+                                    TailsHelper.DefaultReader(tailsDir.absolutePath).read(it)
+                                }
                                 invitedParty.receiveCredentialOffer().subscribe { proof ->
                                     assertEquals(proof?.schemaIdRaw, party.proofSchemaId)
                                     observer.onSuccess(true)

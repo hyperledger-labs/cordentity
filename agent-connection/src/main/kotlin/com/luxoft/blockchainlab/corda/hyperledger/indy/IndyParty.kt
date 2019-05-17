@@ -99,8 +99,9 @@ class IndyParty(private val webSocket: AgentWebSocketClient, val did: String, va
      * @return observable ([Single]<>) object emitting [TailsResponse] object
      */
     override fun requestTails(tailsHash: String) : Single<TailsResponse> {
+        val result : Single<TailsResponse> = webSocket.receiveClassObject(this)
         webSocket.sendClassObject(TailsRequest(tailsHash), this)
-        return webSocket.receiveClassObject(this)
+        return result
     }
 
     private val requestHandlerRef: AtomicReference<(TailsRequest)->TailsResponse> =
@@ -113,7 +114,7 @@ class IndyParty(private val webSocket: AgentWebSocketClient, val did: String, va
             webSocket.sendClassObject(requestHandlerRef.get().invoke(it), this)
             webSocket.receiveClassObject<TailsRequest>(this).subscribe(tailRequestMessageHandler)
         }
-        webSocket.receiveClassObject<TailsRequest>(this).subscribe { tailRequestMessageHandler }
+        webSocket.receiveClassObject<TailsRequest>(this).subscribe(tailRequestMessageHandler)
     }
 
     /**
