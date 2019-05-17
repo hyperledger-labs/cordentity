@@ -1,5 +1,9 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy
 
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.CreateCredentialDefinitionFlow
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.CreateRevocationRegistryFlow
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.CreateSchemaFlow
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.RevokeCredentialFlow
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.AssignPermissionsFlowB2B
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.CreatePairwiseFlowB2B
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.IssueCredentialFlowB2B
@@ -8,6 +12,8 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.service.IndyService
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.ConfigHelper
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.WalletHelper
 import com.luxoft.blockchainlab.hyperledger.indy.ledger.IndyPoolLedgerService
+import com.luxoft.blockchainlab.hyperledger.indy.models.*
+import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletService
 import io.mockk.every
 import io.mockk.mockkObject
@@ -40,6 +46,8 @@ import kotlin.math.absoluteValue
  * Note: [projectReciverFlows] must be kept updated!
  * */
 open class CordaTestBase {
+
+    protected lateinit var trustee: StartedNode<MockNode>
 
     /**
      * List of all flows that may be initiated by a message
@@ -138,7 +146,6 @@ open class CordaTestBase {
 
         private val organisation: String = args.config.myLegalName.organisation
 
-        // TODO: maybe because of here?
         override fun start(): StartedNode<MockNode> {
             val sessionId = Random().nextLong().absoluteValue.toString()
             mockkObject(ConfigHelper)
@@ -173,5 +180,239 @@ open class CordaTestBase {
         } finally {
             net.stopNodes()
         }
+    }
+
+    fun createNodes(name: String, count: Int) = (0 until count)
+        .map { createPartyNode(CordaX500Name("$name-$it", "London", "GB")) }
+
+    fun createIssuerNodes(trustee: StartedNode<MockNode>, count: Int) = (0 until count)
+        .map { createPartyNode(CordaX500Name("Issuer-$it", "London", "GB")) }
+        .map { setPermissions(it, trustee); it }
+
+
+    data class ProofRequestPayload(
+        val attributeValues: Map<String, String>,
+        val schemaId: SchemaId,
+        var credDefId: CredentialDefinitionId,
+        var schemaIssuerDid: String,
+        var schemaName: String,
+        var schemaVersion: String,
+        var issuerDid: String
+    ) {
+        companion object {
+            fun create(
+                attributeValues: Map<String, String>,
+                issuerDid: String,
+                schemaId: SchemaId,
+                credentialDefId: CredentialDefinitionId
+            ) = ProofRequestPayload(
+                attributeValues,
+                schemaId,
+                credentialDefId,
+                schemaId.did,
+                schemaId.name,
+                schemaId.version,
+                issuerDid
+            )
+        }
+    }
+
+    fun ProofRequest.applyPayloadRandomly(payload: ProofRequestPayload, nonRevoked: Interval?) {
+        val rng = Random()
+
+        payload.attributeValues.entries.forEach attributeLoop@ { (key, value) ->
+            val proveGE = rng.nextBoolean()
+            if (proveGE) {
+                val valueInt = value.toInt()
+                val greaterThan = rng.nextInt().absoluteValue % valueInt
+
+                proveGreaterThan(key, greaterThan) {
+                    FilterProperty.values().forEach filterLoop@ {
+                        val skip = rng.nextBoolean()
+                        if (skip) return@filterLoop
+
+                        when (it) {
+                            FilterProperty.CredentialDefinitionId -> it shouldBe payload.credDefId.toString()
+                            FilterProperty.SchemaId -> it shouldBe payload.schemaId.toString()
+                            FilterProperty.IssuerDid -> it shouldBe payload.issuerDid
+                            FilterProperty.SchemaIssuerDid -> it shouldBe payload.schemaIssuerDid
+                            FilterProperty.SchemaName -> it shouldBe payload.schemaName
+                            FilterProperty.SchemaVersion -> it shouldBe payload.schemaVersion
+                        }
+                    }
+                }
+            } else {
+                reveal(key) {
+                    FilterProperty.values().forEach filterLoop@ {
+                        val skip = rng.nextBoolean()
+                        if (skip) return@filterLoop
+
+                        when (it) {
+                            FilterProperty.Value -> it shouldBe value
+                            FilterProperty.CredentialDefinitionId -> it shouldBe payload.credDefId.toString()
+                            FilterProperty.SchemaId -> it shouldBe payload.schemaId.toString()
+                            FilterProperty.IssuerDid -> it shouldBe payload.issuerDid
+                            FilterProperty.SchemaIssuerDid -> it shouldBe payload.schemaIssuerDid
+                            FilterProperty.SchemaName -> it shouldBe payload.schemaName
+                            FilterProperty.SchemaVersion -> it shouldBe payload.schemaVersion
+                        }
+                    }
+                }
+            }
+
+            if (nonRevoked != null) proveNonRevocation(nonRevoked)
+        }
+    }
+
+    fun createRandomProofRequest(
+        attributeValues: Map<String, String>,
+        issuerDid: String,
+        schemaId: SchemaId,
+        credentialDefId: CredentialDefinitionId,
+        nonRevoked: Interval?
+    ): ProofRequest {
+        val rng = Random()
+        val name = "proof-request-${rng.nextInt().absoluteValue}"
+        val version = "${rng.nextInt().absoluteValue}.${rng.nextInt().absoluteValue}"
+
+        val prPayload = ProofRequestPayload.create(attributeValues, issuerDid, schemaId, credentialDefId)
+
+        return proofRequest(name, version) {
+            applyPayloadRandomly(prPayload, nonRevoked)
+        }
+    }
+
+    data class CredentialAndMetadata(
+        val schema: Schema,
+        val credentialDefinition: CredentialDefinition,
+        val revocationRegistryInfo: RevocationRegistryInfo?,
+        val idAndValues: Pair<String, Map<String, String>>,
+        val prover: Pair<CordaX500Name, String>
+    ) {
+        constructor(
+            schema: Schema,
+            credentialDefinition: CredentialDefinition,
+            revocationRegistryInfo: RevocationRegistryInfo?,
+            idAndValues: Pair<String, Map<String, String>>,
+            prover: StartedNode<MockNode>
+        ) : this(schema, credentialDefinition, revocationRegistryInfo, idAndValues, Pair(prover.getName(), prover.getPartyDid()))
+    }
+
+    data class ProofState(
+        val issuerNameAndDid: Pair<CordaX500Name, String>,
+        val verifierNameAndDid: Pair<CordaX500Name, String>,
+        val credentialAndMetadata: CredentialAndMetadata,
+        val proofRequest: ProofRequest
+    ) {
+        constructor(
+            issuer: StartedNode<MockNode>,
+            verifier: StartedNode<MockNode>,
+            credentialAndMetadata: CredentialAndMetadata,
+            proofRequest: ProofRequest
+        ) : this(
+            Pair(issuer.getName(), issuer.getPartyDid()),
+            Pair(verifier.getName(), verifier.getPartyDid()),
+            credentialAndMetadata,
+            proofRequest
+        )
+    }
+
+    /**
+     * N issuers, each issues M random credentials to each of K provers, then L verifiers try to verify these credentials randomly
+     * revocation is optional, but if it takes place, all credentials should be revoked after all
+     * credentials can be similar (issued using single cred def) or different (issued using multiple cred defs)
+     */
+    fun constructTypicalFlow(
+        issuerCount: Int,
+        proverCount: Int,
+        verifierCount: Int,
+        credentialCount: Int,
+        similarCredentials: Boolean,
+        enableRevocation: Boolean,
+        maxCredentialsPerRevRegistry: Int
+    ): Boolean {
+        val issuers = createIssuerNodes(trustee, issuerCount)
+        val provers = createNodes("Prover", proverCount)
+
+        val issuerToIssuedCredentials = mutableMapOf<StartedNode<MockNode>, MutableList<CredentialAndMetadata>>()
+
+        issuers.forEach { issuer ->
+            val credentials = issuerToIssuedCredentials.getOrPut(issuer) { mutableListOf() }
+
+            if (similarCredentials)
+                credentials.addAll(issuer.issueRandomSimilarCredentials(provers, enableRevocation, credentialCount, maxCredentialsPerRevRegistry))
+            else
+                credentials.addAll(issuer.issueRandomDifferentCredentials(provers, enableRevocation, credentialCount, maxCredentialsPerRevRegistry))
+        }
+
+        val verifiers = createNodes("Verifier", verifierCount)
+
+        val unableToProve = mutableListOf<ProofState>()
+
+        val nonRevoked = if (enableRevocation) Interval.now() else null
+
+        verifiers.forEach { verifier ->
+            issuerToIssuedCredentials.entries.forEach { (issuer, credentialAndMetadataList) ->
+                credentialAndMetadataList.forEach { credentialAndMetadata ->
+                    val pr = createRandomProofRequest(
+                        credentialAndMetadata.idAndValues.second,
+                        issuer.getPartyDid(),
+                        credentialAndMetadata.schema.getSchemaIdObject(),
+                        credentialAndMetadata.credentialDefinition.getCredentialDefinitionIdObject(),
+                        nonRevoked
+                    )
+
+                    val prover = provers.first { it.getName() == credentialAndMetadata.prover.first }
+                    val (proofId, proofValid) = verifier.verify(prover, pr)
+
+                    if (!proofValid)
+                        unableToProve.add(ProofState(issuer, verifier, credentialAndMetadata, pr))
+                }
+            }
+        }
+
+        if (unableToProve.isNotEmpty()) {
+            println("------- Failed proofs -------")
+            println(SerializationUtils.anyToJSON(unableToProve))
+            println("-----------------------------")
+        }
+
+        val ableToProve = mutableListOf<ProofState>()
+
+        if (enableRevocation) {
+            issuerToIssuedCredentials.entries.forEach { (issuer, credentialAndMetadataList) ->
+                credentialAndMetadataList.forEach { credentialAndMetadata ->
+                    issuer.revoke(credentialAndMetadata.idAndValues.first)
+                }
+            }
+
+            verifiers.forEach { verifier ->
+                issuerToIssuedCredentials.entries.forEach { (issuer, credentialAndMetadataList) ->
+                    credentialAndMetadataList.forEach { credentialAndMetadata ->
+                        val pr = createRandomProofRequest(
+                            credentialAndMetadata.idAndValues.second,
+                            issuer.getPartyDid(),
+                            credentialAndMetadata.schema.getSchemaIdObject(),
+                            credentialAndMetadata.credentialDefinition.getCredentialDefinitionIdObject(),
+                            Interval.now()
+                        )
+
+                        val prover = provers.first { it.getName() == credentialAndMetadata.prover.first }
+                        val (proofId, proofValid) = verifier.verify(prover, pr)
+
+                        if (proofValid)
+                            ableToProve.add(ProofState(issuer, verifier, credentialAndMetadata, pr))
+                    }
+                }
+            }
+
+            if (ableToProve.isNotEmpty()) {
+                println("------- Failed proofs after revocation -------")
+                println(SerializationUtils.anyToJSON(ableToProve))
+                println("----------------------------------------------")
+            }
+        }
+
+        return unableToProve.isEmpty() && ableToProve.isEmpty()
     }
 }

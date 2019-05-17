@@ -1,4 +1,3 @@
-/*
 package com.luxoft.blockchainlab.corda.hyperledger.indy
 
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.CreateCredentialDefinitionFlow
@@ -21,7 +20,6 @@ import java.util.*
 
 class ReadmeExampleTest : CordaTestBase() {
 
-    private lateinit var trustee: StartedNode<MockNode>
     private lateinit var issuer: StartedNode<MockNode>
     private lateinit var alice: StartedNode<MockNode>
     private lateinit var bob: StartedNode<MockNode>
@@ -40,48 +38,44 @@ class ReadmeExampleTest : CordaTestBase() {
     @Ignore("The test not represents the logic it should")
     fun `grocery store example`() {
         val ministry: StartedNode<InternalMockNetwork.MockNode> = issuer
-        val alice: StartedNode<*> = alice
-        val store: StartedNode<*> = bob
+        val alice: StartedNode<MockNode> = alice
+        val store: StartedNode<MockNode> = bob
 
         // Each Corda node has a X500 name:
 
-        val ministryX500 = ministry.info.singleIdentity().name
-        val aliceX500 = alice.info.singleIdentity().name
+        val ministryX500 = ministry.getName()
+        val aliceX500 = alice.getName()
 
         // And each Indy node has a DID, a.k.a Decentralized ID:
 
-        val ministryDID = store.services.startFlow(
-            GetDidFlowB2B.Initiator(ministryX500)
-        ).resultFuture.get()
+        val ministryDID = ministry.getPartyDid()
+        val aliceDID = alice.getPartyDid()
 
         // To allow customers and shops to communicate, Ministry issues a shopping scheme:
 
-        val schemaId = ministry.services.startFlow(
+        val schema = ministry.services.startFlow(
             CreateSchemaFlow.Authority(
                 "shopping scheme",
                 "1.0",
                 listOf("NAME", "BORN")
             )
         ).resultFuture.get()
+        val schemaId = schema.getSchemaIdObject()
 
         // Ministry creates a credential definition for the shopping scheme:
 
-        val credentialDefinitionId = ministry.services.startFlow(
-            CreateCredentialDefinitionFlow.Authority(schemaId, false)
+        val credentialDefinition = ministry.services.startFlow(
+            CreateCredentialDefinitionFlow.Authority(schemaId, enableRevocation = false)
         ).resultFuture.get()
+        val credentialDefinitionId = credentialDefinition.getCredentialDefinitionIdObject()
 
         // Ministry verifies Alice's legal status and issues her a shopping credential:
 
         ministry.services.startFlow(
-            IssueCredentialFlowB2B.Issuer(
-                UUID.randomUUID().toString(),
-                credentialDefinitionId,
-                null,
-                aliceX500
-            ) { mapOf(
-                "NAME" to CredentialValue("Alice"),
-                "BORN" to CredentialValue("2000")
-            ) }
+            IssueCredentialFlowB2B.Issuer(aliceX500, credentialDefinitionId, null) {
+                attributes["NAME"] = CredentialValue("Alice")
+                attributes["BORN"] = CredentialValue("2000")
+            }
         ).resultFuture.get()
 
         // When Alice comes to grocery store, the store asks Alice to verify that she is legally allowed to buy drinks:
@@ -95,7 +89,7 @@ class ReadmeExampleTest : CordaTestBase() {
         }
 
         val verified = store.services.startFlow(
-            VerifyCredentialFlowB2B.Verifier(UUID.randomUUID().toString(), aliceX500, proofRequest)
+            VerifyCredentialFlowB2B.Verifier(aliceX500, proofRequest)
         ).resultFuture.get()
 
         // If the verification succeeds, the store can be sure that Alice's age is above 18.
@@ -103,4 +97,3 @@ class ReadmeExampleTest : CordaTestBase() {
         println("You can buy drinks: $verified")
     }
 }
-*/
