@@ -4,9 +4,9 @@ import com.luxoft.blockchainlab.hyperledger.indy.models.*
 
 
 /**
- * [LedgerService] is an interface that encapsulates all work related to storing and retrieving of public data
+ * [LedgerUser] is an interface that encapsulates all work related to storing and retrieving of public data
  */
-interface LedgerService {
+interface LedgerUser {
     /**
      * Stores schema on ledger
      *

@@ -35,8 +35,8 @@ object CreateSchemaFlow {
         override fun call(): SchemaId {
             try {
                 // check if schema already exists
-                val schemaId = SchemaId(indyUser().walletService.getIdentityDetails().did, schemaName, schemaVersion)
-                if (indyUser().ledgerService.schemaExists(schemaId))
+                val schemaId = SchemaId(indyUser().walletUser.getIdentityDetails().did, schemaName, schemaVersion)
+                if (indyUser().ledgerUser.schemaExists(schemaId))
                     throw IndySchemaAlreadyExistsException(schemaName, schemaVersion)
 
                 // create schema

@@ -8,28 +8,27 @@ import org.hyperledger.indy.sdk.anoncreds.Anoncreds
 import org.hyperledger.indy.sdk.anoncreds.DuplicateMasterSecretNameException
 import org.hyperledger.indy.sdk.did.Did
 import org.hyperledger.indy.sdk.pairwise.Pairwise
-import org.hyperledger.indy.sdk.pool.Pool
 import org.hyperledger.indy.sdk.wallet.Wallet
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ExecutionException
 
 /**
- * This is an implementation of [WalletService] which uses indy sdk standard [org.hyperledger.indy.sdk.wallet.Wallet]
+ * This is an implementation of [WalletUser] which uses indy sdk standard [org.hyperledger.indy.sdk.wallet.Wallet]
  *  and [org.hyperledger.indy.sdk.anoncreds.Anoncreds] API
  *
  * @param wallet [Wallet] - user's wallet
  * @param didConfig [DidConfig] - what did we should use to perform operations
  * @param tailsPath [String] - path to the directory with tails files (they will be generated when revocation-stuff is done)
  */
-class IndySDKWalletService(
+class IndySDKWalletUser(
     val wallet: Wallet,
     didConfig: DidConfig = DidConfig(),
     val tailsPath: String = "tails"
-) : WalletService {
+) : WalletUser {
 
     var did: String
     var verkey: String
-    val logger = LoggerFactory.getLogger(IndySDKWalletService::class.java)
+    private val logger = LoggerFactory.getLogger(IndySDKWalletUser::class.java)
 
     companion object {
         val SIGNATURE_TYPE = "CL"

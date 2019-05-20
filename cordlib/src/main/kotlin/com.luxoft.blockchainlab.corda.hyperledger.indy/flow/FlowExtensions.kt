@@ -1,7 +1,7 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy.flow
 
 import com.luxoft.blockchainlab.corda.hyperledger.indy.service.IndyService
-import com.luxoft.blockchainlab.hyperledger.indy.IndyFacade
+import com.luxoft.blockchainlab.hyperledger.indy.SsiUser
 import net.corda.core.flows.FlowLogic
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.identity.Party
@@ -20,7 +20,7 @@ fun FlowLogic<Any>.whoIsNotary(): Party {
     return serviceHub.networkMapCache.notaryIdentities.single()
 }
 
-fun FlowLogic<Any>.indyUser(): IndyFacade {
+fun FlowLogic<Any>.indyUser(): SsiUser {
     return serviceHub.cordaService(IndyService::class.java).indyUser
 }
 

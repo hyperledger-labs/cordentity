@@ -51,7 +51,7 @@ object AssignPermissionsFlowB2B {
                 val otherSide: Party = whoIs(authority)
                 val flowSession: FlowSession = initiateFlow(otherSide)
 
-                val identity = indyUser().walletService.getIdentityDetails()
+                val identity = indyUser().walletUser.getIdentityDetails()
                 flowSession.send(IndyPermissionsRequest(identity.did, identity.verkey, alias, role))
 
             } catch (t: Throwable) {

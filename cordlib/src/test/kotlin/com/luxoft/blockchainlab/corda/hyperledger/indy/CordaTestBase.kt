@@ -6,8 +6,8 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.IssueCredentialF
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.VerifyCredentialFlowB2B
 import com.luxoft.blockchainlab.corda.hyperledger.indy.service.IndyService
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.ConfigHelper
-import com.luxoft.blockchainlab.hyperledger.indy.ledger.IndyPoolLedgerService
-import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletService
+import com.luxoft.blockchainlab.hyperledger.indy.ledger.IndyPoolLedgerUser
+import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletUser
 import io.mockk.every
 import io.mockk.mockkObject
 import net.corda.core.concurrent.CordaFuture
@@ -25,9 +25,6 @@ import net.corda.testing.node.internal.MockNodeArgs
 import net.corda.testing.node.internal.newContext
 import org.junit.After
 import org.junit.Before
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
-import org.slf4j.event.Level
 import java.time.Duration
 import java.util.*
 import kotlin.math.absoluteValue
@@ -163,8 +160,8 @@ open class CordaTestBase {
             for (party in parties) {
                 val indyUser = party.services.cordaService(IndyService::class.java).indyUser
                 // TODO: get rid of casts
-                (indyUser.walletService as IndySDKWalletService).wallet.closeWallet().get()
-                (indyUser.ledgerService as IndyPoolLedgerService).pool.closePoolLedger().get()
+                (indyUser.walletUser as IndySDKWalletUser).wallet.closeWallet().get()
+                (indyUser.ledgerUser as IndyPoolLedgerUser).pool.closePoolLedger().get()
             }
 
             parties.clear()

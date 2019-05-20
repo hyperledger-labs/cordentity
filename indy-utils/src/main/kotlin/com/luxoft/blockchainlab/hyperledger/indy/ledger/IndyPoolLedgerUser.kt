@@ -2,6 +2,8 @@ package com.luxoft.blockchainlab.hyperledger.indy.ledger
 
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
+import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletUser
+import com.luxoft.blockchainlab.hyperledger.indy.wallet.WalletUser
 import mu.KotlinLogging
 import org.hyperledger.indy.sdk.did.Did
 import org.hyperledger.indy.sdk.ledger.Ledger
@@ -15,15 +17,16 @@ const val RETRY_DELAY_MS: Long = 100L
 const val RETRY_TIMES: Int = 10
 
 /**
- * This is an implementation of [LedgerService] which uses standard indy pool as ledger.
+ * This is an implementation of [LedgerUser] which uses standard indy pool as ledger.
  *
  * @param pool [Pool] - indy pool handle
- * @param wallet [Wallet] - indy user's wallet
- * @param did [String] - did to perform operations
+ * @param walletUser [IndySDKWalletUser] - indy SDK wallet user obj
  */
-class IndyPoolLedgerService(val pool: Pool, val wallet: Wallet, val did: String) : LedgerService {
+class IndyPoolLedgerUser(val pool: Pool, walletUser: IndySDKWalletUser) : LedgerUser {
 
-    val logger = KotlinLogging.logger {}
+    private val wallet = walletUser.wallet
+    private val did = walletUser.did
+    private val logger = KotlinLogging.logger {}
 
     private fun store(data: String) {
         val attemptId = Random().nextLong()

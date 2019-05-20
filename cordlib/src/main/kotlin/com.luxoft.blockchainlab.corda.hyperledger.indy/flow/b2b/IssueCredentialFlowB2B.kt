@@ -87,7 +87,7 @@ object IssueCredentialFlowB2B {
                             identifier,
                             credentialReq,
                             credential,
-                            indyUser().walletService.getIdentityDetails().did,
+                            indyUser().walletUser.getIdentityDetails().did,
                             listOf(ourIdentity, prover)
                         )
                         StateAndContract(credentialOut, IndyCredentialContract::class.java.name)

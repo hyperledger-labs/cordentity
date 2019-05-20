@@ -4,10 +4,10 @@ import com.luxoft.blockchainlab.hyperledger.indy.models.*
 
 
 /**
- * [WalletService] is an interface that encapsulates [org.hyperledger.indy.sdk.wallet.Wallet] operations in perspective
- *  of doing some cryptographic work that is not related to [com.luxoft.blockchainlab.hyperledger.indy.ledger.LedgerService]
+ * [WalletUser] is an interface that encapsulates [org.hyperledger.indy.sdk.wallet.Wallet] operations in perspective
+ *  of doing some cryptographic work that is not related to [com.luxoft.blockchainlab.hyperledger.indy.ledger.LedgerUser]
  */
-interface WalletService : IndyIssuer, IndyProver, IndyVerifier, IndyTrustee
+interface WalletUser : IndyIssuer, IndyProver, IndyVerifier, IndyTrustee
 
 
 /**
