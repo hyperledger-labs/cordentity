@@ -106,7 +106,7 @@ class IndyUser(
         return credentialInfo
     }
 
-    override fun receiveCredential(
+    override fun checkLedgerAndReceiveCredential(
         credentialInfo: CredentialInfo,
         credentialRequest: CredentialRequestInfo,
         offer: CredentialOffer

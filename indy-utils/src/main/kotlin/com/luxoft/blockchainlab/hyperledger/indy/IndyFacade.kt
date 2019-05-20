@@ -100,7 +100,7 @@ interface IndyFacade {
      * @param credentialRequest [CredentialRequestInfo] - credential request and all reliable data
      * @param offer [CredentialOffer]
      */
-    fun receiveCredential(
+    fun checkLedgerAndReceiveCredential(
         credentialInfo: CredentialInfo,
         credentialRequest: CredentialRequestInfo,
         offer: CredentialOffer

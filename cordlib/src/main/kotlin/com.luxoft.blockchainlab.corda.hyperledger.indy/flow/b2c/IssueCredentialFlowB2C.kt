@@ -5,8 +5,8 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialCo
 import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialDefinitionContract
 import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyRevocationRegistryContract
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredential
-import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.getCredentialDefinitionById
-import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.getRevocationRegistryDefinitionById
+import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.getCredentialDefinitionById
+import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.getRevocationRegistryDefinitionById
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.indyUser
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.whoIsNotary
 import com.luxoft.blockchainlab.corda.hyperledger.indy.service.awaitFiber

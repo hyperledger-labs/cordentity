@@ -150,7 +150,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
             attributes["height"] = CredentialValue("175")
             attributes["age"] = CredentialValue("28")
         }
-        prover.receiveCredential(credentialInfo, credReq, credOffer)
+        prover.checkLedgerAndReceiveCredential(credentialInfo, credReq, credOffer)
 
         val proofReq = proofRequest("proof_req", "0.1") {
             reveal("name") { FilterProperty.Value shouldBe "Alex" }
@@ -194,7 +194,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
             attributes["height"] = CredentialValue("175")
             attributes["age"] = CredentialValue("28")
         }
-        prover.receiveCredential(credInfo, credReq, credOffer)
+        prover.checkLedgerAndReceiveCredential(credInfo, credReq, credOffer)
 
         // repeating this stuff for 3 times
         for (i in (0 until 3)) {
@@ -227,7 +227,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
             attributes["height"] = CredentialValue("175")
             attributes["age"] = CredentialValue("28")
         }
-        prover.receiveCredential(credInfo1, credReq1, credOffer1)
+        prover.checkLedgerAndReceiveCredential(credInfo1, credReq1, credOffer1)
 
         // verify first credential
         val proofReq1 = proofRequest("proof_req", "0.1") {
@@ -255,7 +255,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
             attributes["age"] = CredentialValue("17")
         }
 
-        prover.receiveCredential(credInfo2, credReq2, credOffer2)
+        prover.checkLedgerAndReceiveCredential(credInfo2, credReq2, credOffer2)
 
         // verify second credential
         val proofReq2 = proofRequest("proof_req", "0.1") {
@@ -283,7 +283,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
              attributes["height"] = CredentialValue("175")
              attributes["age"] = CredentialValue("28")
          }
-         prover.receiveCredential(credentialInfo, credReq, credOffer)
+         prover.checkLedgerAndReceiveCredential(credentialInfo, credReq, credOffer)
 
          val proofReq = proofRequest("proof_req", "0.1") {
              reveal("name") { FilterProperty.Value shouldBe "Alex" }
@@ -314,14 +314,14 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
              attributes["height"] = CredentialValue("175")
              attributes["age"] = CredentialValue("28")
          }
-         prover.receiveCredential(gvtCredential, gvtCredReq, gvtCredOffer)
+         prover.checkLedgerAndReceiveCredential(gvtCredential, gvtCredReq, gvtCredOffer)
 
          val xyzCredReq = prover.createCredentialRequest(prover.walletService.getIdentityDetails().did, xyzCredOffer)
          val xyzCredential = issuer2.issueCredentialAndUpdateLedger(xyzCredReq, xyzCredOffer, null) {
              attributes["status"] = CredentialValue("partial")
              attributes["period"] = CredentialValue("8")
          }
-         prover.receiveCredential(xyzCredential, xyzCredReq, xyzCredOffer)
+         prover.checkLedgerAndReceiveCredential(xyzCredential, xyzCredReq, xyzCredOffer)
 
          val proofReq = proofRequest("proof_req", "0.1") {
              reveal("name") { FilterProperty.Value shouldBe "Alex" }
@@ -354,14 +354,14 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
              attributes["height"] = CredentialValue("175")
              attributes["age"] = CredentialValue("28")
          }
-         prover.receiveCredential(gvtCredential, gvtCredReq, gvtCredOffer)
+         prover.checkLedgerAndReceiveCredential(gvtCredential, gvtCredReq, gvtCredOffer)
 
          val xyzCredReq = prover.createCredentialRequest(prover.walletService.getIdentityDetails().did, xyzCredOffer)
          val xyzCredential = issuer1.issueCredentialAndUpdateLedger(xyzCredReq, xyzCredOffer, null) {
              attributes["status"] = CredentialValue("partial")
              attributes["period"] = CredentialValue("8")
          }
-         prover.receiveCredential(xyzCredential, xyzCredReq, xyzCredOffer)
+         prover.checkLedgerAndReceiveCredential(xyzCredential, xyzCredReq, xyzCredOffer)
 
          val proofReq = proofRequest("proof_req", "0.1") {
              reveal("name") { FilterProperty.Value shouldBe "Alex" }
