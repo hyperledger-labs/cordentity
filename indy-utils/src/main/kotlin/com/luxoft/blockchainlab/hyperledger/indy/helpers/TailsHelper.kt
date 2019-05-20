@@ -41,7 +41,8 @@ object TailsHelper {
                 /**
                  * Non-alphanumeric symbols are not allowed (files are named by tailsHash)
                  */
-                if (name.toCharArray().any { !it.isLetterOrDigit() }) return@forEach
+                if (name.toCharArray().any { !it.isLetterOrDigit() })
+                    throw RuntimeException("Invalid character in the tails filename. Tails files must be named by hash.")
                 val file = Paths.get(path, name).toFile()
                 if (file.exists())
                     file.delete()
@@ -52,8 +53,10 @@ object TailsHelper {
     }
     class DefaultReader(private val path: String) {
         fun read(tailsRequest: TailsRequest) : TailsResponse {
+            if (tailsRequest.tailsHash.toCharArray().any { !it.isLetterOrDigit() })
+                throw RuntimeException("Invalid character in the tails hash.")
             val file = Paths.get(path, tailsRequest.tailsHash).toFile()
-            return if (tailsRequest.tailsHash.toCharArray().any { !it.isLetterOrDigit() } || !file.exists())
+            return if (!file.exists())
                 TailsResponse(tailsRequest.tailsHash, mapOf())
             else
                 TailsResponse(tailsRequest.tailsHash, mapOf(tailsRequest.tailsHash to file.readText()))

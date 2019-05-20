@@ -6,6 +6,7 @@ import com.luxoft.blockchainlab.hyperledger.indy.models.KeyCorrectnessProof
 import org.junit.Ignore
 import org.junit.Test
 import rx.Single
+import java.io.File
 import kotlin.test.assertEquals
 import java.net.URI
 import java.net.URL
@@ -28,7 +29,7 @@ class PythonRefAgentConnectionTest {
     class InvitedPartyProcess (
             private val agentUrl: String,
             val proofSchemaId: String = "${Random().nextInt()}:::1",
-            val tailsHash: String = "${Random().nextInt(0x7fffffff)}"
+            val tailsHash: String = "${Random().nextInt(Int.MAX_VALUE)}"
             ) {
 
         fun start(invitationString: String) {
@@ -58,7 +59,7 @@ class PythonRefAgentConnectionTest {
 
         fun start() {
             val rand = Random().nextInt()
-            val tailsDir = Paths.get(System.getProperty("user.home"),"tails").toFile()
+            val tailsDir = File("tails").apply { deleteOnExit() }
             if (!tailsDir.exists())
                 tailsDir.mkdirs()
             agentInitEndpoint(agentUrl)
@@ -67,7 +68,7 @@ class PythonRefAgentConnectionTest {
                 val invitedPartiesCompleted = mutableListOf<Single<Boolean>>()
                 invitedPartyAgents.forEach { agentUrl ->
                     val party = InvitedPartyProcess(agentUrl)
-                    Paths.get(System.getProperty("user.home"), "tails", party.tailsHash).toFile().writeText(party.tailsHash)
+                    Paths.get("tails", party.tailsHash).toFile().apply{ deleteOnExit() }.writeText(party.tailsHash)
                     invitedPartiesCompleted.add(Single.create { observer ->
                         generateInvite().subscribe {invitation ->
                             waitForInvitedParty(invitation).subscribe { invitedParty ->

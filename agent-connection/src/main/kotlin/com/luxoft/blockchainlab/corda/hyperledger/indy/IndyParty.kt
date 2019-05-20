@@ -4,8 +4,6 @@ import com.luxoft.blockchainlab.hyperledger.indy.models.*
 import rx.Single
 import java.util.concurrent.atomic.AtomicReference
 
-typealias ReqHandlerType = (TailsRequest) -> TailsResponse
-
 /**
  * Represents remote Indy Party
  */
