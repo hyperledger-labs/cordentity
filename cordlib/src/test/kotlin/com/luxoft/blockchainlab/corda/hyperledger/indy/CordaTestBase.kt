@@ -13,7 +13,7 @@ import com.luxoft.blockchainlab.hyperledger.indy.helpers.ConfigHelper
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.WalletHelper
 import com.luxoft.blockchainlab.hyperledger.indy.ledger.IndyPoolLedgerService
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
-import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
+import com.luxoft.blockchainlab.hyperledger.indy.utils.*
 import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletService
 import io.mockk.every
 import io.mockk.mockkObject

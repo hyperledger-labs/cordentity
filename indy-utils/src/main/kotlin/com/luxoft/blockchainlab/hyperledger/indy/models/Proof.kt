@@ -216,53 +216,7 @@ data class ProofRequest(
     val requestedAttributes: MutableMap<String, CredentialAttributeReference> = mutableMapOf(),
     val requestedPredicates: MutableMap<String, CredentialPredicateReference> = mutableMapOf(),
     var nonRevoked: Interval? = null
-) {
-    fun reveal(attrName: String, filterFiller: (Filter.() -> Unit)? = null) {
-        val attributeReference = if (filterFiller == null) {
-            CredentialAttributeReference(attrName)
-        } else {
-            var filter: Filter? = Filter(attrName)
-            filter!!.filterFiller()
-            if (filter.isEmpty())
-               filter = null
-
-            CredentialAttributeReference(attrName, filter)
-        }
-
-        requestedAttributes[attrName] = attributeReference
-    }
-
-    fun proveGreaterThan(attrName: String, greaterThan: Int, filterFiller: (Filter.() -> Unit)? = null) {
-        val predicateReference = if (filterFiller == null) {
-            CredentialPredicateReference(attrName, greaterThan)
-        } else {
-            var filter: Filter? = Filter(attrName)
-            filter!!.filterFiller()
-            if (filter.isEmpty())
-                filter = null
-
-            CredentialPredicateReference(attrName, greaterThan, restrictions = filter)
-        }
-
-        requestedPredicates[attrName] = predicateReference
-    }
-
-    fun proveNonRevocation(interval: Interval) {
-        nonRevoked = interval
-    }
-}
-
-fun proofRequest(
-    name: String,
-    version: String,
-    nonce: String = Random().nextLong().toString(),
-    init: ProofRequest.() -> Unit
-): ProofRequest {
-    val pr = ProofRequest(name, version, nonce)
-    pr.init()
-
-    return pr
-}
+)
 
 data class CredentialAttributeReference(
     val name: String,
