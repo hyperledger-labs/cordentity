@@ -4,14 +4,11 @@ import co.paralleluniverse.fibers.Suspendable
 import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialContract
 import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialDefinitionContract
 import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyRevocationRegistryContract
-import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredential
-import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredentialDefinition
-import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyRevocationRegistryDefinition
+import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.*
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.*
 import com.luxoft.blockchainlab.hyperledger.indy.IndyCredentialDefinitionNotFoundException
 import com.luxoft.blockchainlab.hyperledger.indy.IndyCredentialMaximumReachedException
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
-import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletService
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndContract
 import net.corda.core.flows.*
@@ -184,7 +181,7 @@ object IssueCredentialFlowB2B {
                             when (state) {
                                 is IndyCredential -> {
                                     require(state.credentialRequestInfo == credentialRequestInfo) { "Received incorrect CredentialRequest" }
-                                    indyUser().receiveCredential(
+                                    indyUser().checkLedgerAndReceiveCredential(
                                         state.credentialInfo,
                                         state.credentialRequestInfo,
                                         offer

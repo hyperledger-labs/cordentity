@@ -153,7 +153,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
                 "age" to CredentialValue("28")
             )
         }
-        prover.receiveCredential(credentialInfo, credReq, credOffer)
+        prover.checkLedgerAndReceiveCredential(credentialInfo, credReq, credOffer)
 
         Thread.sleep(3000)
 
@@ -213,7 +213,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
                 "age" to CredentialValue("28")
             )
         }
-        prover.receiveCredential(credentialInfo, credReq, credOffer)
+        prover.checkLedgerAndReceiveCredential(credentialInfo, credReq, credOffer)
 
         val fieldName = CredentialFieldReference("name", gvtSchema.id, credDef.id)
         val fieldSex = CredentialFieldReference("sex", gvtSchema.id, credDef.id)
@@ -252,7 +252,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
                 "age" to CredentialValue("28")
             )
         }
-        prover.receiveCredential(gvtCredential, gvtCredReq, gvtCredOffer)
+        prover.checkLedgerAndReceiveCredential(gvtCredential, gvtCredReq, gvtCredOffer)
 
         val xyzCredReq = prover.createCredentialRequest(prover.walletService.getIdentityDetails().did, xyzCredOffer)
         val xyzCredential = issuer2.issueCredentialAndUpdateLedger(xyzCredReq, xyzCredOffer, null) {
@@ -261,7 +261,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
                 "period" to CredentialValue("8")
             )
         }
-        prover.receiveCredential(xyzCredential, xyzCredReq, xyzCredOffer)
+        prover.checkLedgerAndReceiveCredential(xyzCredential, xyzCredReq, xyzCredOffer)
 
         val field_name = CredentialFieldReference("name", schema1.id, credDef1.id)
         val field_age = CredentialFieldReference("age", schema1.id, credDef1.id)
@@ -308,7 +308,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
                 "age" to CredentialValue("28")
             )
         }
-        prover.receiveCredential(gvtCredential, gvtCredReq, gvtCredOffer)
+        prover.checkLedgerAndReceiveCredential(gvtCredential, gvtCredReq, gvtCredOffer)
 
         val xyzCredReq = prover.createCredentialRequest(prover.walletService.getIdentityDetails().did, xyzCredOffer)
         val xyzCredential = issuer1.issueCredentialAndUpdateLedger(xyzCredReq, xyzCredOffer, null) {
@@ -317,7 +317,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
                 "period" to CredentialValue("8")
             )
         }
-        prover.receiveCredential(xyzCredential, xyzCredReq, xyzCredOffer)
+        prover.checkLedgerAndReceiveCredential(xyzCredential, xyzCredReq, xyzCredOffer)
 
         val field_name = CredentialFieldReference("name", gvtSchema.id, gvtCredDef.id)
         val field_age = CredentialFieldReference("age", gvtSchema.id, gvtCredDef.id)
