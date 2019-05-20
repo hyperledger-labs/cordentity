@@ -1,6 +1,7 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy
 
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
+import mu.KotlinLogging
 import rx.Single
 import java.util.concurrent.atomic.AtomicReference
 
@@ -8,6 +9,8 @@ import java.util.concurrent.atomic.AtomicReference
  * Represents remote Indy Party
  */
 class IndyParty(private val webSocket: AgentWebSocketClient, val did: String, val endpoint: String, val verkey: String, val myDid : String) : IndyPartyConnection {
+
+    private val log = KotlinLogging.logger {}
 
     /**
      * Returns the connected Indy Party session DID
@@ -109,8 +112,14 @@ class IndyParty(private val webSocket: AgentWebSocketClient, val did: String, va
 
     init {
         tailRequestMessageHandler = {
-            webSocket.sendClassObject(requestHandlerRef.get().invoke(it), this)
-            webSocket.receiveClassObject<TailsRequest>(this).subscribe(tailRequestMessageHandler)
+            try {
+                val tailsResponse = requestHandlerRef.get().invoke(it)
+                webSocket.sendClassObject(tailsResponse, this)
+            } catch (e: Throwable) {
+                log.error(e) { "Error processing tails request" }
+            } finally {
+                webSocket.receiveClassObject<TailsRequest>(this).subscribe(tailRequestMessageHandler)
+            }
         }
         webSocket.receiveClassObject<TailsRequest>(this).subscribe(tailRequestMessageHandler)
     }
