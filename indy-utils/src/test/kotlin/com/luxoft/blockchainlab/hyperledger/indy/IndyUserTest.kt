@@ -40,7 +40,7 @@ class IndyUserTest {
         val walletUser = IndySDKWalletUser(wallet)
         indyUser = IndyUser
             .with(walletUser)
-            .with(IndyPoolLedgerUser(pool, walletUser))
+            .with(IndyPoolLedgerUser(pool, walletUser.did) { walletUser.sign(it) })
             .build()
     }
 

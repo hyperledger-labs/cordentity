@@ -17,6 +17,13 @@ interface WalletUser : IndyIssuer, IndyProver, IndyVerifier, IndyTrustee
 interface IndyIssuer : IndyWalletHolder {
 
     /**
+     * Signs something using wallet and did
+     *
+     * @param
+     */
+    fun sign(data: String): String
+
+    /**
      * Creates credential offer
      *
      * @param credentialDefinitionId [CredentialDefinitionId] - credential definition id
@@ -245,4 +252,13 @@ interface IndyWalletHolder {
      * @return [IdentityDetails]
      */
     fun getIdentityDetails(): IdentityDetails
+
+    /**
+     * Gets [IdentityDetails] of some did
+     *
+     * @param did [String]
+     *
+     * @return [IdentityDetails]
+     */
+    fun getIdentityDetails(did: String): IdentityDetails
 }

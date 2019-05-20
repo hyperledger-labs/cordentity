@@ -63,7 +63,7 @@ class IndyService(services: AppServiceHub) : SingletonSerializeAsToken() {
         val pool = PoolHelper.openOrCreate(genesisFile, poolName)
         logger.debug { "Pool $poolName opened for $nodeName" }
 
-        val ledgerUser = IndyPoolLedgerUser(pool, walletUser)
+        val ledgerUser = IndyPoolLedgerUser(pool, walletUser.did) { walletUser.sign(it) }
 
         IndyUser.with(walletUser).with(ledgerUser).build()
     }

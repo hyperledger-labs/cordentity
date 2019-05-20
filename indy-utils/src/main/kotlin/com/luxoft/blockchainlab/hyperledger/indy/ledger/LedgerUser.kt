@@ -190,12 +190,4 @@ interface LedgerUser {
         retryTimes: Int = RETRY_TIMES
     ): DataUsedInProofJson
 
-    /**
-     * Gets identity details for somebody by [did]
-     *
-     * @param did [String]
-     *
-     * @return [IdentityDetails]
-     */
-    fun getIdentityDetails(did: String): IdentityDetails
 }

@@ -82,15 +82,15 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
 
         // create indy users
         val issuerWalletUser = IndySDKWalletUser(issuerWallet)
-        val issuerLedgerUser = IndyPoolLedgerUser(pool, issuerWalletUser)
+        val issuerLedgerUser = IndyPoolLedgerUser(pool, issuerWalletUser.did) { issuerWalletUser.sign(it) }
         issuer1 = IndyUser.with(issuerWalletUser).with(issuerLedgerUser).build()
 
         val issuer2WalletUser = IndySDKWalletUser(issuer2Wallet)
-        val issuer2LedgerUser = IndyPoolLedgerUser(pool, issuer2WalletUser)
+        val issuer2LedgerUser = IndyPoolLedgerUser(pool, issuer2WalletUser.did) { issuer2WalletUser.sign(it) }
         issuer2 = IndyUser.with(issuer2LedgerUser).with(issuer2WalletUser).build()
 
         val proverWalletUser = IndySDKWalletUser(proverWallet)
-        val proverLedgerUser = IndyPoolLedgerUser(pool, proverWalletUser)
+        val proverLedgerUser = IndyPoolLedgerUser(pool, proverWalletUser.did) { proverWalletUser.sign(it) }
         prover = IndyUser.with(proverLedgerUser).with(proverWalletUser).build()
 
         // set relationships

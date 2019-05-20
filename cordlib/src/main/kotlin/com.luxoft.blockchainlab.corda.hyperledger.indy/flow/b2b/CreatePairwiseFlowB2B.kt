@@ -33,7 +33,7 @@ object CreatePairwiseFlowB2B {
                     indyUser().walletUser.createSessionDid(it)
                 }
 
-                val identityDetails = indyUser().ledgerUser.getIdentityDetails(sessionDid)
+                val identityDetails = indyUser().walletUser.getIdentityDetails(sessionDid)
 
                 flowSession.send(identityDetails)
                 return sessionDid

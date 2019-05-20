@@ -7,6 +7,7 @@ import com.luxoft.blockchainlab.hyperledger.indy.utils.getRootCause
 import org.hyperledger.indy.sdk.anoncreds.Anoncreds
 import org.hyperledger.indy.sdk.anoncreds.DuplicateMasterSecretNameException
 import org.hyperledger.indy.sdk.did.Did
+import org.hyperledger.indy.sdk.ledger.Ledger
 import org.hyperledger.indy.sdk.pairwise.Pairwise
 import org.hyperledger.indy.sdk.wallet.Wallet
 import org.slf4j.LoggerFactory
@@ -26,8 +27,8 @@ class IndySDKWalletUser(
     val tailsPath: String = "tails"
 ) : WalletUser {
 
-    var did: String
-    var verkey: String
+    val did: String
+    val verkey: String
     private val logger = LoggerFactory.getLogger(IndySDKWalletUser::class.java)
 
     companion object {
@@ -43,6 +44,10 @@ class IndySDKWalletUser(
         val didResult = Did.createAndStoreMyDid(wallet, SerializationUtils.anyToJSON(didConfig)).get()
         this.did = didResult.did
         this.verkey = didResult.verkey
+    }
+
+    override fun sign(data: String): String {
+        return Ledger.signRequest(wallet, did, data).get()
     }
 
     override fun createRevocationState(
@@ -403,5 +408,9 @@ class IndySDKWalletUser(
 
     override fun getIdentityDetails(): IdentityDetails {
         return IdentityDetails(did, verkey, null, null)
+    }
+
+    override fun getIdentityDetails(did: String): IdentityDetails {
+        return IdentityDetails(did, Did.keyForLocalDid(wallet, did).get(), null, null)
     }
 }
