@@ -1,10 +1,6 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy
 
 
-import net.corda.core.identity.CordaX500Name
-import net.corda.node.internal.StartedNode
-import net.corda.testing.node.internal.InternalMockNetwork.MockNode
-import org.junit.Before
 import org.junit.Ignore
 import org.junit.Test
 
@@ -16,15 +12,6 @@ import org.junit.Test
  * Ignored tests are not-fixed bugs
  */
 class CordentityE2E : CordaTestBase() {
-
-    private lateinit var notary: StartedNode<MockNode>
-
-    @Before
-    fun setup() {
-        notary = net.defaultNotaryNode
-
-        trustee = createPartyNode(CordaX500Name("Trustee", "London", "GB"))
-    }
 
     @Test
     fun `1 issuer 1 prover 1 verifier 1 credential without revocation`() {

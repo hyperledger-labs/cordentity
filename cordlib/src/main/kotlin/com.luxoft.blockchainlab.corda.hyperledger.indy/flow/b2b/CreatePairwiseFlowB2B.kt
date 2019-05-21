@@ -30,10 +30,10 @@ object CreatePairwiseFlowB2B {
                 val flowSession: FlowSession = initiateFlow(otherSide)
 
                 val sessionDid = flowSession.receive<IdentityDetails>().unwrap {
-                    indyUser().walletService.createSessionDid(it)
+                    indyUser().walletUser.createSessionDid(it)
                 }
 
-                val identityDetails = indyUser().ledgerService.getIdentityDetails(sessionDid)
+                val identityDetails = indyUser().walletUser.getIdentityDetails(sessionDid)
 
                 flowSession.send(identityDetails)
                 return sessionDid
@@ -51,7 +51,7 @@ object CreatePairwiseFlowB2B {
         @Suspendable
         override fun call() {
             try {
-                val myIdentityRecord = indyUser().walletService.getIdentityDetails()
+                val myIdentityRecord = indyUser().walletUser.getIdentityDetails()
 
                 flowSession.sendAndReceive<IdentityDetails>(myIdentityRecord).unwrap {
                     indyUser().addKnownIdentitiesAndStoreOnLedger(it)

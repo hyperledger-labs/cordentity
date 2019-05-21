@@ -7,7 +7,6 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyRevocation
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.getCredentialDefinitionById
 import com.luxoft.blockchainlab.hyperledger.indy.IndyCredentialDefinitionNotFoundException
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialDefinitionId
-import com.luxoft.blockchainlab.hyperledger.indy.models.RevocationRegistryDefinitionId
 import com.luxoft.blockchainlab.hyperledger.indy.models.RevocationRegistryInfo
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndContract
@@ -70,13 +69,14 @@ object CreateRevocationRegistryFlow {
                 val credentialDefinitionCmd = Command(credentialDefinitionCmdType, signers)
 
                 // submit txn
-                val trxBuilder = TransactionBuilder(whoIsNotary()).withItems(
-                    credentialDefinitionIn,
-                    credentialDefinitionOut,
-                    credentialDefinitionCmd,
-                    revocationRegistryDefinitionOut,
-                    revocationRegistryCmd
-                )
+                val trxBuilder = TransactionBuilder(whoIsNotary())
+                    .withItems(
+                        credentialDefinitionIn,
+                        credentialDefinitionOut,
+                        credentialDefinitionCmd,
+                        revocationRegistryDefinitionOut,
+                        revocationRegistryCmd
+                    )
 
                 trxBuilder.toWireTransaction(serviceHub)
                     .toLedgerTransaction(serviceHub)

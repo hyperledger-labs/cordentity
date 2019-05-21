@@ -1,30 +1,29 @@
 package com.luxoft.blockchainlab.hyperledger.indy
 
-import com.luxoft.blockchainlab.hyperledger.indy.ledger.LedgerService
+import com.luxoft.blockchainlab.hyperledger.indy.ledger.LedgerUser
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
-import com.luxoft.blockchainlab.hyperledger.indy.wallet.WalletService
-import org.hyperledger.indy.sdk.did.Did
+import com.luxoft.blockchainlab.hyperledger.indy.wallet.WalletUser
 
 
 /**
  * The central class that encapsulates Indy SDK calls and keeps the corresponding state.
- * This is implementation of [IndyFacade] so it should support every valid [LedgerService] and [WalletService]
+ * This is implementation of [SsiUser] so it should support every valid [LedgerUser] and [WalletUser]
  *  implementation.
  */
 class IndyUser(
-    override val walletService: WalletService,
-    override val ledgerService: LedgerService
-) : IndyFacade {
+    override val walletUser: WalletUser,
+    override val ledgerUser: LedgerUser
+) : SsiUser {
 
     init {
         // we create some master secret by default, but user can create and manage them manually
-        walletService.createMasterSecret(DEFAULT_MASTER_SECRET_ID)
+        walletUser.createMasterSecret(DEFAULT_MASTER_SECRET_ID)
     }
 
     override fun createSchemaAndStoreOnLedger(name: String, version: String, attributes: List<String>): Schema {
-        val schema = walletService.createSchema(name, version, attributes)
-        ledgerService.storeSchema(schema)
+        val schema = walletUser.createSchema(name, version, attributes)
+        ledgerUser.storeSchema(schema)
 
         return schema
     }
@@ -33,11 +32,11 @@ class IndyUser(
         schemaId: SchemaId,
         enableRevocation: Boolean
     ): CredentialDefinition {
-        val schema = ledgerService.retrieveSchema(schemaId)
+        val schema = ledgerUser.retrieveSchema(schemaId)
             ?: throw IndySchemaNotFoundException(schemaId, "Create credential definition has been failed")
 
-        val credentialDefinition = walletService.createCredentialDefinition(schema, enableRevocation)
-        ledgerService.storeCredentialDefinition(credentialDefinition)
+        val credentialDefinition = walletUser.createCredentialDefinition(schema, enableRevocation)
+        ledgerUser.storeCredentialDefinition(credentialDefinition)
 
         return credentialDefinition
     }
@@ -46,9 +45,9 @@ class IndyUser(
         credentialDefinitionId: CredentialDefinitionId,
         maxCredentialNumber: Int
     ): RevocationRegistryInfo {
-        val revocationRegistryInfo = walletService.createRevocationRegistry(credentialDefinitionId, maxCredentialNumber)
-        ledgerService.storeRevocationRegistryDefinition(revocationRegistryInfo.definition)
-        ledgerService.storeRevocationRegistryEntry(
+        val revocationRegistryInfo = walletUser.createRevocationRegistry(credentialDefinitionId, maxCredentialNumber)
+        ledgerUser.storeRevocationRegistryDefinition(revocationRegistryInfo.definition)
+        ledgerUser.storeRevocationRegistryEntry(
             revocationRegistryInfo.entry,
             revocationRegistryInfo.definition.id,
             revocationRegistryInfo.definition.revocationRegistryDefinitionType
@@ -58,7 +57,7 @@ class IndyUser(
     }
 
     override fun createCredentialOffer(credentialDefinitionId: CredentialDefinitionId): CredentialOffer {
-        return walletService.createCredentialOffer(credentialDefinitionId)
+        return walletUser.createCredentialOffer(credentialDefinitionId)
     }
 
     override fun createCredentialRequest(
@@ -68,13 +67,13 @@ class IndyUser(
     ): CredentialRequestInfo {
         val credentialDefinitionId = offer.getCredentialDefinitionIdObject()
 
-        val credentialDefinition = ledgerService.retrieveCredentialDefinition(credentialDefinitionId)
+        val credentialDefinition = ledgerUser.retrieveCredentialDefinition(credentialDefinitionId)
             ?: throw IndyCredentialDefinitionNotFoundException(
                 credentialDefinitionId,
                 "Unable to create credential request"
             )
 
-        return walletService.createCredentialRequest(proverDid, credentialDefinition, offer, masterSecretId)
+        return walletUser.createCredentialRequest(proverDid, credentialDefinition, offer, masterSecretId)
     }
 
     override fun issueCredentialAndUpdateLedger(
@@ -87,17 +86,17 @@ class IndyUser(
         proposal.proposalFiller()
 
         val proposalJson = SerializationUtils.anyToJSON(proposal.attributes)
-        val credentialInfo = walletService.issueCredential(credentialRequest, proposalJson, offer, revocationRegistryId)
+        val credentialInfo = walletUser.issueCredential(credentialRequest, proposalJson, offer, revocationRegistryId)
 
         if (revocationRegistryId == null) return credentialInfo
 
-        val revocationRegistryDefinition = ledgerService.retrieveRevocationRegistryDefinition(revocationRegistryId)
+        val revocationRegistryDefinition = ledgerUser.retrieveRevocationRegistryDefinition(revocationRegistryId)
             ?: throw IndyRevRegNotFoundException(revocationRegistryId, "Unable to issue credential")
 
         val revocationRegistryDelta =
             SerializationUtils.jSONToAny<RevocationRegistryEntry>(credentialInfo.revocRegDeltaJson!!)
 
-        ledgerService.storeRevocationRegistryEntry(
+        ledgerUser.storeRevocationRegistryEntry(
             revocationRegistryDelta,
             revocationRegistryDefinition.id,
             revocationRegistryDefinition.revocationRegistryDefinitionType
@@ -114,20 +113,20 @@ class IndyUser(
         val revocationRegistryDefinitionId = credentialInfo.credential.getRevocationRegistryIdObject()
 
         val revocationRegistryDefinition = if (revocationRegistryDefinitionId != null)
-            ledgerService.retrieveRevocationRegistryDefinition(revocationRegistryDefinitionId)
+            ledgerUser.retrieveRevocationRegistryDefinition(revocationRegistryDefinitionId)
                 ?: throw IndyRevRegNotFoundException(
                     revocationRegistryDefinitionId,
                     "Receive credential has been failed"
                 )
         else null
 
-        val credentialDefinition = ledgerService.retrieveCredentialDefinition(offer.getCredentialDefinitionIdObject())
+        val credentialDefinition = ledgerUser.retrieveCredentialDefinition(offer.getCredentialDefinitionIdObject())
             ?: throw IndyCredentialDefinitionNotFoundException(
                 offer.getCredentialDefinitionIdObject(),
                 "Receive credential has been failed"
             )
 
-        walletService.receiveCredential(
+        walletUser.receiveCredential(
             credentialInfo,
             credentialRequest,
             offer,
@@ -140,11 +139,11 @@ class IndyUser(
         revocationRegistryId: RevocationRegistryDefinitionId,
         credentialRevocationId: String
     ): RevocationRegistryEntry {
-        val revocationRegistryDefinition = ledgerService.retrieveRevocationRegistryDefinition(revocationRegistryId)
+        val revocationRegistryDefinition = ledgerUser.retrieveRevocationRegistryDefinition(revocationRegistryId)
             ?: throw IndyRevRegNotFoundException(revocationRegistryId, "Revoke credential has been failed")
 
-        val revocationRegistryEntry = walletService.revokeCredential(revocationRegistryId, credentialRevocationId)
-        ledgerService.storeRevocationRegistryEntry(
+        val revocationRegistryEntry = walletUser.revokeCredential(revocationRegistryId, credentialRevocationId)
+        ledgerUser.storeRevocationRegistryEntry(
             revocationRegistryEntry,
             revocationRegistryDefinition.id,
             revocationRegistryDefinition.revocationRegistryDefinitionType
@@ -154,40 +153,40 @@ class IndyUser(
     }
 
     override fun createProofFromLedgerData(proofRequest: ProofRequest, masterSecretId: String): ProofInfo {
-        return walletService.createProof(
+        return walletUser.createProof(
             proofRequest,
-            provideSchema = { ledgerService.retrieveSchema(it)!! },
-            provideCredentialDefinition = { ledgerService.retrieveCredentialDefinition(it)!! },
+            provideSchema = { ledgerUser.retrieveSchema(it)!! },
+            provideCredentialDefinition = { ledgerUser.retrieveCredentialDefinition(it)!! },
             masterSecretId = masterSecretId
         ) { revRegId, credRevId, interval ->
-            val revocationRegistryDefinition = ledgerService.retrieveRevocationRegistryDefinition(revRegId)
+            val revocationRegistryDefinition = ledgerUser.retrieveRevocationRegistryDefinition(revRegId)
                 ?: throw IndyRevRegNotFoundException(revRegId, "Get revocation state has been failed")
 
-            val response = ledgerService.retrieveRevocationRegistryDelta(revRegId, interval)
+            val response = ledgerUser.retrieveRevocationRegistryDelta(revRegId, interval)
                 ?: throw IndyRevDeltaNotFoundException(revRegId, "Interval is $interval")
             val (timestamp, revRegDelta) = response
 
-            walletService.createRevocationState(revocationRegistryDefinition, revRegDelta, credRevId, timestamp)
+            walletUser.createRevocationState(revocationRegistryDefinition, revRegDelta, credRevId, timestamp)
         }
     }
 
     override fun verifyProofWithLedgerData(proofReq: ProofRequest, proof: ProofInfo): Boolean {
-        val dataUsedInProofJson = ledgerService.retrieveDataUsedInProof(proofReq, proof)
+        val dataUsedInProofJson = ledgerUser.retrieveDataUsedInProof(proofReq, proof)
 
-        return walletService.verifyProof(proofReq, proof, dataUsedInProofJson)
+        return walletUser.verifyProof(proofReq, proof, dataUsedInProofJson)
     }
 
     override fun addKnownIdentitiesAndStoreOnLedger(identityDetails: IdentityDetails) {
-        walletService.addKnownIdentities(identityDetails)
-        ledgerService.storeNym(identityDetails)
+        walletUser.addKnownIdentities(identityDetails)
+        ledgerUser.storeNym(identityDetails)
     }
 
     companion object : IndyFacadeBuilder() {
-        override fun build(): IndyFacade {
-            if (builderLedgerService == null || builderWalletService == null)
-                throw RuntimeException("WalletService and LedgerService should be specified")
+        override fun build(): SsiUser {
+            if (builderLedgerUser == null || builderWalletUser == null)
+                throw RuntimeException("WalletUser and LedgerUser should be specified")
 
-            return IndyUser(builderWalletService!!, builderLedgerService!!)
+            return IndyUser(builderWalletUser!!, builderLedgerUser!!)
         }
     }
 

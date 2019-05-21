@@ -11,7 +11,6 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.service.awaitFiber
 import com.luxoft.blockchainlab.corda.hyperledger.indy.service.connectionService
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialFieldReference
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialPredicate
-import com.luxoft.blockchainlab.hyperledger.indy.IndyUser
 import com.luxoft.blockchainlab.hyperledger.indy.models.Interval
 import com.luxoft.blockchainlab.hyperledger.indy.models.ProofRequest
 import net.corda.core.contracts.Command
@@ -37,7 +36,7 @@ object VerifyCredentialFlowB2C {
 
                 val proof = connectionService().receiveProof(indyPartyDID).awaitFiber()
 
-                val usedData = indyUser().ledgerService.retrieveDataUsedInProof(proofRequest, proof)
+                val usedData = indyUser().ledgerUser.retrieveDataUsedInProof(proofRequest, proof)
                 val credentialProofOut =
                         IndyCredentialProof(identifier, proofRequest, proof, usedData, listOf(ourIdentity))
 

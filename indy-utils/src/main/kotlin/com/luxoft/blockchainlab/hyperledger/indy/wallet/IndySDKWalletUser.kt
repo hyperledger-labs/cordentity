@@ -9,29 +9,29 @@ import org.hyperledger.indy.sdk.anoncreds.CredentialsSearch
 import org.hyperledger.indy.sdk.anoncreds.CredentialsSearchForProofReq
 import org.hyperledger.indy.sdk.anoncreds.DuplicateMasterSecretNameException
 import org.hyperledger.indy.sdk.did.Did
+import org.hyperledger.indy.sdk.ledger.Ledger
 import org.hyperledger.indy.sdk.pairwise.Pairwise
-import org.hyperledger.indy.sdk.pool.Pool
 import org.hyperledger.indy.sdk.wallet.Wallet
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ExecutionException
 
 /**
- * This is an implementation of [WalletService] which uses indy sdk standard [org.hyperledger.indy.sdk.wallet.Wallet]
+ * This is an implementation of [WalletUser] which uses indy sdk standard [org.hyperledger.indy.sdk.wallet.Wallet]
  *  and [org.hyperledger.indy.sdk.anoncreds.Anoncreds] API
  *
  * @param wallet [Wallet] - user's wallet
  * @param didConfig [DidConfig] - what did we should use to perform operations
  * @param tailsPath [String] - path to the directory with tails files (they will be generated when revocation-stuff is done)
  */
-class IndySDKWalletService(
+class IndySDKWalletUser(
     val wallet: Wallet,
     didConfig: DidConfig = DidConfig(),
     val tailsPath: String = "tails"
-) : WalletService {
+) : WalletUser {
 
-    var did: String
-    var verkey: String
-    val logger = LoggerFactory.getLogger(IndySDKWalletService::class.java)
+    val did: String
+    val verkey: String
+    private val logger = LoggerFactory.getLogger(IndySDKWalletUser::class.java)
 
     companion object {
         val SIGNATURE_TYPE = "CL"
@@ -46,6 +46,10 @@ class IndySDKWalletService(
         val didResult = Did.createAndStoreMyDid(wallet, SerializationUtils.anyToJSON(didConfig)).get()
         this.did = didResult.did
         this.verkey = didResult.verkey
+    }
+
+    override fun sign(data: String): String {
+        return Ledger.signRequest(wallet, did, data).get()
     }
 
     override fun createRevocationState(
@@ -231,7 +235,11 @@ class IndySDKWalletService(
         val allRevStates = mutableListOf<RevocationState>()
 
         val requestedAttributes = proofRequest.requestedAttributes.keys.associate { key ->
-            val credential = SerializationUtils.jSONToAny<Array<CredentialForTheRequest>>(searchObj.fetchNextCredentials(key, 1).get()).first()
+            val credential = SerializationUtils.jSONToAny<Array<CredentialForTheRequest>>(
+                searchObj.fetchNextCredentials(key, 1).get()
+            )
+                .firstOrNull()
+                ?: throw RuntimeException("Unable to find attribute $key that satisfies proof request: ${proofRequest.requestedAttributes[key]}")
 
             allSchemaIds.add(SchemaId.fromString(credential.credInfo.schemaId))
             allCredentialDefinitionIds.add(CredentialDefinitionId.fromString(credential.credInfo.credDefId))
@@ -275,7 +283,11 @@ class IndySDKWalletService(
         }
 
         val requestedPredicates = proofRequest.requestedPredicates.keys.associate { key ->
-            val credential = SerializationUtils.jSONToAny<Array<CredentialForTheRequest>>(searchObj.fetchNextCredentials(key, 1).get()).first()
+            val credential = SerializationUtils.jSONToAny<Array<CredentialForTheRequest>>(
+                searchObj.fetchNextCredentials(key, 1).get()
+            )
+                .firstOrNull()
+                ?: throw RuntimeException("Unable to find attribute $key that satisfies proof request: ${proofRequest.requestedPredicates[key]}")
 
             allSchemaIds.add(SchemaId.fromString(credential.credInfo.schemaId))
             allCredentialDefinitionIds.add(CredentialDefinitionId.fromString(credential.credInfo.credDefId))
@@ -385,5 +397,9 @@ class IndySDKWalletService(
 
     override fun getIdentityDetails(): IdentityDetails {
         return IdentityDetails(did, verkey, null, null)
+    }
+
+    override fun getIdentityDetails(did: String): IdentityDetails {
+        return IdentityDetails(did, Did.keyForLocalDid(wallet, did).get(), null, null)
     }
 }

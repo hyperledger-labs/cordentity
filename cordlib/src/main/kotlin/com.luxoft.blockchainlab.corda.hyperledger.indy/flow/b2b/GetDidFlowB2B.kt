@@ -4,7 +4,6 @@ import co.paralleluniverse.fibers.Suspendable
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.indyUser
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.whoIs
 import com.luxoft.blockchainlab.hyperledger.indy.models.IdentityDetails
-import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import net.corda.core.flows.*
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.identity.Party
@@ -46,7 +45,7 @@ object GetDidFlowB2B {
         @Suspendable
         override fun call() {
             try {
-                val identityDetails = indyUser().walletService.getIdentityDetails()
+                val identityDetails = indyUser().walletUser.getIdentityDetails()
 
                 flowSession.send(identityDetails)
             } catch (e: Exception) {

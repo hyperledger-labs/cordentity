@@ -2,12 +2,12 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy.service
 
 
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.name
-import com.luxoft.blockchainlab.hyperledger.indy.IndyFacade
+import com.luxoft.blockchainlab.hyperledger.indy.SsiUser
 import com.luxoft.blockchainlab.hyperledger.indy.IndyUser
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.*
-import com.luxoft.blockchainlab.hyperledger.indy.ledger.IndyPoolLedgerService
+import com.luxoft.blockchainlab.hyperledger.indy.ledger.IndyPoolLedgerUser
 import com.luxoft.blockchainlab.hyperledger.indy.models.DidConfig
-import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletService
+import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletUser
 import mu.KotlinLogging
 import net.corda.core.node.AppServiceHub
 import net.corda.core.node.services.CordaService
@@ -40,7 +40,7 @@ class IndyService(services: AppServiceHub) : SingletonSerializeAsToken() {
     private val did = ConfigHelper.getDid()
     private val seed = ConfigHelper.getSeed()
 
-    val indyUser: IndyFacade by lazy {
+    val indyUser: SsiUser by lazy {
         val nodeName = services.myInfo.name().organisation
 
         walletName ?: throw RuntimeException("Wallet name should be specified in config")
@@ -52,7 +52,7 @@ class IndyService(services: AppServiceHub) : SingletonSerializeAsToken() {
         val tailsPath = "tails"
         val didConfig = DidConfig(did, seed, null, null)
 
-        val walletService = IndySDKWalletService(wallet, didConfig, tailsPath)
+        val walletUser = IndySDKWalletUser(wallet, didConfig, tailsPath)
         logger.debug { "IndyUser object created for $nodeName" }
 
         genesisFilePath ?: throw RuntimeException("Genesis file path should be specified in config")
@@ -63,9 +63,9 @@ class IndyService(services: AppServiceHub) : SingletonSerializeAsToken() {
         val pool = PoolHelper.openOrCreate(genesisFile, poolName)
         logger.debug { "Pool $poolName opened for $nodeName" }
 
-        val ledgerService = IndyPoolLedgerService(pool, walletService)
+        val ledgerUser = IndyPoolLedgerUser(pool, walletUser.did) { walletUser.sign(it) }
 
-        IndyUser.with(walletService).with(ledgerService).build()
+        IndyUser.with(walletUser).with(ledgerUser).build()
     }
 
 }

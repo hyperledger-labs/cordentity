@@ -11,10 +11,10 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.VerifyCredential
 import com.luxoft.blockchainlab.corda.hyperledger.indy.service.IndyService
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.ConfigHelper
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.WalletHelper
-import com.luxoft.blockchainlab.hyperledger.indy.ledger.IndyPoolLedgerService
+import com.luxoft.blockchainlab.hyperledger.indy.ledger.IndyPoolLedgerUser
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
 import com.luxoft.blockchainlab.hyperledger.indy.utils.*
-import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletService
+import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletUser
 import io.mockk.every
 import io.mockk.mockkObject
 import net.corda.core.concurrent.CordaFuture
@@ -32,9 +32,7 @@ import net.corda.testing.node.internal.MockNodeArgs
 import net.corda.testing.node.internal.newContext
 import org.junit.After
 import org.junit.Before
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
-import org.slf4j.event.Level
+import java.lang.RuntimeException
 import java.time.Duration
 import java.util.*
 import kotlin.math.absoluteValue
@@ -48,6 +46,7 @@ import kotlin.math.absoluteValue
 open class CordaTestBase {
 
     protected lateinit var trustee: StartedNode<MockNode>
+    protected lateinit var notary: StartedNode<MockNode>
 
     /**
      * List of all flows that may be initiated by a message
@@ -127,13 +126,17 @@ open class CordaTestBase {
 
     @Before
     fun commonSetup() {
-        System.setProperty(org.slf4j.impl.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "OFF")
+        System.setProperty(org.slf4j.impl.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "TRACE")
 
         net = InternalMockNetwork(
             cordappPackages = listOf("com.luxoft.blockchainlab.corda.hyperledger.indy"),
             networkParameters = testNetworkParameters(maxTransactionSize = 10485760 * 5),
             defaultFactory = CordaTestBase::MockIndyNode
         )
+
+        notary = net.defaultNotaryNode
+
+        trustee = createPartyNode(CordaX500Name("Trustee", "London", "GB"))
     }
 
     open class MockIndyNode(args: MockNodeArgs) : InternalMockNetwork.MockNode(args) {
@@ -172,8 +175,8 @@ open class CordaTestBase {
             for (party in parties) {
                 val indyUser = party.services.cordaService(IndyService::class.java).indyUser
                 // TODO: get rid of casts
-                (indyUser.walletService as IndySDKWalletService).wallet.closeWallet().get()
-                (indyUser.ledgerService as IndyPoolLedgerService).pool.closePoolLedger().get()
+                (indyUser.walletUser as IndySDKWalletUser).wallet.closeWallet().get()
+                (indyUser.ledgerUser as IndyPoolLedgerUser).pool.closePoolLedger().get()
             }
 
             parties.clear()
@@ -188,7 +191,6 @@ open class CordaTestBase {
     fun createIssuerNodes(trustee: StartedNode<MockNode>, count: Int) = (0 until count)
         .map { createPartyNode(CordaX500Name("Issuer-$it", "London", "GB")) }
         .map { setPermissions(it, trustee); it }
-
 
     data class ProofRequestPayload(
         val attributeValues: Map<String, String>,

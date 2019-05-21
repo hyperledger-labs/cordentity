@@ -18,7 +18,7 @@ import java.time.Duration
 import java.util.*
 import kotlin.math.absoluteValue
 
-val flowTimeout = Duration.ofSeconds(60)
+val flowTimeout = Duration.ofMinutes(2)
 
 fun StartedNode<InternalMockNetwork.MockNode>.getParty() = this.info.singleIdentity()
 
@@ -30,7 +30,7 @@ fun CordaX500Name.getNodeByName(net: InternalMockNetwork) =
     net.defaultNotaryNode.services.identityService.wellKnownPartyFromX500Name(this)!!
 
 fun StartedNode<InternalMockNetwork.MockNode>.getPartyDid() =
-    this.services.cordaService(IndyService::class.java).indyUser.walletService.getIdentityDetails().did
+    this.services.cordaService(IndyService::class.java).indyUser.walletUser.getIdentityDetails().did
 
 fun StartedNode<InternalMockNetwork.MockNode>.issueRandomSchema(): Schema {
     val rng = Random()

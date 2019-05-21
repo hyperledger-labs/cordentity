@@ -13,12 +13,9 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.service.awaitFiber
 import com.luxoft.blockchainlab.corda.hyperledger.indy.service.connectionService
 import com.luxoft.blockchainlab.hyperledger.indy.IndyCredentialDefinitionNotFoundException
 import com.luxoft.blockchainlab.hyperledger.indy.IndyCredentialMaximumReachedException
-import com.luxoft.blockchainlab.hyperledger.indy.IndyUser
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialDefinitionId
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialProposal
-import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialValue
 import com.luxoft.blockchainlab.hyperledger.indy.models.RevocationRegistryDefinitionId
-import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletService
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndContract
 import net.corda.core.flows.*
@@ -66,7 +63,7 @@ object IssueCredentialFlowB2C {
                     identifier,
                     credentialRequest,
                     credential,
-                    indyUser().walletService.getIdentityDetails().did,
+                    indyUser().walletUser.getIdentityDetails().did,
                     listOf(ourIdentity)
                 )
                 val newCredentialOut = StateAndContract(credentialOut, IndyCredentialContract::class.java.name)

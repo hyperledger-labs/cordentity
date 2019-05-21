@@ -1,22 +1,21 @@
 package com.luxoft.blockchainlab.hyperledger.indy
 
-import com.luxoft.blockchainlab.hyperledger.indy.ledger.LedgerService
+import com.luxoft.blockchainlab.hyperledger.indy.ledger.LedgerUser
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
-import com.luxoft.blockchainlab.hyperledger.indy.wallet.WalletService
-import org.hyperledger.indy.sdk.did.Did
+import com.luxoft.blockchainlab.hyperledger.indy.wallet.WalletUser
 
 const val DEFAULT_MASTER_SECRET_ID = "main"
 
 /**
- * This is the top-level interface that encapsulates work that should be done by [WalletService] and [LedgerService]
+ * This is the top-level interface that encapsulates work that should be done by [WalletUser] and [LedgerUser]
  *  cooperatively. Everything is abstracted as much as possible, so every valid service implementation should work.
  */
-interface IndyFacade {
-    val walletService: WalletService
-    val ledgerService: LedgerService
+interface SsiUser {
+    val walletUser: WalletUser
+    val ledgerUser: LedgerUser
 
     /**
-     * Creates [Schema] using [WalletService] and stores it using [LedgerService]
+     * Creates [Schema] using [WalletUser] and stores it using [LedgerUser]
      *
      * @param name [String] - schema name
      * @param version [String] - schema version in format "d.d.d"
@@ -27,7 +26,7 @@ interface IndyFacade {
     fun createSchemaAndStoreOnLedger(name: String, version: String, attributes: List<String>): Schema
 
     /**
-     * Creates [CredentialDefinition] using [WalletService] and stores it using [LedgerService]
+     * Creates [CredentialDefinition] using [WalletUser] and stores it using [LedgerUser]
      *
      * @param schemaId [SchemaId] - id of schema paired with this credential definition
      * @param enableRevocation [Boolean] - flag if you need revocation be enabled
@@ -37,8 +36,8 @@ interface IndyFacade {
     fun createCredentialDefinitionAndStoreOnLedger(schemaId: SchemaId, enableRevocation: Boolean): CredentialDefinition
 
     /**
-     * Creates [RevocationRegistryDefinition] and first [RevocationRegistryEntry] using [WalletService] and stores it
-     * using [LedgerService]
+     * Creates [RevocationRegistryDefinition] and first [RevocationRegistryEntry] using [WalletUser] and stores it
+     * using [LedgerUser]
      *
      * @param credentialDefinitionId [CredentialDefinitionId] - id of credential definition paired with this revocation
      *  registry
@@ -52,7 +51,7 @@ interface IndyFacade {
     ): RevocationRegistryInfo
 
     /**
-     * Creates [CredentialOffer] using [WalletService]
+     * Creates [CredentialOffer] using [WalletUser]
      *
      * @param credentialDefinitionId [CredentialDefinitionId]
      *
@@ -61,7 +60,7 @@ interface IndyFacade {
     fun createCredentialOffer(credentialDefinitionId: CredentialDefinitionId): CredentialOffer
 
     /**
-     * Creates [CredentialRequest] using [WalletService]
+     * Creates [CredentialRequest] using [WalletUser]
      *
      * @param proverDid [String]
      * @param offer [CredentialOffer]
@@ -76,7 +75,7 @@ interface IndyFacade {
     ): CredentialRequestInfo
 
     /**
-     * Issues [Credential] by [CredentialRequest] and [CredentialOffer] using [WalletService].
+     * Issues [Credential] by [CredentialRequest] and [CredentialOffer] using [WalletUser].
      * If revocation is enabled it will hold one of [maxCredentialNumber].
      *
      * @param credentialRequest [CredentialRequestInfo] - [CredentialRequest] and all reliable info
@@ -94,7 +93,7 @@ interface IndyFacade {
     ): CredentialInfo
 
     /**
-     * Stores [Credential] in prover's wallet gathering data using [LedgerService]
+     * Stores [Credential] in prover's wallet gathering data using [LedgerUser]
      *
      * @param credentialInfo [CredentialInfo] - credential and all reliable data
      * @param credentialRequest [CredentialRequestInfo] - credential request and all reliable data
@@ -107,7 +106,7 @@ interface IndyFacade {
     )
 
     /**
-     * Revokes previously issued [Credential] using [WalletService] and [LedgerService]
+     * Revokes previously issued [Credential] using [WalletUser] and [LedgerUser]
      *
      * @param revocationRegistryId [RevocationRegistryDefinitionId] - revocation registry definition id
      * @param credentialRevocationId [String] - revocation registry credential index
@@ -149,24 +148,24 @@ interface IndyFacade {
 }
 
 /**
- * Builder for some [IndyFacade] implementation
+ * Builder for some [SsiUser] implementation
  */
 abstract class IndyFacadeBuilder {
-    var builderWalletService: WalletService? = null
-    var builderLedgerService: LedgerService? = null
+    var builderWalletUser: WalletUser? = null
+    var builderLedgerUser: LedgerUser? = null
 
-    fun with(walletService: WalletService): IndyFacadeBuilder {
-        builderWalletService = walletService
+    fun with(walletUser: WalletUser): IndyFacadeBuilder {
+        builderWalletUser = walletUser
         return this
     }
 
-    fun with(ledgerService: LedgerService): IndyFacadeBuilder {
-        builderLedgerService = ledgerService
+    fun with(ledgerUser: LedgerUser): IndyFacadeBuilder {
+        builderLedgerUser = ledgerUser
         return this
     }
 
     /**
-     * Implement this method, but be sure that you've checked presence of [WalletService] and [LedgerService]
+     * Implement this method, but be sure that you've checked presence of [WalletUser] and [LedgerUser]
      */
-    abstract fun build(): IndyFacade
+    abstract fun build(): SsiUser
 }

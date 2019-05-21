@@ -4,10 +4,10 @@ import com.luxoft.blockchainlab.hyperledger.indy.models.*
 
 
 /**
- * [WalletService] is an interface that encapsulates [org.hyperledger.indy.sdk.wallet.Wallet] operations in perspective
- *  of doing some cryptographic work that is not related to [com.luxoft.blockchainlab.hyperledger.indy.ledger.LedgerService]
+ * [WalletUser] is an interface that encapsulates [org.hyperledger.indy.sdk.wallet.Wallet] operations in perspective
+ *  of doing some cryptographic work that is not related to [com.luxoft.blockchainlab.hyperledger.indy.ledger.LedgerUser]
  */
-interface WalletService : IndyIssuer, IndyProver, IndyVerifier, IndyTrustee
+interface WalletUser : IndyIssuer, IndyProver, IndyVerifier, IndyTrustee
 
 
 /**
@@ -15,6 +15,13 @@ interface WalletService : IndyIssuer, IndyProver, IndyVerifier, IndyTrustee
  * Has read/write access to public ledger.
  */
 interface IndyIssuer : IndyWalletHolder {
+
+    /**
+     * Signs something using wallet and did
+     *
+     * @param
+     */
+    fun sign(data: String): String
 
     /**
      * Creates credential offer
@@ -224,4 +231,13 @@ interface IndyWalletHolder {
      * @return [IdentityDetails]
      */
     fun getIdentityDetails(): IdentityDetails
+
+    /**
+     * Gets [IdentityDetails] of some did
+     *
+     * @param did [String]
+     *
+     * @return [IdentityDetails]
+     */
+    fun getIdentityDetails(did: String): IdentityDetails
 }

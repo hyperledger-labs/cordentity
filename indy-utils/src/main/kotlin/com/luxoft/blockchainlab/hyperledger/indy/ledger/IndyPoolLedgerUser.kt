@@ -3,10 +3,8 @@ package com.luxoft.blockchainlab.hyperledger.indy.ledger
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import mu.KotlinLogging
-import org.hyperledger.indy.sdk.did.Did
 import org.hyperledger.indy.sdk.ledger.Ledger
 import org.hyperledger.indy.sdk.pool.Pool
-import org.hyperledger.indy.sdk.wallet.Wallet
 import java.lang.Thread.sleep
 import java.util.*
 
@@ -15,20 +13,23 @@ const val RETRY_DELAY_MS: Long = 100L
 const val RETRY_TIMES: Int = 10
 
 /**
- * This is an implementation of [LedgerService] which uses standard indy pool as ledger.
+ * This is an implementation of [LedgerUser] which uses standard indy pool as ledger.
  *
  * @param pool [Pool] - indy pool handle
- * @param wallet [Wallet] - indy user's wallet
- * @param did [String] - did to perform operations
+ * @param did [String] - indy user did
+ * @param signProvider - lambda that is used to sign ledger requests
  */
-class IndyPoolLedgerService(val pool: Pool, val wallet: Wallet, val did: String) : LedgerService {
+class IndyPoolLedgerUser(val pool: Pool, val did: String, val signProvider: (data: String) -> String) : LedgerUser {
 
-    val logger = KotlinLogging.logger {}
+    private val logger = KotlinLogging.logger {}
 
-    private fun store(data: String) {
+    private fun store(request: String) {
         val attemptId = Random().nextLong()
-        logger.debug { "Trying to store data on ledger [attempt id = $attemptId]: $data" }
-        val response = Ledger.signAndSubmitRequest(pool, wallet, did, data).get()
+        logger.debug { "Trying to store data on ledger [attempt id = $attemptId]: $request" }
+
+        val signedRequest = signProvider(request)
+
+        val response = Ledger.submitRequest(pool, signedRequest).get()
         logger.debug { "Ledger responded [attempt id = $attemptId]: $response" }
     }
 
@@ -69,7 +70,7 @@ class IndyPoolLedgerService(val pool: Pool, val wallet: Wallet, val did: String)
             about.role
         ).get()
 
-        Ledger.signAndSubmitRequest(pool, wallet, did, nymRequest).get()
+        store(nymRequest)
     }
 
     override fun schemaExists(id: SchemaId): Boolean {
@@ -303,9 +304,5 @@ class IndyPoolLedgerService(val pool: Pool, val wallet: Wallet, val did: String)
         } else Pair("{}", "{}")
 
         return DataUsedInProofJson(usedSchemasJson, usedCredentialDefsJson, revRegDefsJson, revRegDeltasJson)
-    }
-
-    override fun getIdentityDetails(did: String): IdentityDetails {
-        return IdentityDetails(did, Did.keyForDid(pool, wallet, did).get(), null, null)
     }
 }

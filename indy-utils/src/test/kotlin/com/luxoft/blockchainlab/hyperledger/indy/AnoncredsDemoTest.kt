@@ -1,23 +1,14 @@
 package com.luxoft.blockchainlab.hyperledger.indy
 
-import com.luxoft.blockchainlab.hyperledger.indy.helpers.GenesisHelper
-import com.luxoft.blockchainlab.hyperledger.indy.helpers.PoolHelper
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.WalletHelper
-import com.luxoft.blockchainlab.hyperledger.indy.ledger.IndyPoolLedgerService
+import com.luxoft.blockchainlab.hyperledger.indy.ledger.IndyPoolLedgerUser
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
 import com.luxoft.blockchainlab.hyperledger.indy.utils.*
-import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletService
+import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletUser
 import junit.framework.Assert.assertFalse
 import junit.framework.Assert.assertTrue
-import org.hyperledger.indy.sdk.did.Did
-import org.hyperledger.indy.sdk.did.DidResults
-import org.hyperledger.indy.sdk.ledger.Ledger
-import org.hyperledger.indy.sdk.pool.Pool
 import org.hyperledger.indy.sdk.wallet.Wallet
 import org.junit.*
-import java.io.File
-import java.util.*
-import kotlin.math.absoluteValue
 
 
 class AnoncredsDemoTest : IndyIntegrationTest() {
@@ -27,374 +18,63 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
     private val proverWalletName = "proverWallet"
 
     private lateinit var issuerWallet: Wallet
-    private lateinit var issuer1: IndyFacade
+    private lateinit var issuer1: SsiUser
 
     private lateinit var issuer2Wallet: Wallet
-    private lateinit var issuer2: IndyFacade
+    private lateinit var issuer2: SsiUser
 
     private lateinit var proverWallet: Wallet
-    private lateinit var prover: IndyFacade
-
-    companion object {
-        private lateinit var pool: Pool
-        private lateinit var poolName: String
-
-        @JvmStatic
-        @BeforeClass
-        fun setUpTest() {
-            System.setProperty(org.slf4j.impl.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "TRACE")
-
-            // Create and Open Pool
-            poolName = PoolHelper.DEFAULT_POOL_NAME
-            val genesisFile = File(TEST_GENESIS_FILE_PATH)
-            if (!GenesisHelper.exists(genesisFile))
-                throw RuntimeException("Genesis file $TEST_GENESIS_FILE_PATH doesn't exist")
-
-            PoolHelper.createOrTrunc(genesisFile, poolName)
-            pool = PoolHelper.openExisting(poolName)
-        }
-
-        @JvmStatic
-        @AfterClass
-        fun tearDownTest() {
-            // Close pool
-            pool.closePoolLedger().get()
-            Pool.deletePoolLedgerConfig(poolName)
-        }
-    }
+    private lateinit var prover: SsiUser
 
     @Before
     @Throws(Exception::class)
     fun setUp() {
-        //issuer1.addKnownIdentitiesAndStoreOnLedger(prover.walletService.getIdentityDetails())
-    }
-
-    val rng = Random()
-
-    fun createIssuers(count: Int): List<Pair<Wallet, IndyFacade>> {
         WalletHelper.createOrTrunc("Trustee", "123")
         val trusteeWallet = WalletHelper.openExisting("Trustee", "123")
+
+        WalletHelper.createOrTrunc(issuerWalletName, walletPassword)
+        issuerWallet = WalletHelper.openExisting(issuerWalletName, walletPassword)
+
+        WalletHelper.createOrTrunc(issuer2WalletName, walletPassword)
+        issuer2Wallet = WalletHelper.openExisting(issuer2WalletName, walletPassword)
+
+        WalletHelper.createOrTrunc(proverWalletName, walletPassword)
+        proverWallet = WalletHelper.openExisting(proverWalletName, walletPassword)
+
         // create trustee did
         val trusteeDidInfo = createTrusteeDid(trusteeWallet)
 
-        return (0 until count).map {
-            WalletHelper.createOrTrunc("Issuer-$it", "123")
-            val issuerWallet = WalletHelper.openExisting("Issuer-$it", "123")
+        // create indy users
+        val issuerWalletUser = IndySDKWalletUser(issuerWallet)
+        val issuerLedgerUser = IndyPoolLedgerUser(pool, issuerWalletUser.did) { issuerWalletUser.sign(it) }
+        issuer1 = IndyUser.with(issuerWalletUser).with(issuerLedgerUser).build()
 
-            val issuerWalletService = IndySDKWalletService(issuerWallet)
-            val issuerLedgerService = IndyPoolLedgerService(pool, issuerWalletService)
-            val issuerFacade = IndyUser.with(issuerWalletService).with(issuerLedgerService).build()
+        val issuer2WalletUser = IndySDKWalletUser(issuer2Wallet)
+        val issuer2LedgerUser = IndyPoolLedgerUser(pool, issuer2WalletUser.did) { issuer2WalletUser.sign(it) }
+        issuer2 = IndyUser.with(issuer2LedgerUser).with(issuer2WalletUser).build()
 
-            linkIssuerToTrustee(trusteeWallet, trusteeDidInfo, issuerWalletService.getIdentityDetails())
+        val proverWalletUser = IndySDKWalletUser(proverWallet)
+        val proverLedgerUser = IndyPoolLedgerUser(pool, proverWalletUser.did) { proverWalletUser.sign(it) }
+        prover = IndyUser.with(proverLedgerUser).with(proverWalletUser).build()
 
-            Pair(issuerWallet, issuerFacade)
-        }.also { trusteeWallet.closeWallet().get() }
+        // set relationships
+        linkIssuerToTrustee(trusteeWallet, trusteeDidInfo, issuerWalletUser.getIdentityDetails())
+        linkIssuerToTrustee(trusteeWallet, trusteeDidInfo, issuer2WalletUser.getIdentityDetails())
+
+        issuer1.addKnownIdentitiesAndStoreOnLedger(prover.walletUser.getIdentityDetails())
+
+        trusteeWallet.closeWallet().get()
     }
 
-    fun createEntities(name: String, count: Int) = (0 until count).map {
-        WalletHelper.createOrTrunc("$name-$it", "123")
-        val issuerWallet = WalletHelper.openExisting("$name-$it", "123")
+    @After
+    @Throws(Exception::class)
+    fun tearDown() {
+        // Issuer Remove Wallet
+        issuerWallet.closeWallet().get()
+        issuer2Wallet.closeWallet().get()
 
-        val issuerWalletService = IndySDKWalletService(issuerWallet)
-        val issuerLedgerService = IndyPoolLedgerService(pool, issuerWalletService)
-        val issuerFacade = IndyUser.with(issuerWalletService).with(issuerLedgerService).build()
-
-        Pair(issuerWallet, issuerFacade)
-    }
-
-    fun disposeEntities(entities: List<Pair<Wallet, IndyFacade>>) = entities.forEach { it.first.closeWallet().get() }
-
-    private fun linkIssuerToTrustee(
-        trusteeWallet: Wallet,
-        trusteeDidInfo: DidResults.CreateAndStoreMyDidResult,
-        issuerDidInfo: IdentityDetails
-    ) {
-        val nymRequest = Ledger.buildNymRequest(
-            trusteeDidInfo.did,
-            issuerDidInfo.did,
-            issuerDidInfo.verkey,
-            null,
-            "TRUSTEE"
-        ).get()
-
-        Ledger.signAndSubmitRequest(pool, trusteeWallet, trusteeDidInfo.did, nymRequest).get()
-    }
-
-    private fun createTrusteeDid(wallet: Wallet) = Did.createAndStoreMyDid(wallet, """{"seed":"$TRUSTEE_SEED"}""").get()
-
-    private fun IndyFacade.createMetadata(
-        schemaName: String,
-        schemaVersion: String,
-        schemaAttributes: List<String>,
-        enableRevocation: Boolean,
-        maxCredentialNumber: Int
-    ): Triple<Schema, CredentialDefinition, RevocationRegistryInfo?> {
-        val schema = createSchemaAndStoreOnLedger(schemaName, schemaVersion, schemaAttributes)
-        val credDef = createCredentialDefinitionAndStoreOnLedger(schema.getSchemaIdObject(), enableRevocation)
-        val revRegInfo = if (enableRevocation) {
-            if (maxCredentialNumber < 2)
-                throw RuntimeException("maxCredentialNumber should be at least 2")
-            createRevocationRegistryAndStoreOnLedger(credDef.getCredentialDefinitionIdObject(), maxCredentialNumber)
-        } else null
-
-        return Triple(schema, credDef, revRegInfo)
-    }
-
-    private fun IndyFacade.createRandomMetadata(
-        attributeCountRange: IntRange,
-        enableRevocation: Boolean,
-        maxCredentialNumber: Int
-    ): Triple<Schema, CredentialDefinition, RevocationRegistryInfo?> {
-        val name = "schema-${rng.nextInt().absoluteValue}"
-        val version = "${rng.nextInt().absoluteValue}.${rng.nextInt().absoluteValue}"
-        val attributeCount =
-            rng.nextInt().absoluteValue % (attributeCountRange.last - attributeCountRange.first) + attributeCountRange.first
-        val attributes = (0 until attributeCount).map { "attribute-${rng.nextInt().absoluteValue}" }
-
-        return createMetadata(name, version, attributes, enableRevocation, maxCredentialNumber)
-    }
-
-    private fun IndyFacade.issueRandomCredential(
-        to: IndyFacade,
-        schemaAttributes: List<String>,
-        credentialDefId: CredentialDefinitionId,
-        revocationRegistryId: RevocationRegistryDefinitionId?
-    ): CredentialInfo {
-        val rng = Random()
-        val attributesToValues = mutableMapOf<String, String>()
-
-        val offer = this.createCredentialOffer(credentialDefId)
-        val request = to.createCredentialRequest(to.walletService.getIdentityDetails().did, offer)
-
-        val credentialInfo = this.issueCredentialAndUpdateLedger(request, offer, revocationRegistryId) {
-            schemaAttributes.forEach {
-                val value = rng.nextInt().absoluteValue.toString()
-                attributes[it] = CredentialValue(value)
-
-                // for test purposes
-                attributesToValues[it] = value
-            }
-        }
-
-        to.checkLedgerAndReceiveCredential(credentialInfo, request, offer)
-
-        return credentialInfo
-    }
-
-    data class CredentialAndMetadata(
-        val proverDid: String,
-        val credentialInfo: CredentialInfo
-    )
-
-    private fun IndyFacade.issueRandomSimilarCredentials(
-        to: List<IndyFacade>,
-        attributeCountRange: IntRange,
-        enableRevocation: Boolean,
-        count: Int,
-        maxCredentialsPerRevRegistry: Int
-    ): List<CredentialAndMetadata> {
-        val (schema, credDef, revRegInfo) = createRandomMetadata(
-            attributeCountRange,
-            enableRevocation,
-            maxCredentialsPerRevRegistry
-        )
-
-        return to.map { prover ->
-            (0 until count).map {
-                val credential = issueRandomCredential(
-                    prover,
-                    schema.attributeNames,
-                    credDef.getCredentialDefinitionIdObject(),
-                    revRegInfo?.definition?.getRevocationRegistryIdObject()
-                )
-                CredentialAndMetadata(prover.walletService.getIdentityDetails().did, credential)
-            }
-        }.flatten()
-    }
-
-    private fun IndyFacade.issueRandomDifferentCredentials(
-        to: List<IndyFacade>,
-        attributeCountRange: IntRange,
-        enableRevocation: Boolean,
-        count: Int,
-        maxCredentialsPerRevRegistry: Int
-    ) = to.map { prover ->
-        (0 until count).map {
-            val (schema, credDef, revRegInfo) = createRandomMetadata(
-                attributeCountRange,
-                enableRevocation,
-                maxCredentialsPerRevRegistry
-            )
-
-            val credential = issueRandomCredential(
-                prover,
-                schema.attributeNames,
-                credDef.getCredentialDefinitionIdObject(),
-                revRegInfo?.definition?.getRevocationRegistryIdObject()
-            )
-            CredentialAndMetadata(prover.walletService.getIdentityDetails().did, credential)
-        }
-    }.flatten()
-
-    private fun IndyFacade.verifyRandomAttributes(
-        of: IndyFacade,
-        nonRevoked: Interval?,
-        vararg credentials: Credential
-    ): Pair<Boolean, ProofRequest> {
-        val payloads = credentials.map { ProofRequestPayload.fromCredential(it) }.toTypedArray()
-        val proofRequest = createRandomProofRequest(nonRevoked, *payloads)
-
-        val proof = of.createProofFromLedgerData(proofRequest)
-
-        val verifyStatus = verifyProofWithLedgerData(proofRequest, proof)
-
-        return Pair(verifyStatus, proofRequest)
-    }
-
-    data class ProofState(
-        val proverDid: String,
-        val verifierDid: String,
-        val credentials: List<CredentialInfo>,
-        val proofRequest: ProofRequest
-    ) {
-        constructor(
-            issuer: IndyFacade,
-            verifier: IndyFacade,
-            credentials: List<CredentialInfo>,
-            proofRequest: ProofRequest
-        ) : this(
-            issuer.walletService.getIdentityDetails().did,
-            verifier.walletService.getIdentityDetails().did,
-            credentials,
-            proofRequest
-        )
-    }
-
-    private fun constructTypicalFlow(
-        issuerCount: Int,
-        proverCount: Int,
-        verifierCount: Int,
-        attributeCountRange: IntRange,
-        credentialCount: Int,
-        similarCredentials: Boolean,
-        enableRevocation: Boolean,
-        maxCredentialsPerRevRegistry: Int
-    ): Boolean {
-        val issuers = createIssuers(issuerCount)
-        val provers = createEntities("Prover", proverCount)
-
-        val issuerToCredentials = if (similarCredentials)
-            issuers.associate { (issuerWallet, issuer) ->
-                issuer to issuer.issueRandomSimilarCredentials(
-                    provers.map { it.second },
-                    attributeCountRange,
-                    enableRevocation,
-                    credentialCount,
-                    maxCredentialsPerRevRegistry
-                )
-            }
-        else
-            issuers.associate { (issuerWallet, issuer) ->
-                issuer to issuer.issueRandomDifferentCredentials(
-                    provers.map { it.second },
-                    attributeCountRange,
-                    enableRevocation,
-                    credentialCount,
-                    maxCredentialsPerRevRegistry
-                )
-            }
-
-        val credentialsByProver = mutableMapOf<IndyFacade, MutableList<CredentialInfo>>()
-        issuerToCredentials.entries.forEach { (issuer, credentialAndMetadataList) ->
-            credentialAndMetadataList.forEach { credentialAndMetadata ->
-                val prover =
-                    provers.first { it.second.walletService.getIdentityDetails().did == credentialAndMetadata.proverDid }
-                        .second
-                val proverCredentials = credentialsByProver.getOrPut(prover) { mutableListOf() }
-
-                proverCredentials.add(credentialAndMetadata.credentialInfo)
-            }
-        }
-
-        val verifiers = createEntities("Verifier", verifierCount)
-
-        val unableToProve = mutableListOf<ProofState>()
-
-        val nonRevoked = if (enableRevocation) Interval.now() else null
-
-        verifiers.forEach { (verifierWallet, verifier) ->
-            credentialsByProver.entries.forEach { (prover, credentials) ->
-                val (proofStatus, proofRequest) = verifier.verifyRandomAttributes(
-                    prover,
-                    nonRevoked,
-                    *(credentials.map { it.credential }.toTypedArray())
-                )
-
-                if (!proofStatus)
-                    unableToProve.add(
-                        ProofState(
-                            prover.walletService.getIdentityDetails().did,
-                            verifier.walletService.getIdentityDetails().did,
-                            credentials,
-                            proofRequest
-                        )
-                    )
-            }
-        }
-
-        if (unableToProve.isNotEmpty()) {
-            println("------- Failed proofs -------")
-            println(SerializationUtils.anyToJSON(unableToProve))
-            println("-----------------------------")
-        }
-
-        val ableToProve = mutableListOf<ProofState>()
-
-        if (enableRevocation) {
-            issuerToCredentials.forEach { (issuer, credentialAndMetadataList) ->
-                credentialAndMetadataList.map { it.credentialInfo }.forEach { credentialInfo ->
-                    issuer.revokeCredentialAndUpdateLedger(
-                        credentialInfo.credential.getRevocationRegistryIdObject()!!,
-                        credentialInfo.credRevocId!!
-                    )
-                }
-            }
-
-            verifiers.forEach { (verifierWallet, verifier) ->
-                credentialsByProver.entries.forEach { (prover, credentials) ->
-                    val (proofStatus, proofRequest) = verifier.verifyRandomAttributes(
-                        prover,
-                        Interval.now(),
-                        *(credentials.map { it.credential }.toTypedArray())
-                    )
-
-                    if (proofStatus)
-                        ableToProve.add(
-                            ProofState(
-                                prover.walletService.getIdentityDetails().did,
-                                verifier.walletService.getIdentityDetails().did,
-                                credentials,
-                                proofRequest
-                            )
-                        )
-                }
-            }
-
-            if (ableToProve.isNotEmpty()) {
-                println("------- Failed proofs after revocation -------")
-                println(SerializationUtils.anyToJSON(ableToProve))
-                println("----------------------------------------------")
-            }
-        }
-
-        return unableToProve.isEmpty() && ableToProve.isEmpty()
-    }
-
-    @Test
-    fun `1 issuer 1 prover 1 verifier 1 credential without revocation`() {
-        assert(
-            constructTypicalFlow(1, 1, 1, (2..4), 1, false, false, 2)
-        )
+        // Prover Remove Wallet
+        proverWallet.closeWallet().get()
     }
 
     @Test
@@ -406,7 +86,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
             issuer1.createRevocationRegistryAndStoreOnLedger(credDef.getCredentialDefinitionIdObject(), 5)
 
         val credOffer = issuer1.createCredentialOffer(credDef.getCredentialDefinitionIdObject())
-        val credReq = prover.createCredentialRequest(prover.walletService.getIdentityDetails().did, credOffer)
+        val credReq = prover.createCredentialRequest(prover.walletUser.getIdentityDetails().did, credOffer)
         val credentialInfo = issuer1.issueCredentialAndUpdateLedger(
             credReq,
             credOffer,
@@ -454,7 +134,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         val credDef = issuer1.createCredentialDefinitionAndStoreOnLedger(schema.getSchemaIdObject(), false)
 
         val credOffer = issuer1.createCredentialOffer(credDef.getCredentialDefinitionIdObject())
-        val credReq = prover.createCredentialRequest(prover.walletService.getIdentityDetails().did, credOffer)
+        val credReq = prover.createCredentialRequest(prover.walletUser.getIdentityDetails().did, credOffer)
         val credInfo = issuer1.issueCredentialAndUpdateLedger(credReq, credOffer, null) {
             attributes["sex"] = CredentialValue("male")
             attributes["name"] = CredentialValue("Alex")
@@ -488,7 +168,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
 
         // issue first credential
         val credOffer1 = issuer1.createCredentialOffer(credDef.getCredentialDefinitionIdObject())
-        val credReq1 = prover.createCredentialRequest(prover.walletService.getIdentityDetails().did, credOffer1)
+        val credReq1 = prover.createCredentialRequest(prover.walletUser.getIdentityDetails().did, credOffer1)
         val credInfo1 = issuer1.issueCredentialAndUpdateLedger(credReq1, credOffer1, revRegId) {
             attributes["sex"] = CredentialValue("male")
             attributes["name"] = CredentialValue("Alex")
@@ -514,7 +194,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
 
         // issue second credential
         val credOffer2 = issuer1.createCredentialOffer(credDef.getCredentialDefinitionIdObject())
-        val credReq2 = prover.createCredentialRequest(prover.walletService.getIdentityDetails().did, credOffer2)
+        val credReq2 = prover.createCredentialRequest(prover.walletUser.getIdentityDetails().did, credOffer2)
 
         val credInfo2 = issuer1.issueCredentialAndUpdateLedger(credReq2, credOffer2, revRegId) {
             attributes["sex"] = CredentialValue("female")
@@ -544,7 +224,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         val gvtSchema = issuer1.createSchemaAndStoreOnLedger(GVT_SCHEMA_NAME, SCHEMA_VERSION, GVT_SCHEMA_ATTRIBUTES)
         val credDef = issuer1.createCredentialDefinitionAndStoreOnLedger(gvtSchema.getSchemaIdObject(), false)
         val credOffer = issuer1.createCredentialOffer(credDef.getCredentialDefinitionIdObject())
-        val credReq = prover.createCredentialRequest(prover.walletService.getIdentityDetails().did, credOffer)
+        val credReq = prover.createCredentialRequest(prover.walletUser.getIdentityDetails().did, credOffer)
         val credentialInfo = issuer1.issueCredentialAndUpdateLedger(credReq, credOffer, null) {
             attributes["sex"] = CredentialValue("male")
             attributes["name"] = CredentialValue("Alex")
@@ -575,7 +255,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         val gvtCredOffer = issuer1.createCredentialOffer(credDef1.getCredentialDefinitionIdObject())
         val xyzCredOffer = issuer2.createCredentialOffer(credDef2.getCredentialDefinitionIdObject())
 
-        val gvtCredReq = prover.createCredentialRequest(prover.walletService.getIdentityDetails().did, gvtCredOffer)
+        val gvtCredReq = prover.createCredentialRequest(prover.walletUser.getIdentityDetails().did, gvtCredOffer)
         val gvtCredential = issuer1.issueCredentialAndUpdateLedger(gvtCredReq, gvtCredOffer, null) {
             attributes["sex"] = CredentialValue("male")
             attributes["name"] = CredentialValue("Alex")
@@ -584,7 +264,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         }
         prover.checkLedgerAndReceiveCredential(gvtCredential, gvtCredReq, gvtCredOffer)
 
-        val xyzCredReq = prover.createCredentialRequest(prover.walletService.getIdentityDetails().did, xyzCredOffer)
+        val xyzCredReq = prover.createCredentialRequest(prover.walletUser.getIdentityDetails().did, xyzCredOffer)
         val xyzCredential = issuer2.issueCredentialAndUpdateLedger(xyzCredReq, xyzCredOffer, null) {
             attributes["status"] = CredentialValue("partial")
             attributes["period"] = CredentialValue("8")
@@ -615,7 +295,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         val gvtCredOffer = issuer1.createCredentialOffer(gvtCredDef.getCredentialDefinitionIdObject())
         val xyzCredOffer = issuer1.createCredentialOffer(xyzCredDef.getCredentialDefinitionIdObject())
 
-        val gvtCredReq = prover.createCredentialRequest(prover.walletService.getIdentityDetails().did, gvtCredOffer)
+        val gvtCredReq = prover.createCredentialRequest(prover.walletUser.getIdentityDetails().did, gvtCredOffer)
         val gvtCredential = issuer1.issueCredentialAndUpdateLedger(gvtCredReq, gvtCredOffer, null) {
             attributes["sex"] = CredentialValue("male")
             attributes["name"] = CredentialValue("Alex")
@@ -624,7 +304,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         }
         prover.checkLedgerAndReceiveCredential(gvtCredential, gvtCredReq, gvtCredOffer)
 
-        val xyzCredReq = prover.createCredentialRequest(prover.walletService.getIdentityDetails().did, xyzCredOffer)
+        val xyzCredReq = prover.createCredentialRequest(prover.walletUser.getIdentityDetails().did, xyzCredOffer)
         val xyzCredential = issuer1.issueCredentialAndUpdateLedger(xyzCredReq, xyzCredOffer, null) {
             attributes["status"] = CredentialValue("partial")
             attributes["period"] = CredentialValue("8")

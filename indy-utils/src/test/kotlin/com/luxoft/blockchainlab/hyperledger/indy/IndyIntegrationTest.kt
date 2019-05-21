@@ -1,5 +1,17 @@
 package com.luxoft.blockchainlab.hyperledger.indy
 
+import com.luxoft.blockchainlab.hyperledger.indy.helpers.GenesisHelper
+import com.luxoft.blockchainlab.hyperledger.indy.helpers.PoolHelper
+import com.luxoft.blockchainlab.hyperledger.indy.models.IdentityDetails
+import org.hyperledger.indy.sdk.did.Did
+import org.hyperledger.indy.sdk.did.DidResults
+import org.hyperledger.indy.sdk.ledger.Ledger
+import org.hyperledger.indy.sdk.pool.Pool
+import org.hyperledger.indy.sdk.wallet.Wallet
+import org.junit.AfterClass
+import org.junit.BeforeClass
+import java.io.File
+
 
 open class IndyIntegrationTest {
     protected var GVT_SCHEMA_NAME = "gvt"
@@ -28,8 +40,52 @@ open class IndyIntegrationTest {
     protected val TYPE = "default"
 
     companion object {
+        lateinit var pool: Pool
+        lateinit var poolName: String
+
         val TEST_GENESIS_FILE_PATH by lazy {
             this::class.java.classLoader.getResource("docker_pool_transactions_genesis.txt").file
         }
+
+        @JvmStatic
+        @BeforeClass
+        fun setUpTest() {
+            System.setProperty(org.slf4j.impl.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "OFF")
+
+            // Create and Open Pool
+            poolName = PoolHelper.DEFAULT_POOL_NAME
+            val genesisFile = File(TEST_GENESIS_FILE_PATH)
+            if (!GenesisHelper.exists(genesisFile))
+                throw RuntimeException("Genesis file $TEST_GENESIS_FILE_PATH doesn't exist")
+
+            PoolHelper.createOrTrunc(genesisFile, poolName)
+            pool = PoolHelper.openExisting(poolName)
+        }
+
+        @JvmStatic
+        @AfterClass
+        fun tearDownTest() {
+            // Close pool
+            pool.closePoolLedger().get()
+            Pool.deletePoolLedgerConfig(poolName)
+        }
     }
+
+    protected fun linkIssuerToTrustee(
+        trusteeWallet: Wallet,
+        trusteeDidInfo: DidResults.CreateAndStoreMyDidResult,
+        issuerDidInfo: IdentityDetails
+    ) {
+        val nymRequest = Ledger.buildNymRequest(
+            trusteeDidInfo.did,
+            issuerDidInfo.did,
+            issuerDidInfo.verkey,
+            null,
+            "TRUSTEE"
+        ).get()
+
+        Ledger.signAndSubmitRequest(pool, trusteeWallet, trusteeDidInfo.did, nymRequest).get()
+    }
+
+    protected fun createTrusteeDid(wallet: Wallet) = Did.createAndStoreMyDid(wallet, """{"seed":"$TRUSTEE_SEED"}""").get()
 }

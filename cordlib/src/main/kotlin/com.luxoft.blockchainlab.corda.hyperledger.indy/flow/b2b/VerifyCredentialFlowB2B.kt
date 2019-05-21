@@ -46,7 +46,7 @@ object VerifyCredentialFlowB2B {
                 val id = UUID.randomUUID().toString()
 
                 val verifyCredentialOut = flowSession.sendAndReceive<ProofInfo>(proofRequest).unwrap { proof ->
-                    val usedData = indyUser().ledgerService.retrieveDataUsedInProof(proofRequest, proof)
+                    val usedData = indyUser().ledgerUser.retrieveDataUsedInProof(proofRequest, proof)
                     val credentialProofOut =
                         IndyCredentialProof(id, proofRequest, proof, usedData, listOf(ourIdentity, prover))
 
