@@ -13,12 +13,15 @@ import com.luxoft.blockchainlab.hyperledger.indy.wallet.WalletUser
  */
 class IndyUser(
     override val walletUser: WalletUser,
-    override val ledgerUser: LedgerUser
+    override val ledgerUser: LedgerUser,
+    //Required for android because it will cause exception in native code and app crash
+    createDefaultMasterSecret: Boolean = true
 ) : SsiUser {
 
     init {
         // we create some master secret by default, but user can create and manage them manually
-        walletUser.createMasterSecret(DEFAULT_MASTER_SECRET_ID)
+        if (createDefaultMasterSecret)
+            walletUser.createMasterSecret(DEFAULT_MASTER_SECRET_ID)
     }
 
     override fun createSchemaAndStoreOnLedger(name: String, version: String, attributes: List<String>): Schema {

@@ -1,7 +1,6 @@
 package com.luxoft.blockchainlab.hyperledger.indy.models
 
 import com.fasterxml.jackson.annotation.*
-import java.util.*
 
 /**
  * Represents a particular attribute of a credential
@@ -242,7 +241,8 @@ data class CredentialPredicateReference(
  *     }
  */
 data class Filter(
-    @JsonIgnore val attrName: String,
+    //TODO: We are loosing meta info after serialization, need to rework. Can`t serialize because of INDY.
+    @JsonIgnore val attrName: String = "",
     @JsonProperty("schema_id") var schemaIdRaw: String? = null,
     var schemaIssuerDid: String? = null,
     var schemaName: String? = null,

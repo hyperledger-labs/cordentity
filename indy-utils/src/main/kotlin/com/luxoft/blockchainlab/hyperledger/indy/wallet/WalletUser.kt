@@ -240,4 +240,12 @@ interface IndyWalletHolder {
      * @return [IdentityDetails]
      */
     fun getIdentityDetails(did: String): IdentityDetails
+
+    //TODO: return credentials only for current DID?
+    /**
+     * Gets Iterator [CredentialReference] in this wallet
+     *
+     * @return Iterator<[CredentialReference]>
+     */
+    fun getCredentials(): Iterator<CredentialReference>
 }
