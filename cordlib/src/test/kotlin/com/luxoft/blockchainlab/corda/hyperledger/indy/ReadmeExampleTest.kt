@@ -29,7 +29,7 @@ class ReadmeExampleTest : CordaTestBase() {
         alice = createPartyNode(CordaX500Name("Alice", "London", "GB"))
         bob = createPartyNode(CordaX500Name("Bob", "London", "GB"))
 
-        setPermissions(issuer, trustee)
+        trustee.setPermissions(issuer, net)
     }
 
     @Test
@@ -52,6 +52,7 @@ class ReadmeExampleTest : CordaTestBase() {
         // To allow customers and shops to communicate, Ministry issues a shopping scheme:
 
         val schema = ministry.services.startFlow(
+            net,
             CreateSchemaFlow.Authority(
                 "shopping scheme",
                 "1.0",
@@ -63,6 +64,7 @@ class ReadmeExampleTest : CordaTestBase() {
         // Ministry creates a credential definition for the shopping scheme:
 
         val credentialDefinition = ministry.services.startFlow(
+            net,
             CreateCredentialDefinitionFlow.Authority(schemaId, enableRevocation = false)
         ).resultFuture.get()
         val credentialDefinitionId = credentialDefinition.getCredentialDefinitionIdObject()
@@ -70,6 +72,7 @@ class ReadmeExampleTest : CordaTestBase() {
         // Ministry verifies Alice's legal status and issues her a shopping credential:
 
         ministry.services.startFlow(
+            net,
             IssueCredentialFlowB2B.Issuer(aliceX500, credentialDefinitionId, null) {
                 attributes["NAME"] = CredentialValue("Alice")
                 attributes["BORN"] = CredentialValue("2000")
@@ -87,6 +90,7 @@ class ReadmeExampleTest : CordaTestBase() {
         }
 
         val verified = store.services.startFlow(
+            net,
             VerifyCredentialFlowB2B.Verifier(aliceX500, proofRequest)
         ).resultFuture.get()
 

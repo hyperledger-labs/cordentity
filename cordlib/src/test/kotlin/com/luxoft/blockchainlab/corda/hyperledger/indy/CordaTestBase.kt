@@ -62,20 +62,21 @@ open class CordaTestBase {
      * The mocked Corda network
      * */
     protected lateinit var net: InternalMockNetwork
-        private set
 
     protected val parties: MutableList<StartedNode<MockNode>> = mutableListOf()
 
     /**
-     * Shares permissions from [authority] to [issuer]
+     * Shares permissions from authority to issuer
      * This action is needed to implement authority chains
      *
-     * @param issuer            a node that needs permissions
-     * @param authority         a node that can share permissions
+     * Call from authority
+     *
+     * @param to                a node that needs permissions
      */
-    protected fun setPermissions(issuer: StartedNode<MockNode>, authority: StartedNode<MockNode>) {
-        val permissionsFuture = issuer.services.startFlow(
-            AssignPermissionsFlowB2B.Issuer(authority = authority.info.singleIdentity().name, role = "TRUSTEE")
+    protected fun StartedNode<InternalMockNetwork.MockNode>.setPermissions(to: StartedNode<MockNode>, network: InternalMockNetwork) {
+        val permissionsFuture = to.services.startFlow(
+            network,
+            AssignPermissionsFlowB2B.Issuer(authority = info.singleIdentity().name, role = "TRUSTEE")
         ).resultFuture
 
         permissionsFuture.getOrThrow(Duration.ofSeconds(30))
@@ -103,25 +104,6 @@ open class CordaTestBase {
         }
 
         return party
-    }
-
-    /**
-     * Substitutes [StartedNodeServices.startFlow] method to run mocked Corda flows.
-     *
-     * Usage:
-     *
-     *     val did = store.services.startFlow(GetDidFlowB2B.Initiator(name)).resultFuture.get()
-     */
-    protected fun <T> StartedNodeServices.startFlow(logic: FlowLogic<T>): FlowStateMachine<T> {
-        val machine = startFlow(logic, newContext()).getOrThrow()
-
-        return object : FlowStateMachine<T> by machine {
-            override val resultFuture: CordaFuture<T>
-                get() {
-                    net.runNetwork()
-                    return machine.resultFuture
-                }
-        }
     }
 
     @Before
@@ -190,7 +172,7 @@ open class CordaTestBase {
 
     fun createIssuerNodes(trustee: StartedNode<MockNode>, count: Int) = (0 until count)
         .map { createPartyNode(CordaX500Name("Issuer-$it", "London", "GB")) }
-        .map { setPermissions(it, trustee); it }
+        .map { trustee.setPermissions(it, net); it }
 
     data class ProofRequestPayload(
         val attributeValues: Map<String, String>,
@@ -342,9 +324,9 @@ open class CordaTestBase {
             val credentials = issuerToIssuedCredentials.getOrPut(issuer) { mutableListOf() }
 
             if (similarCredentials)
-                credentials.addAll(issuer.issueRandomSimilarCredentials(provers, enableRevocation, credentialCount, maxCredentialsPerRevRegistry))
+                credentials.addAll(issuer.issueRandomSimilarCredentials(provers, enableRevocation, credentialCount, maxCredentialsPerRevRegistry, net))
             else
-                credentials.addAll(issuer.issueRandomDifferentCredentials(provers, enableRevocation, credentialCount, maxCredentialsPerRevRegistry))
+                credentials.addAll(issuer.issueRandomDifferentCredentials(provers, enableRevocation, credentialCount, maxCredentialsPerRevRegistry, net))
         }
 
         val verifiers = createNodes("Verifier", verifierCount)
@@ -365,7 +347,7 @@ open class CordaTestBase {
                     )
 
                     val prover = provers.first { it.getName() == credentialAndMetadata.prover.first }
-                    val (proofId, proofValid) = verifier.verify(prover, pr)
+                    val (proofId, proofValid) = verifier.verify(prover, pr, net)
 
                     if (!proofValid)
                         unableToProve.add(ProofState(issuer, verifier, credentialAndMetadata, pr))
@@ -384,7 +366,7 @@ open class CordaTestBase {
         if (enableRevocation) {
             issuerToIssuedCredentials.entries.forEach { (issuer, credentialAndMetadataList) ->
                 credentialAndMetadataList.forEach { credentialAndMetadata ->
-                    issuer.revoke(credentialAndMetadata.idAndValues.first)
+                    issuer.revoke(credentialAndMetadata.idAndValues.first, net)
                 }
             }
 
@@ -400,7 +382,7 @@ open class CordaTestBase {
                         )
 
                         val prover = provers.first { it.getName() == credentialAndMetadata.prover.first }
-                        val (proofId, proofValid) = verifier.verify(prover, pr)
+                        val (proofId, proofValid) = verifier.verify(prover, pr, net)
 
                         if (proofValid)
                             ableToProve.add(ProofState(issuer, verifier, credentialAndMetadata, pr))
