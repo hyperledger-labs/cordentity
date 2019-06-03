@@ -27,8 +27,8 @@ class IndySDKWalletUser(
     val tailsPath: String = "tails"
 ) : WalletUser {
 
-    val did: String
-    val verkey: String
+    override val did: String
+    override val verkey: String
     private val logger = LoggerFactory.getLogger(IndySDKWalletUser::class.java)
 
     companion object {
@@ -42,8 +42,8 @@ class IndySDKWalletUser(
 
     init {
         val didResult = Did.createAndStoreMyDid(wallet, SerializationUtils.anyToJSON(didConfig)).get()
-        this.did = didResult.did
-        this.verkey = didResult.verkey
+        did = didResult.did
+        verkey = didResult.verkey
     }
 
     override fun sign(data: String): String {

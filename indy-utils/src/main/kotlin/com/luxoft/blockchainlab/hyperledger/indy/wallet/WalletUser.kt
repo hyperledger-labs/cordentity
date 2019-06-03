@@ -238,6 +238,12 @@ interface IndyVerifier {
  */
 interface IndyWalletHolder {
     /**
+     * Each wallet holder should have at least one pair of did/verkey to be able to perform any action
+     */
+    val did: String
+    val verkey: String
+
+    /**
      * Creates temporary did which can be used by identity to perform some any operations
      *
      * @param identityRecord [IdentityDetails] - identity details
