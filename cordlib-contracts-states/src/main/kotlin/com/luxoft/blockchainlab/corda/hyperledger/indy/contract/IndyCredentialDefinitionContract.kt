@@ -18,17 +18,11 @@ class IndyCredentialDefinitionContract : Contract {
 
             when (command) {
                 is Command.Create -> creation(tx, signers)
-                is Command.Upgrade -> upgrade(tx, signers)
                 is Command.Consume -> consummation(tx, signers)
+                is Command.Issue -> issuance(tx, signers)
                 else -> throw IllegalArgumentException("Unrecognised command.")
             }
         }
-    }
-
-    private fun upgrade(tx: LedgerTransaction, signers: Set<PublicKey>) = requireThat {
-        // TODO: should contain 1 input and 1 output states of type IndyCredentialDefinition (different)
-        // TODO: should contain 1 input and 1 output states of type IndySchema (similar)
-        // TODO: input state of type IndyCredentialDefinition should have currentCredNumber == maxCredNumber
     }
 
     private fun creation(tx: LedgerTransaction, signers: Set<PublicKey>) = requireThat {
@@ -38,19 +32,21 @@ class IndyCredentialDefinitionContract : Contract {
     }
 
     private fun consummation(tx: LedgerTransaction, signers: Set<PublicKey>) = requireThat {
-        // TODO: should contain 1 input and 1 output states of type IndyCredentialDefinition (different)
-        // TODO: input and output state should be similar except output.currentCredNumber - input.currentCredNumber == 1
+        // TODO: should contain 1 input and 1 output states of type IndySchema (similar)
+    }
+
+    private fun issuance(tx: LedgerTransaction, signers: Set<PublicKey>) = requireThat {
+
     }
 
     interface Command : CommandData {
-
         // when we create new credential definition
         class Create : TypeOnlyCommandData(), Command
 
-        // when we reach maxCredNumber
-        class Upgrade : TypeOnlyCommandData(), Command
+        // when we issue new revocation registry
+        class Consume : TypeOnlyCommandData(), Command
 
         // when we issue new credential
-        class Consume : TypeOnlyCommandData(), Command
+        class Issue : TypeOnlyCommandData(), Command
     }
 }

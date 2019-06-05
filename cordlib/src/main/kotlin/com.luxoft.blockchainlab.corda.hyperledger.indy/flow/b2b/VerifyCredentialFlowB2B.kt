@@ -4,14 +4,12 @@ import co.paralleluniverse.fibers.Suspendable
 import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialContract
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredentialProof
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.*
-import com.luxoft.blockchainlab.hyperledger.indy.*
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndContract
 import net.corda.core.flows.*
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.identity.Party
-import net.corda.core.serialization.CordaSerializable
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
 import net.corda.core.utilities.unwrap
@@ -20,7 +18,6 @@ import net.corda.core.utilities.unwrap
  * Flows to verify predicates on attributes
  * */
 object VerifyCredentialFlowB2B {
-
 
 
     /**
@@ -41,11 +38,11 @@ object VerifyCredentialFlowB2B {
     @InitiatingFlow
     @StartableByRPC
     open class Verifier(
-            private val identifier: String,
-            private val attributes: List<ProofAttribute>,
-            private val predicates: List<ProofPredicate>,
-            private val proverName: CordaX500Name,
-            private val nonRevoked: Interval = Interval.now()
+        private val identifier: String,
+        private val attributes: List<ProofAttribute>,
+        private val predicates: List<ProofPredicate>,
+        private val proverName: CordaX500Name,
+        private val nonRevoked: Interval?
     ) : FlowLogic<Boolean>() {
 
         @Suspendable
@@ -71,7 +68,7 @@ object VerifyCredentialFlowB2B {
                     CredentialPredicate(fieldRef, it.value)
                 }
 
-                val proofRequest = IndyUser.createProofRequest(
+                val proofRequest = indyUser().createProofRequest(
                     version = "0.1",
                     name = "proof_req_0.1",
                     attributes = fieldRefAttr,
@@ -80,16 +77,12 @@ object VerifyCredentialFlowB2B {
                 )
 
                 val verifyCredentialOut = flowSession.sendAndReceive<ProofInfo>(proofRequest).unwrap { proof ->
-                    val usedData = indyUser().getDataUsedInProof(proofRequest, proof)
+                    val usedData = indyUser().ledgerUser.retrieveDataUsedInProof(proofRequest, proof)
                     val credentialProofOut =
                         IndyCredentialProof(identifier, proofRequest, proof, usedData, listOf(ourIdentity, prover))
 
-                    if (!indyUser().verifyProof(
-                            credentialProofOut.proofReq,
-                            proof,
-                            usedData
-                        )
-                    ) throw FlowException("Proof verification failed")
+                    if (!indyUser().verifyProofWithLedgerData(credentialProofOut.proofReq, proof))
+                        throw FlowException("Proof verification failed")
 
                     StateAndContract(credentialProofOut, IndyCredentialContract::class.java.name)
                 }
@@ -131,7 +124,7 @@ object VerifyCredentialFlowB2B {
         override fun call() {
             try {
                 val indyProofRequest = flowSession.receive<ProofRequest>().unwrap { it }
-                flowSession.send(indyUser().createProof(indyProofRequest))
+                flowSession.send(indyUser().createProofFromLedgerData(indyProofRequest))
 
                 val flow = object : SignTransactionFlow(flowSession) {
                     // TODO: Add some checks here.

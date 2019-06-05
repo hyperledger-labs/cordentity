@@ -16,4 +16,4 @@ fun CordaX500Name.getNodeByName(net: InternalMockNetwork) =
     net.defaultNotaryNode.services.identityService.wellKnownPartyFromX500Name(this)!!
 
 fun StartedNode<InternalMockNetwork.MockNode>.getPartyDid() =
-    this.services.cordaService(IndyService::class.java).indyUser.did
+    this.services.cordaService(IndyService::class.java).indyUser.walletUser.getIdentityDetails().did

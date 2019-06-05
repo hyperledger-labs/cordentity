@@ -3,16 +3,19 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2c
 import co.paralleluniverse.fibers.Suspendable
 import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialContract
 import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialDefinitionContract
+import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyRevocationRegistryContract
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredential
-import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.getCredentialDefinitionById
+import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.getCredentialDefinitionById
+import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.getRevocationRegistryDefinitionById
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.indyUser
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.whoIsNotary
 import com.luxoft.blockchainlab.corda.hyperledger.indy.service.awaitFiber
 import com.luxoft.blockchainlab.corda.hyperledger.indy.service.connectionService
-import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialDefinitionId
 import com.luxoft.blockchainlab.hyperledger.indy.IndyCredentialDefinitionNotFoundException
 import com.luxoft.blockchainlab.hyperledger.indy.IndyCredentialMaximumReachedException
-import com.luxoft.blockchainlab.hyperledger.indy.IndyUser
+import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialDefinitionId
+import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialProposal
+import com.luxoft.blockchainlab.hyperledger.indy.models.RevocationRegistryDefinitionId
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndContract
 import net.corda.core.flows.*
@@ -23,29 +26,22 @@ object IssueCredentialFlowB2C {
     @InitiatingFlow
     @StartableByRPC
     open class Issuer(
-            private val identifier: String,
-            private val credentialProposal: String,
-            private val credentialDefinitionId: CredentialDefinitionId,
-            private val indyPartyDID: String
+        private val identifier: String,
+        private val credentialDefinitionId: CredentialDefinitionId,
+        private val revocationRegistryDefinitionId: RevocationRegistryDefinitionId?,
+        private val credentialProposalProvider: () -> CredentialProposal,
+        private val indyPartyDID: String
     ) : FlowLogic<Unit>() {
 
         @Suspendable
         override fun call() {
             try {
-                // checking if cred def exists and can produce new credentials
-                val originalCredentialDefIn = getCredentialDefinitionById(credentialDefinitionId)
-                        ?: throw IndyCredentialDefinitionNotFoundException(
-                                credentialDefinitionId,
-                                "State doesn't exist in Corda vault"
-                        )
-                val originalCredentialDef = originalCredentialDefIn.state.data
+                val revocationRegistryDefinition = if (revocationRegistryDefinitionId == null) null
+                else getRevocationRegistryDefinitionById(revocationRegistryDefinitionId)?.state?.data
 
-                if (!originalCredentialDef.canProduceCredentials())
-                    throw IndyCredentialMaximumReachedException(
-                            originalCredentialDef.credentialDefinitionId.getPossibleRevocationRegistryDefinitionId(
-                                    IndyUser.REVOCATION_TAG
-                            )
-                    )
+                if (revocationRegistryDefinition != null)
+                    if (!revocationRegistryDefinition.canProduceCredentials())
+                        throw IndyCredentialMaximumReachedException(revocationRegistryDefinition.id)
 
                 // issue credential
                 val offer = indyUser().createCredentialOffer(credentialDefinitionId)
@@ -54,20 +50,21 @@ object IssueCredentialFlowB2C {
 
                 val credentialRequest = connectionService().receiveCredentialRequest(indyPartyDID).awaitFiber()
 
-                val credential = indyUser().issueCredential(
-                        credentialRequest,
-                        credentialProposal,
-                        offer
+                val credential = indyUser().issueCredentialAndUpdateLedger(
+                    credentialRequest,
+                    offer,
+                    revocationRegistryDefinitionId,
+                    credentialProposalProvider
                 )
 
                 connectionService().sendCredential(credential, indyPartyDID)
 
                 val credentialOut = IndyCredential(
-                        identifier,
-                        credentialRequest,
-                        credential,
-                        indyUser().did,
-                        listOf(ourIdentity)
+                    identifier,
+                    credentialRequest,
+                    credential,
+                    indyUser().walletUser.getIdentityDetails().did,
+                    listOf(ourIdentity)
                 )
                 val newCredentialOut = StateAndContract(credentialOut, IndyCredentialContract::class.java.name)
 
@@ -76,25 +73,54 @@ object IssueCredentialFlowB2C {
                 val newCredentialCmdType = IndyCredentialContract.Command.Issue()
                 val newCredentialCmd = Command(newCredentialCmdType, signers)
 
-                // consume credential definition
-                val credentialDefinition = originalCredentialDef.requestNewCredential()
-                val credentialDefinitionOut =
-                        StateAndContract(credentialDefinition, IndyCredentialDefinitionContract::class.java.name)
-                val credentialDefinitionCmdType = IndyCredentialDefinitionContract.Command.Consume()
+                // checking if cred def exists and can produce new credentials
+                val originalCredentialDefIn = getCredentialDefinitionById(credentialDefinitionId)
+                    ?: throw IndyCredentialDefinitionNotFoundException(
+                        credentialDefinitionId,
+                        "State doesn't exist in Corda vault"
+                    )
+                val credentialDefinitionIn = originalCredentialDefIn.state.data
+                val credentialDefinitionOut = StateAndContract(
+                    credentialDefinitionIn,
+                    IndyCredentialDefinitionContract::class.java.name
+                )
+                val credentialDefinitionCmdType = IndyCredentialDefinitionContract.Command.Issue()
                 val credentialDefinitionCmd = Command(credentialDefinitionCmdType, signers)
 
-                // do stuff
-                val trxBuilder = TransactionBuilder(whoIsNotary()).withItems(
-                        originalCredentialDefIn,
+                val trxBuilder = if (revocationRegistryDefinition != null) {
+                    // consume credential definition
+                    val revocationRegistryDefinitionState = revocationRegistryDefinition.requestNewCredential()
+                    val revocationRegistryDefinitionOut = StateAndContract(
+                        revocationRegistryDefinitionState,
+                        IndyRevocationRegistryContract::class.java.name
+                    )
+                    val revocationRegistryDefinitionCmdType = IndyRevocationRegistryContract.Command.Issue()
+                    val revocationRegistryDefinitionCmd = Command(revocationRegistryDefinitionCmdType, signers)
+
+                    // do stuff
+                    TransactionBuilder(whoIsNotary()).withItems(
+                        credentialDefinitionIn,
+                        credentialDefinitionOut,
+                        credentialDefinitionCmd,
                         newCredentialOut,
                         newCredentialCmd,
+                        revocationRegistryDefinition,
+                        revocationRegistryDefinitionOut,
+                        revocationRegistryDefinitionCmd
+                    )
+                } else {
+                    TransactionBuilder(whoIsNotary()).withItems(
+                        credentialDefinitionIn,
                         credentialDefinitionOut,
-                        credentialDefinitionCmd
-                )
+                        credentialDefinitionCmd,
+                        newCredentialOut,
+                        newCredentialCmd
+                    )
+                }
 
                 trxBuilder.toWireTransaction(serviceHub)
-                        .toLedgerTransaction(serviceHub)
-                        .verify()
+                    .toLedgerTransaction(serviceHub)
+                    .verify()
 
                 val selfSignedTx = serviceHub.signInitialTransaction(trxBuilder, ourIdentity.owningKey)
 

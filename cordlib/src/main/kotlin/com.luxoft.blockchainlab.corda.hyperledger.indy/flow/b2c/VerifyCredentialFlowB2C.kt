@@ -11,7 +11,6 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.service.awaitFiber
 import com.luxoft.blockchainlab.corda.hyperledger.indy.service.connectionService
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialFieldReference
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialPredicate
-import com.luxoft.blockchainlab.hyperledger.indy.IndyUser
 import com.luxoft.blockchainlab.hyperledger.indy.models.Interval
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndContract
@@ -51,7 +50,7 @@ object VerifyCredentialFlowB2C {
                     CredentialPredicate(fieldRef, it.value)
                 } //com.fasterxml.jackson.databind.ObjectMapper@548ccc41
 
-                val proofRequest = IndyUser.createProofRequest(
+                val proofRequest = indyUser().createProofRequest(
                         version = "0.1",
                         name = "proof_req_0.1",
                         attributes = fieldRefAttr,
@@ -63,16 +62,12 @@ object VerifyCredentialFlowB2C {
 
                 val proof = connectionService().receiveProof(indyPartyDID).awaitFiber()
 
-                val usedData = indyUser().getDataUsedInProof(proofRequest, proof)
+                val usedData = indyUser().ledgerUser.retrieveDataUsedInProof(proofRequest, proof)
                 val credentialProofOut =
                         IndyCredentialProof(identifier, proofRequest, proof, usedData, listOf(ourIdentity))
 
-                if (!indyUser().verifyProof(
-                                credentialProofOut.proofReq,
-                                proof,
-                                usedData
-                        )
-                ) throw FlowException("Proof verification failed")
+                if (!indyUser().verifyProofWithLedgerData(credentialProofOut.proofReq, proof))
+                    throw FlowException("Proof verification failed")
 
                 val verifyCredentialOut = StateAndContract(credentialProofOut, IndyCredentialContract::class.java.name)
 

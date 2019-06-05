@@ -1,7 +1,8 @@
 package com.luxoft.blockchainlab.hyperledger.indy.models
 
-import com.fasterxml.jackson.annotation.JsonGetter
 import com.fasterxml.jackson.annotation.JsonProperty
+import java.math.BigInteger
+import java.nio.charset.StandardCharsets
 
 /**
  * Represents credential offer structure from.
@@ -93,12 +94,17 @@ data class Credential(
     @JsonProperty("rev_reg") val revocationRegistry: RawJsonMap?,
     val witness: RawJsonMap?,
     @JsonProperty("rev_reg_id") override val revocationRegistryIdRaw: String?,
-    val values: Map<String, CredentialValue>,
+    val values: CredentialProposal,
     val signature: Map<String, RawJsonMap?>,
     val signatureCorrectnessProof: RawJsonMap
 ) : ContainsSchemaId, ContainsCredentialDefinitionId, ContainsRevocationRegistryId
 
-data class CredentialValue(val raw: String, val encoded: String)
+data class CredentialValue(
+    val raw: String,
+    val encoded: String = if (raw.toLongOrNull() == null)
+        BigInteger(raw.toByteArray(StandardCharsets.UTF_8)).toString(10)
+    else raw
+)
 
 data class CredentialInfo(val credential: Credential, val credRevocId: String?, val revocRegDeltaJson: String?)
 

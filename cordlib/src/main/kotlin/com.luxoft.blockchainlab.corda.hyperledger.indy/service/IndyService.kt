@@ -2,13 +2,16 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy.service
 
 
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.name
+import com.luxoft.blockchainlab.hyperledger.indy.SsiUser
 import com.luxoft.blockchainlab.hyperledger.indy.IndyUser
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.*
+import com.luxoft.blockchainlab.hyperledger.indy.ledger.IndyPoolLedgerUser
+import com.luxoft.blockchainlab.hyperledger.indy.models.DidConfig
+import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletUser
 import mu.KotlinLogging
 import net.corda.core.node.AppServiceHub
 import net.corda.core.node.services.CordaService
 import net.corda.core.serialization.SingletonSerializeAsToken
-import org.hyperledger.indy.sdk.did.DidJSONParameters
 import java.io.File
 import java.lang.RuntimeException
 
@@ -33,19 +36,24 @@ class IndyService(services: AppServiceHub) : SingletonSerializeAsToken() {
     private val walletPassword = ConfigHelper.getWalletPassword()
     private val genesisFilePath = ConfigHelper.getGenesisPath()
     private val poolName = ConfigHelper.getPoolName() ?: PoolHelper.DEFAULT_POOL_NAME
-    private val userRole = ConfigHelper.getRole() ?: ""
+    private val userRole = ConfigHelper.getRole() ?: "" // TODO: why do we need this in config?
     private val did = ConfigHelper.getDid()
     private val seed = ConfigHelper.getSeed()
 
-    val indyUser: IndyUser by lazy {
+    val indyUser: SsiUser by lazy {
         val nodeName = services.myInfo.name().organisation
 
         walletName ?: throw RuntimeException("Wallet name should be specified in config")
         walletPassword ?: throw RuntimeException("Wallet password should be specified in config")
 
         val wallet = WalletHelper.openOrCreate(walletName, walletPassword)
-
         logger.debug { "Wallet created for $nodeName" }
+
+        val tailsPath = "tails"
+        val didConfig = DidConfig(did, seed, null, null)
+
+        val walletUser = IndySDKWalletUser(wallet, didConfig, tailsPath)
+        logger.debug { "IndyUser object created for $nodeName" }
 
         genesisFilePath ?: throw RuntimeException("Genesis file path should be specified in config")
         val genesisFile = File(genesisFilePath)
@@ -53,21 +61,11 @@ class IndyService(services: AppServiceHub) : SingletonSerializeAsToken() {
             throw RuntimeException("Genesis file doesn't exist")
 
         val pool = PoolHelper.openOrCreate(genesisFile, poolName)
-
         logger.debug { "Pool $poolName opened for $nodeName" }
 
-        val tailsPath = "tails"
+        val ledgerUser = IndyPoolLedgerUser(pool, walletUser.did) { walletUser.sign(it) }
 
-        when (userRole) {
-            "trustee" -> {
-                val didConfig = DidJSONParameters.CreateAndStoreMyDidJSONParameter(did, seed, null, null)
-                    .toJson()
-
-                IndyUser(pool, wallet, did, didConfig, tailsPath)
-            }
-            else -> IndyUser(pool, wallet, null, tailsPath = tailsPath)
-        }.also { logger.debug { "IndyUser object created for $nodeName" } }
+        IndyUser.with(walletUser).with(ledgerUser).build()
     }
 
 }
-

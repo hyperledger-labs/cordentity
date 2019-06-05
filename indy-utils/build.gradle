@@ -1,10 +1,14 @@
 dependencies {
-    compile 'com.github.seniorjoinu:indy-sdk:v1.7.0-indy-android-compat-5'
-
+    compile("org.hyperledger:indy:$indy_version") {
+        exclude group: 'net.java.dev.jna', module: 'jna'
+        exclude group: 'org.slf4j', module: 'slf4j-api'
+    }
+    
     compile "com.fasterxml.jackson.core:jackson-databind:$jackson_version"
     compile "com.fasterxml.jackson.module:jackson-module-kotlin:$jackson_version"
     
     testImplementation 'net.java.dev.jna:jna:4.5.1'
+    testImplementation 'org.slf4j:slf4j-simple:1.7.26'
 }
 
 sourceSets {
