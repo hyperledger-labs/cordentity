@@ -92,6 +92,8 @@ interface IndyProver : IndyWalletHolder {
      * @param offer [CredentialOffer] - credential offer
      * @param credentialDefinition [CredentialDefinition]
      * @param revocationRegistryDefinition [RevocationRegistryDefinition] on [null]
+     *
+     * @return local UUID of the stored credential in the prover's wallet
      */
     fun receiveCredential(
         credentialInfo: CredentialInfo,
@@ -99,12 +101,13 @@ interface IndyProver : IndyWalletHolder {
         offer: CredentialOffer,
         credentialDefinition: CredentialDefinition,
         revocationRegistryDefinition: RevocationRegistryDefinition?
-    )
+    ): String
 
     /**
      * Creates proof for provided proof request
      *
      * @param proofRequest [ProofRequest] - proof request created by verifier
+     * @param extraQuery - additional WQL query applied to Wallet's credential search
      * @param provideSchema [SchemaProvider] - provide schema for each credential
      * @param provideCredentialDefinition [CredentialDefinitionProvider] - provide credential definition for each credential
      * @param masterSecretId [String]
@@ -114,6 +117,7 @@ interface IndyProver : IndyWalletHolder {
      */
     fun createProof(
         proofRequest: ProofRequest,
+        extraQuery: String?,
         provideSchema: SchemaProvider,
         provideCredentialDefinition: CredentialDefinitionProvider,
         masterSecretId: String,

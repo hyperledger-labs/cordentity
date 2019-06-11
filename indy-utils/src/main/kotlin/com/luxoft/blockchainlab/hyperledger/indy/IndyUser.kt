@@ -109,7 +109,7 @@ class IndyUser(
         credentialInfo: CredentialInfo,
         credentialRequest: CredentialRequestInfo,
         offer: CredentialOffer
-    ) {
+    ): String {
         val revocationRegistryDefinitionId = credentialInfo.credential.getRevocationRegistryIdObject()
 
         val revocationRegistryDefinition = if (revocationRegistryDefinitionId != null)
@@ -126,7 +126,7 @@ class IndyUser(
                 "Receive credential has been failed"
             )
 
-        walletUser.receiveCredential(
+        return walletUser.receiveCredential(
             credentialInfo,
             credentialRequest,
             offer,
@@ -152,9 +152,10 @@ class IndyUser(
         return revocationRegistryEntry
     }
 
-    override fun createProofFromLedgerData(proofRequest: ProofRequest, masterSecretId: String): ProofInfo {
+    override fun createProofFromLedgerData(proofRequest: ProofRequest, extraQuery: String?, masterSecretId: String): ProofInfo {
         return walletUser.createProof(
             proofRequest,
+            extraQuery,
             provideSchema = { ledgerUser.retrieveSchema(it)!! },
             provideCredentialDefinition = { ledgerUser.retrieveCredentialDefinition(it)!! },
             masterSecretId = masterSecretId
@@ -162,7 +163,7 @@ class IndyUser(
             val revocationRegistryDefinition = ledgerUser.retrieveRevocationRegistryDefinition(revRegId)
                 ?: throw IndyRevRegNotFoundException(revRegId, "Get revocation state has been failed")
 
-            val response = ledgerUser.retrieveRevocationRegistryDelta(revRegId, interval)
+            val response = ledgerUser.retrieveRevocationRegistryDelta(revRegId, Interval(null, interval.to))
                 ?: throw IndyRevDeltaNotFoundException(revRegId, "Interval is $interval")
             val (timestamp, revRegDelta) = response
 
@@ -172,6 +173,8 @@ class IndyUser(
 
     override fun verifyProofWithLedgerData(proofReq: ProofRequest, proof: ProofInfo): Boolean {
         val dataUsedInProofJson = ledgerUser.retrieveDataUsedInProof(proofReq, proof)
+
+        proofReq.requestedAttributes.values.forEach { it.restrictions?.attributes?.clear() }
 
         return walletUser.verifyProof(proofReq, proof, dataUsedInProofJson)
     }

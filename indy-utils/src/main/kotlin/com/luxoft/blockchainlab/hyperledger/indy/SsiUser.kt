@@ -98,12 +98,14 @@ interface SsiUser {
      * @param credentialInfo [CredentialInfo] - credential and all reliable data
      * @param credentialRequest [CredentialRequestInfo] - credential request and all reliable data
      * @param offer [CredentialOffer]
+     *
+     * @return local UUID of the stored credential in the prover's wallet
      */
     fun checkLedgerAndReceiveCredential(
         credentialInfo: CredentialInfo,
         credentialRequest: CredentialRequestInfo,
         offer: CredentialOffer
-    )
+    ): String
 
     /**
      * Revokes previously issued [Credential] using [WalletUser] and [LedgerUser]
@@ -120,12 +122,14 @@ interface SsiUser {
      * Creates [ProofInfo] for provided [ProofRequest].
      *
      * @param proofRequest [ProofRequest] - proof request created by verifier
+     * @param extraQuery - additional WQL query applied to Wallet's credential search
      * @param masterSecretId [String]
      *
      * @return [ProofInfo] - proof and all reliable data
      */
     fun createProofFromLedgerData(
         proofRequest: ProofRequest,
+        extraQuery: String? = null,
         masterSecretId: String = DEFAULT_MASTER_SECRET_ID
     ): ProofInfo
 

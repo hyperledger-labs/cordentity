@@ -157,9 +157,10 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         }
     }
 
-    @Ignore
     @Test
-    fun `issuer issues 2 similar credentials verifier tries to verify both`() {
+    fun `issuer issues 5 similar credentials verifier tries to verify all`() {
+        System.setProperty(org.slf4j.impl.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "TRACE")
+
         // init metadata and issue credential
         val schema = issuer1.createSchemaAndStoreOnLedger(GVT_SCHEMA_NAME, SCHEMA_VERSION, GVT_SCHEMA_ATTRIBUTES)
         val credDef = issuer1.createCredentialDefinitionAndStoreOnLedger(schema.getSchemaIdObject(), true)
@@ -167,29 +168,34 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         val revRegId = revReg.definition.getRevocationRegistryIdObject()
 
         // issue first credential
-        val credOffer1 = issuer1.createCredentialOffer(credDef.getCredentialDefinitionIdObject())
-        val credReq1 = prover.createCredentialRequest(prover.walletUser.getIdentityDetails().did, credOffer1)
-        val credInfo1 = issuer1.issueCredentialAndUpdateLedger(credReq1, credOffer1, revRegId) {
-            attributes["sex"] = CredentialValue("male")
-            attributes["name"] = CredentialValue("Alex")
-            attributes["height"] = CredentialValue("175")
-            attributes["age"] = CredentialValue("28")
+        for (i in 0..3) {
+            val credOffer1 = issuer1.createCredentialOffer(credDef.getCredentialDefinitionIdObject())
+            val credReq1 = prover.createCredentialRequest(prover.walletUser.getIdentityDetails().did, credOffer1)
+            val credInfo1 = issuer1.issueCredentialAndUpdateLedger(credReq1, credOffer1, revRegId) {
+                attributes["sex"] = CredentialValue("male")
+                attributes["name"] = CredentialValue("Alex$i")
+                attributes["height"] = CredentialValue("${i+175}")
+                attributes["age"] = CredentialValue("${i+28}")
+            }
+            val storedCredentialId = prover.checkLedgerAndReceiveCredential(credInfo1, credReq1, credOffer1)
+
+            // verify first credential
+            val proofReq1 = proofRequest("proof_req", "0.1") {
+                reveal("name") { FilterProperty.Value shouldBe "Alex$i" }
+                reveal("sex")
+                proveGreaterThan("age", 18)
+                proveNonRevocation(Interval(null, Interval.now().to))
+            }
+
+            val proof1 = prover.createProofFromLedgerData(proofReq1,
+                """{
+                    "sex":{"attr::name::value":"Alex$i", "attr::age::value": "${i+28}"},
+                    "age":{"attr::name::value":"Alex$i", "attr::age::value": "${i+28}"}
+                }"""
+            )
+            var proof1Valid = issuer1.verifyProofWithLedgerData(proofReq1, proof1)
+            assert(proof1Valid) {"Proof1 is invalid for Alex$i"}
         }
-        prover.checkLedgerAndReceiveCredential(credInfo1, credReq1, credOffer1)
-
-        // verify first credential
-        val proofReq1 = proofRequest("proof_req", "0.1") {
-            reveal("name") { FilterProperty.Value shouldBe "Alex" }
-            reveal("sex")
-            proveGreaterThan("age", 18)
-            proveNonRevocation(Interval.now())
-        }
-
-        val proof1 = prover.createProofFromLedgerData(proofReq1)
-
-        assert(issuer1.verifyProofWithLedgerData(proofReq1, proof1)) { "Proof is invalid for Alex" }
-
-        // TODO: this line should be optional, but it isn't
         //issuer1.revokeCredentialAndUpdateLedger(revReg.definition.getRevocationRegistryIdObject()!!, credInfo1.credRevocId!!)
 
         // issue second credential
@@ -212,10 +218,9 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
             proveNonRevocation(Interval.now())
         }
 
-        val proof2 = prover.createProofFromLedgerData(proofReq2)
+        val proof2 = prover.createProofFromLedgerData(proofReq2,"""{"age":{"attr::name::value":"Alice"}}""")
 
-        // TODO: is should be without "!" but it isn't
-        assert(!issuer1.verifyProofWithLedgerData(proofReq2, proof2)) { "Proof is not valid for Alice" }
+        assert(issuer1.verifyProofWithLedgerData(proofReq2, proof2)) { "Proof is not valid for Alice" }
     }
 
     @Test
