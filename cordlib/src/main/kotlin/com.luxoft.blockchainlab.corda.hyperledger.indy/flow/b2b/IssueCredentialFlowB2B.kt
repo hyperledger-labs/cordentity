@@ -11,7 +11,6 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.*
 import com.luxoft.blockchainlab.hyperledger.indy.IndyCredentialDefinitionNotFoundException
 import com.luxoft.blockchainlab.hyperledger.indy.IndyCredentialMaximumReachedException
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
-import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletService
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndContract
 import net.corda.core.flows.*

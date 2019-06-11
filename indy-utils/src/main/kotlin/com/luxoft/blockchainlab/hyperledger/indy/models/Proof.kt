@@ -295,7 +295,7 @@ data class Filter(
     var schemaVersion: String? = null,
     var issuerDid: String? = null,
     var credDefId: String? = null,
-    @JsonIgnore private val attributes: MutableMap<String, String> = mutableMapOf()
+    @JsonIgnore val attributes: MutableMap<String, String> = mutableMapOf()
 ) {
     @JsonAnyGetter
     fun getUnknownAttributes() = attributes

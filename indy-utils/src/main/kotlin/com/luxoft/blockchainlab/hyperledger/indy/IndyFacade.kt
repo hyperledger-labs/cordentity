@@ -3,7 +3,6 @@ package com.luxoft.blockchainlab.hyperledger.indy
 import com.luxoft.blockchainlab.hyperledger.indy.ledger.LedgerService
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
 import com.luxoft.blockchainlab.hyperledger.indy.wallet.WalletService
-import org.hyperledger.indy.sdk.did.Did
 
 const val DEFAULT_MASTER_SECRET_ID = "main"
 
@@ -99,12 +98,14 @@ interface IndyFacade {
      * @param credentialInfo [CredentialInfo] - credential and all reliable data
      * @param credentialRequest [CredentialRequestInfo] - credential request and all reliable data
      * @param offer [CredentialOffer]
+     *
+     * @return local UUID of the stored credential in the prover's wallet
      */
     fun receiveCredential(
         credentialInfo: CredentialInfo,
         credentialRequest: CredentialRequestInfo,
         offer: CredentialOffer
-    )
+    ): String
 
     /**
      * Revokes previously issued [Credential] using [WalletService] and [LedgerService]
@@ -121,12 +122,14 @@ interface IndyFacade {
      * Creates [ProofInfo] for provided [ProofRequest].
      *
      * @param proofRequest [ProofRequest] - proof request created by verifier
+     * @param extraQuery - additional WQL query applied to Wallet's credential search
      * @param masterSecretId [String]
      *
      * @return [ProofInfo] - proof and all reliable data
      */
     fun createProofFromLedgerData(
         proofRequest: ProofRequest,
+        extraQuery: String? = null,
         masterSecretId: String = DEFAULT_MASTER_SECRET_ID
     ): ProofInfo
 

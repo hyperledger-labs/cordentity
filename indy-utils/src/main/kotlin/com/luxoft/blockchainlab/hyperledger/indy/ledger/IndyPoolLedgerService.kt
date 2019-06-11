@@ -289,7 +289,7 @@ class IndyPoolLedgerService(val pool: Pool, val wallet: Wallet, val did: String)
                 .map { Pair(it.getRevocationRegistryIdObject()!!, it.timestamp!!) }
                 .distinct()
                 .associate { (revRegId, timestamp) ->
-                    val response = retrieveRevocationRegistryDelta(revRegId, Interval(timestamp, timestamp), delayMs, retryTimes)
+                    val response = retrieveRevocationRegistryDelta(revRegId, Interval(null, timestamp), delayMs, retryTimes)
                         ?: throw RuntimeException("Revocation registry for definition $revRegId at timestamp $timestamp doesn't exist in ledger")
 
                     val (tmstmp, revReg) = response
