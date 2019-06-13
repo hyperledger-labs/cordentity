@@ -43,7 +43,7 @@ class PythonRefAgentConnectionTest {
                     else acceptInvite(invitationString).subscribe { master ->
                         val tails = master.requestTails(tailsHash).toBlocking().value().tails[tailsHash]
                         if (tails != tailsHash)
-                            throw AgentConnectionException("Tails are wrong!!! hash $tailsHash, received $tails")
+                            throw AgentConnectionException("Tails file content doesn't match!!! hash $tailsHash, received $tails")
                         val offer = CredentialOffer(proofSchemaId, ":::1", KeyCorrectnessProof("", "", emptyList()), "")
                         master.sendCredentialOffer(offer)
                         disconnect()

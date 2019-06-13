@@ -58,9 +58,9 @@ interface SsiUser {
      *
      * @return                          created
      */
-    fun getRevocationRegistryInfo(
+    fun getRevocationRegistryDefinition(
             credentialDefinitionId: CredentialDefinitionId
-    ): RevocationRegistryInfo?
+    ): RevocationRegistryDefinition?
 
     /**
      * Creates [CredentialOffer] using [WalletUser]

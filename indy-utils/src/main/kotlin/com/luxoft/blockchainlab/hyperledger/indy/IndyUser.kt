@@ -50,17 +50,12 @@ class IndyUser(
      *
      * @return                          created
      */
-    override fun getRevocationRegistryInfo(
+    override fun getRevocationRegistryDefinition(
             credentialDefinitionId: CredentialDefinitionId
-    ): RevocationRegistryInfo? {
+    ): RevocationRegistryDefinition? {
 
         val revRegId = credentialDefinitionId.getPossibleRevocationRegistryDefinitionId(IndySDKWalletUser.REVOCATION_TAG)
-        val definitionFromLedger = ledgerUser.retrieveRevocationRegistryDefinition(revRegId) ?: return null
-
-        val entryFromLedger = ledgerUser.retrieveRevocationRegistryEntry(revRegId, Timestamp.now())
-                ?: throw RuntimeException("Unable to get revocation registry entry of existing definition $revRegId from ledger")
-
-        return RevocationRegistryInfo(definitionFromLedger, entryFromLedger.second)
+        return ledgerUser.retrieveRevocationRegistryDefinition(revRegId)
     }
 
     /**
