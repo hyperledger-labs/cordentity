@@ -108,7 +108,7 @@ class IndyParty(private val webSocket: AgentWebSocketClient, val did: String, va
     private val requestHandlerRef: AtomicReference<(TailsRequest)->TailsResponse> =
         AtomicReference<(TailsRequest)->TailsResponse> { TailsResponse(it.tailsHash, mapOf())}
 
-    private var tailRequestMessageHandler: (TailsRequest) -> Unit
+    private lateinit var tailRequestMessageHandler: (TailsRequest) -> Unit
 
     init {
         tailRequestMessageHandler = {
