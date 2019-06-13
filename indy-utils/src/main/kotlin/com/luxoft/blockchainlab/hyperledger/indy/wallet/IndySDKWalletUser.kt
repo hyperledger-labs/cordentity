@@ -221,14 +221,16 @@ class IndySDKWalletUser(
 
     override fun createProof(
         proofRequest: ProofRequest,
-        extraQuery: String?,
+        extraQuery: Map<String, Map<String, Any>>?,
         provideSchema: SchemaProvider,
         provideCredentialDefinition: CredentialDefinitionProvider,
         masterSecretId: String,
         revocationStateProvider: RevocationStateProvider?
     ): ProofInfo {
         val proofRequestJson = SerializationUtils.anyToJSON(proofRequest)
-        val searchObj = CredentialsSearchForProofReq.open(wallet, proofRequestJson, extraQuery).get()
+        val extraQueryJson = if (extraQuery == null) null else SerializationUtils.anyToJSON(extraQuery)
+
+        val searchObj = CredentialsSearchForProofReq.open(wallet, proofRequestJson, extraQueryJson).get()
 
         val allSchemaIds = mutableListOf<SchemaId>()
         val allCredentialDefinitionIds = mutableListOf<CredentialDefinitionId>()

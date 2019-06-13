@@ -152,7 +152,10 @@ class IndyUser(
         return revocationRegistryEntry
     }
 
-    override fun createProofFromLedgerData(proofRequest: ProofRequest, extraQuery: String?, masterSecretId: String): ProofInfo {
+    override fun createProofFromLedgerData(proofRequest: ProofRequest, masterSecretId: String): ProofInfo {
+        val extraQuery = proofRequest.extraQuery
+        proofRequest.extraQuery = null
+
         return walletUser.createProof(
             proofRequest,
             extraQuery,
@@ -173,8 +176,6 @@ class IndyUser(
 
     override fun verifyProofWithLedgerData(proofReq: ProofRequest, proof: ProofInfo): Boolean {
         val dataUsedInProofJson = ledgerUser.retrieveDataUsedInProof(proofReq, proof)
-
-        proofReq.requestedAttributes.values.forEach { it.restrictions?.attributes?.clear() }
 
         return walletUser.verifyProof(proofReq, proof, dataUsedInProofJson)
     }

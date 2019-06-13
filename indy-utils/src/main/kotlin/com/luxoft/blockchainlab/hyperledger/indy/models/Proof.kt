@@ -215,7 +215,8 @@ data class ProofRequest(
     var nonce: String,
     val requestedAttributes: MutableMap<String, CredentialAttributeReference> = mutableMapOf(),
     val requestedPredicates: MutableMap<String, CredentialPredicateReference> = mutableMapOf(),
-    var nonRevoked: Interval? = null
+    var nonRevoked: Interval? = null,
+    var extraQuery: Map<String, Map<String, Any>>? = null
 )
 
 data class CredentialAttributeReference(
@@ -269,13 +270,12 @@ data class Filter(
             FilterProperty.SchemaVersion -> schemaVersion = value
             FilterProperty.IssuerDid -> issuerDid = value
             FilterProperty.CredentialDefinitionId -> credDefId = value
-            FilterProperty.Value -> attributes["attr::$attrName::value"] = value
         }
     }
 }
 
 enum class FilterProperty {
-    Value, SchemaId, SchemaIssuerDid, SchemaName, SchemaVersion, IssuerDid, CredentialDefinitionId
+    SchemaId, SchemaIssuerDid, SchemaName, SchemaVersion, IssuerDid, CredentialDefinitionId
 }
 
 /**

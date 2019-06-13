@@ -122,14 +122,12 @@ interface SsiUser {
      * Creates [ProofInfo] for provided [ProofRequest].
      *
      * @param proofRequest [ProofRequest] - proof request created by verifier
-     * @param extraQuery - additional WQL query applied to Wallet's credential search
      * @param masterSecretId [String]
      *
      * @return [ProofInfo] - proof and all reliable data
      */
     fun createProofFromLedgerData(
         proofRequest: ProofRequest,
-        extraQuery: String? = null,
         masterSecretId: String = DEFAULT_MASTER_SECRET_ID
     ): ProofInfo
 

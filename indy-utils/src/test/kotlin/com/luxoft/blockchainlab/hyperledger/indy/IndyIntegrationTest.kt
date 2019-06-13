@@ -50,7 +50,7 @@ open class IndyIntegrationTest {
         @JvmStatic
         @BeforeClass
         fun setUpTest() {
-            System.setProperty(org.slf4j.impl.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "OFF")
+            System.setProperty(org.slf4j.impl.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "TRACE")
 
             // Create and Open Pool
             poolName = PoolHelper.DEFAULT_POOL_NAME

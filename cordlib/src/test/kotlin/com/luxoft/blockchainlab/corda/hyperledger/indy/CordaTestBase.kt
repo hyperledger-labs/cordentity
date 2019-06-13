@@ -232,7 +232,6 @@ open class CordaTestBase {
                         if (skip) return@filterLoop
 
                         when (it) {
-                            FilterProperty.Value -> it shouldBe value
                             FilterProperty.CredentialDefinitionId -> it shouldBe payload.credDefId.toString()
                             FilterProperty.SchemaId -> it shouldBe payload.schemaId.toString()
                             FilterProperty.IssuerDid -> it shouldBe payload.issuerDid

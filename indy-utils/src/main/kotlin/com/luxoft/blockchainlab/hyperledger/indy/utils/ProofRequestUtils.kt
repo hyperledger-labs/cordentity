@@ -12,6 +12,7 @@ import kotlin.math.absoluteValue
  *  [ProofRequest.reveal]
  *  [ProofRequest.proveGreaterThan]
  *  [ProofRequest.proveNonRevocation]
+ *  [ProofRequest.extraQuery] - additional WQL query applied to Wallet's credential search
  * }
  *
  * @param name [String] - proof request name
@@ -93,6 +94,15 @@ fun ProofRequest.proveNonRevocation(interval: Interval) {
     nonRevoked = interval
 }
 
+class ExtraQueryBuilder(val attributes: MutableMap<String, WqlQuery> = mutableMapOf())
+
+fun ProofRequest.extraQuery(init: ExtraQueryBuilder.() -> Unit) {
+    val builder = ExtraQueryBuilder()
+    builder.init()
+
+    this.extraQuery = builder.attributes.entries.associate { it.key to it.value.toMap() }
+}
+
 /**
  * Specifies all possible filter parameters related to some credential
  */
@@ -169,7 +179,6 @@ fun ProofRequest.applyPayloadRandomly(payload: ProofRequestPayload) {
                     if (skip) return@filterLoop
 
                     when (it) {
-                        FilterProperty.Value -> it shouldBe value
                         FilterProperty.CredentialDefinitionId -> it shouldBe payload.credDefId.toString()
                         FilterProperty.SchemaId -> it shouldBe payload.schemaId.toString()
                         FilterProperty.IssuerDid -> it shouldBe payload.issuerDid
