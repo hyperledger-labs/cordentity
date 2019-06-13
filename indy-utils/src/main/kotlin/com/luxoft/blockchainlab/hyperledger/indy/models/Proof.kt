@@ -418,7 +418,10 @@ data class ProofInfo(
     fun isAttributeExists(value: String) = proofData.requestedProof.revealedAttrs.values.any { it.raw == value }
 
     @JsonIgnore
-    fun getAttribyteValue(attrName: String) = proofData.requestedProof.revealedAttrs[attrName]
+    fun getAttributeValue(attrName: String) = proofData.requestedProof.revealedAttrs[attrName]
+
+    @JsonIgnore
+    operator fun get(attrName: String) = getAttributeValue(attrName)
 }
 
 data class ProofIdentifier(

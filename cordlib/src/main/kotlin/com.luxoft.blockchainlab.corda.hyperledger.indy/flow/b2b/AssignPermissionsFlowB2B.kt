@@ -51,8 +51,8 @@ object AssignPermissionsFlowB2B {
                 val otherSide: Party = whoIs(authority)
                 val flowSession: FlowSession = initiateFlow(otherSide)
 
-                // FIXME: parameters `role` and `alias` are mixed up
-                flowSession.send(IndyPermissionsRequest(indyUser().did, indyUser().verkey, role, alias))
+                val identity = indyUser().walletUser.getIdentityDetails()
+                flowSession.send(IndyPermissionsRequest(identity.did, identity.verkey, alias, role))
 
             } catch (t: Throwable) {
                 logger.error("", t)
@@ -68,13 +68,12 @@ object AssignPermissionsFlowB2B {
         override fun call() {
             try {
                 flowSession.receive(AssignPermissionsFlowB2B.IndyPermissionsRequest::class.java).unwrap { indyPermissions ->
-                    // FIXME: parameters `role` and `alias` are mixed up
-                    indyUser().setPermissionsFor(
+                    indyUser().addKnownIdentitiesAndStoreOnLedger(
                         IdentityDetails(
                             indyPermissions.did,
                             indyPermissions.verkey,
-                            indyPermissions.role,
-                            indyPermissions.alias
+                            indyPermissions.alias,
+                            indyPermissions.role
                         )
                     )
                 }

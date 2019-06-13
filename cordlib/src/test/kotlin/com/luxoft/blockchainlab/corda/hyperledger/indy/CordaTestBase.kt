@@ -6,6 +6,8 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.IssueCredentialF
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.VerifyCredentialFlowB2B
 import com.luxoft.blockchainlab.corda.hyperledger.indy.service.IndyService
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.ConfigHelper
+import com.luxoft.blockchainlab.hyperledger.indy.ledger.IndyPoolLedgerUser
+import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletUser
 import io.mockk.every
 import io.mockk.mockkObject
 import net.corda.core.concurrent.CordaFuture
@@ -23,9 +25,6 @@ import net.corda.testing.node.internal.MockNodeArgs
 import net.corda.testing.node.internal.newContext
 import org.junit.After
 import org.junit.Before
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
-import org.slf4j.event.Level
 import java.time.Duration
 import java.util.*
 import kotlin.math.absoluteValue
@@ -128,7 +127,6 @@ open class CordaTestBase {
     open class MockIndyNode(args: MockNodeArgs) : InternalMockNetwork.MockNode(args) {
 
         companion object {
-            val sessionId = Random().nextLong().absoluteValue.toString()
             val TEST_GENESIS_FILE_PATH by lazy {
                 this::class.java.classLoader.getResource("docker_pool_transactions_genesis.txt").file
             }
@@ -137,6 +135,7 @@ open class CordaTestBase {
         private val organisation: String = args.config.myLegalName.organisation
 
         override fun start(): StartedNode<MockNode> {
+            val sessionId = Random().nextLong().absoluteValue.toString()
             mockkObject(ConfigHelper)
 
             every { ConfigHelper.getPoolName() } returns organisation + sessionId
@@ -160,8 +159,9 @@ open class CordaTestBase {
         try {
             for (party in parties) {
                 val indyUser = party.services.cordaService(IndyService::class.java).indyUser
-                indyUser.wallet.closeWallet().get()
-                indyUser.pool.closePoolLedger().get()
+                // TODO: get rid of casts
+                (indyUser.walletUser as IndySDKWalletUser).wallet.closeWallet().get()
+                (indyUser.ledgerUser as IndyPoolLedgerUser).pool.closePoolLedger().get()
             }
 
             parties.clear()

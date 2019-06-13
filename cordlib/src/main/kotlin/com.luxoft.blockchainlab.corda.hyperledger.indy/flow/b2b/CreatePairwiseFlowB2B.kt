@@ -4,8 +4,6 @@ import co.paralleluniverse.fibers.Suspendable
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.indyUser
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.whoIs
 import com.luxoft.blockchainlab.hyperledger.indy.models.IdentityDetails
-import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
-import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils.anyToJSON
 import net.corda.core.flows.*
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.identity.Party
@@ -32,10 +30,10 @@ object CreatePairwiseFlowB2B {
                 val flowSession: FlowSession = initiateFlow(otherSide)
 
                 val sessionDid = flowSession.receive<IdentityDetails>().unwrap {
-                    indyUser().createSessionDid(it)
+                    indyUser().walletUser.createSessionDid(it)
                 }
 
-                val identityDetails = indyUser().getIdentity(sessionDid)
+                val identityDetails = indyUser().walletUser.getIdentityDetails(sessionDid)
 
                 flowSession.send(identityDetails)
                 return sessionDid
@@ -47,23 +45,21 @@ object CreatePairwiseFlowB2B {
         }
     }
 
-
     @InitiatedBy(CreatePairwiseFlowB2B.Prover::class)
     open class Issuer(private val flowSession: FlowSession) : FlowLogic<Unit>() {
 
         @Suspendable
         override fun call() {
             try {
-                val myIdentityRecord = indyUser().getIdentity()
+                val myIdentityRecord = indyUser().walletUser.getIdentityDetails()
 
                 flowSession.sendAndReceive<IdentityDetails>(myIdentityRecord).unwrap {
-                    indyUser().addKnownIdentities(it)
+                    indyUser().addKnownIdentitiesAndStoreOnLedger(it)
                 }
             } catch (t: Throwable) {
                 logger.error("", t)
                 throw FlowException(t.message)
             }
         }
-
     }
 }

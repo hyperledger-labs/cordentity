@@ -15,6 +15,6 @@ object IndySchemaSchemaV1 : MappedSchema(
 ) {
     @Entity
     data class PersistentSchema(val id: String = "") : PersistentState() {
-        constructor(schema: IndySchema) : this(schema.id)
+        constructor(schema: IndySchema) : this(schema.id.toString())
     }
 }

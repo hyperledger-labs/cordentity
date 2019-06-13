@@ -48,21 +48,13 @@ class IndyCredentialContract : Contract {
 
             "All of the participants must be signers." using (signers.containsAll(indyProof.participants.map { it.owningKey }))
 
-            // TODO: this is unnecessary, 'cause only the caller VerifyProofFlow is interested in proof validity
-            // TODO: removing this line will make cordentity compatible with sandboxed JVM
-            "IndyCredential should be verified." using (IndyUser.verifyProof(
-                indyProof.proofReq,
-                indyProof.proof,
-                indyProof.usedData
-            ))
-
             expectedAttrs.forEach {
                 "Proof provided for invalid value." using indyProof.proof.isAttributeExists(it.value)
             }
         }
 
     private fun creation(tx: LedgerTransaction, signers: Set<PublicKey>) = requireThat {
-        // TODO: should contain 1 input and 1 output states of type IndyCredentialDefinition
+        // TODO: should contain 1 input and 1 output states of type IndyRevocationRegistryDefinition
         // TODO: should contain 1 output state of type IndyCredential
     }
 
