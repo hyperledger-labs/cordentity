@@ -12,7 +12,6 @@ import kotlin.math.absoluteValue
  *  [ProofRequest.reveal]
  *  [ProofRequest.proveGreaterThan]
  *  [ProofRequest.proveNonRevocation]
- *  [ProofRequest.extraQuery] - additional WQL query applied to Wallet's credential search
  * }
  *
  * @param name [String] - proof request name
