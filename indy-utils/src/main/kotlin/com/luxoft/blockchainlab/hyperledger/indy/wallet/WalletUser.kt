@@ -118,10 +118,10 @@ interface IndyProver : IndyWalletHolder {
      */
     fun createProof(
         proofRequest: ProofRequest,
-        extraQuery: Map<String, Map<String, Any>>?,
         provideSchema: SchemaProvider,
         provideCredentialDefinition: CredentialDefinitionProvider,
         masterSecretId: String,
+        extraQuery: Map<String, Map<String, Any>>?,
         revocationStateProvider: RevocationStateProvider?
     ): ProofInfo
 

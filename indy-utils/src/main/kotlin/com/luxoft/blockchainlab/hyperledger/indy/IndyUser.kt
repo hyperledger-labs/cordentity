@@ -161,10 +161,10 @@ class IndyUser(
 
         return walletUser.createProof(
             proofRequest,
-            extraQuery,
             provideSchema = { ledgerUser.retrieveSchema(it)!! },
             provideCredentialDefinition = { ledgerUser.retrieveCredentialDefinition(it)!! },
-            masterSecretId = masterSecretId
+            masterSecretId = masterSecretId,
+            extraQuery = extraQuery
         ) { revRegId, credRevId, interval ->
             val revocationRegistryDefinition = ledgerUser.retrieveRevocationRegistryDefinition(revRegId)
                 ?: throw IndyRevRegNotFoundException(revRegId, "Get revocation state has been failed")
