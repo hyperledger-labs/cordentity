@@ -224,6 +224,17 @@ class OrWqlQuery : ComplexWqlQuery() {
 typealias SimpleWqlQueryModifier = SimpleWqlQuery.() -> Unit
 typealias ComplexWqlQueryModifier = ComplexWqlQuery.() -> Unit
 
+/**
+ * Typed-builder for WQL
+ * Example:
+ * wql {
+ *  or/and {
+ *      "name" eq/neq/lt/lte/gt/gte/like "value"
+ *      "name" containsIn listOf("value1", "value2")
+ *      not { "name" eq "value3" }
+ *  }
+ * }
+ */
 fun wql(init: SimpleWqlQueryModifier): SimpleWqlQuery {
     val query = IsWqlQuery()
     query.init()

@@ -107,7 +107,8 @@ interface IndyProver : IndyWalletHolder {
      * Creates proof for provided proof request
      *
      * @param proofRequest [ProofRequest] - proof request created by verifier
-     * @param extraQuery - additional WQL query applied to Wallet's credential search
+     * @param extraQuery Map [String] to Map [String] to [Any] - additional WQL query applied to Wallet's credential search
+     *  use [com.luxoft.blockchainlab.hyperledger.indy.utils.wql] to build it nicely (examples in tests)
      * @param provideSchema [SchemaProvider] - provide schema for each credential
      * @param provideCredentialDefinition [CredentialDefinitionProvider] - provide credential definition for each credential
      * @param masterSecretId [String]

@@ -2,6 +2,7 @@ package com.luxoft.blockchainlab.hyperledger.indy
 
 import com.luxoft.blockchainlab.hyperledger.indy.ledger.LedgerUser
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
+import com.luxoft.blockchainlab.hyperledger.indy.utils.ExtraQueryBuilder
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import com.luxoft.blockchainlab.hyperledger.indy.wallet.WalletUser
 
@@ -152,9 +153,11 @@ class IndyUser(
         return revocationRegistryEntry
     }
 
-    override fun createProofFromLedgerData(proofRequest: ProofRequest, masterSecretId: String): ProofInfo {
-        val extraQuery = proofRequest.extraQuery
-        proofRequest.extraQuery = null
+    override fun createProofFromLedgerData(proofRequest: ProofRequest, masterSecretId: String, init: ExtraQueryBuilder.() -> Unit): ProofInfo {
+        val builder = ExtraQueryBuilder()
+        builder.init()
+        val builderEntries = builder.attributes.entries
+        val extraQuery = if (builderEntries.isEmpty()) null else builderEntries.associate { it.key to it.value.toMap() }
 
         return walletUser.createProof(
             proofRequest,

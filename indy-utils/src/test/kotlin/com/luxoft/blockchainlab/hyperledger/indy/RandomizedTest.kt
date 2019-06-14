@@ -267,7 +267,7 @@ class RandomizedTest : IndyIntegrationTest() {
 
             val unableToProve = mutableListOf<ProofState>()
 
-            val nonRevoked = if (enableRevocation) Interval.now() else null
+            val nonRevoked = if (enableRevocation) Interval.allTime() else null
 
             verifiers.forEach { (verifierWallet, verifier) ->
                 credentialsByProver.entries.forEach { (prover, credentials) ->
@@ -306,7 +306,7 @@ class RandomizedTest : IndyIntegrationTest() {
                     credentialsByProver.entries.forEach { (prover, credentials) ->
                         val (proofStatus, proofRequest) = verifier.verifyRandomAttributes(
                             prover,
-                            Interval.now(),
+                            Interval.allTime(),
                             *(credentials.map { it.credential }.toTypedArray())
                         )
 

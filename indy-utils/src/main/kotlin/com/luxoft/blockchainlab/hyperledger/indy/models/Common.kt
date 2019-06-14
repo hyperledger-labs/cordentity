@@ -24,7 +24,6 @@ object Timestamp {
 data class Interval(val from: Long?, val to: Long) {
     companion object {
         fun allTime() = Interval(null, Timestamp.now())
-        fun now(plusMs: Long = 0) = Interval(Timestamp.now() + plusMs, Timestamp.now() + plusMs)
     }
 }
 

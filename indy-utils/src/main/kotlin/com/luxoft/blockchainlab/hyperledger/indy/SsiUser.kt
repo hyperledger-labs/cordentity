@@ -2,6 +2,7 @@ package com.luxoft.blockchainlab.hyperledger.indy
 
 import com.luxoft.blockchainlab.hyperledger.indy.ledger.LedgerUser
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
+import com.luxoft.blockchainlab.hyperledger.indy.utils.ExtraQueryBuilder
 import com.luxoft.blockchainlab.hyperledger.indy.wallet.WalletUser
 
 const val DEFAULT_MASTER_SECRET_ID = "main"
@@ -128,7 +129,8 @@ interface SsiUser {
      */
     fun createProofFromLedgerData(
         proofRequest: ProofRequest,
-        masterSecretId: String = DEFAULT_MASTER_SECRET_ID
+        masterSecretId: String = DEFAULT_MASTER_SECRET_ID,
+        init: ExtraQueryBuilder.() -> Unit = {}
     ): ProofInfo
 
     /**

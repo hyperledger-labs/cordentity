@@ -215,8 +215,7 @@ data class ProofRequest(
     var nonce: String,
     val requestedAttributes: MutableMap<String, CredentialAttributeReference> = mutableMapOf(),
     val requestedPredicates: MutableMap<String, CredentialPredicateReference> = mutableMapOf(),
-    var nonRevoked: Interval? = null,
-    var extraQuery: Map<String, Map<String, Any>>? = null
+    var nonRevoked: Interval? = null
 )
 
 data class CredentialAttributeReference(
@@ -271,6 +270,10 @@ data class Filter(
             FilterProperty.IssuerDid -> issuerDid = value
             FilterProperty.CredentialDefinitionId -> credDefId = value
         }
+    }
+
+    infix fun String.shouldBe(value: String) {
+        attributes["attr::${this@shouldBe}::value"] = value
     }
 }
 

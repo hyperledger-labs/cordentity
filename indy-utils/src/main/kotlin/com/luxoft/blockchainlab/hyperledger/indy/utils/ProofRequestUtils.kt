@@ -96,13 +96,6 @@ fun ProofRequest.proveNonRevocation(interval: Interval) {
 
 class ExtraQueryBuilder(val attributes: MutableMap<String, WqlQuery> = mutableMapOf())
 
-fun ProofRequest.extraQuery(init: ExtraQueryBuilder.() -> Unit) {
-    val builder = ExtraQueryBuilder()
-    builder.init()
-
-    this.extraQuery = builder.attributes.entries.associate { it.key to it.value.toMap() }
-}
-
 /**
  * Specifies all possible filter parameters related to some credential
  */
