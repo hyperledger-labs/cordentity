@@ -39,6 +39,7 @@ class IndyService(services: AppServiceHub) : SingletonSerializeAsToken() {
     private val userRole = ConfigHelper.getRole() ?: "" // TODO: why do we need this in config?
     private val did = ConfigHelper.getDid()
     private val seed = ConfigHelper.getSeed()
+    private val tailsPath = ConfigHelper.getTailsPath()
 
     val indyUser: SsiUser by lazy {
         val nodeName = services.myInfo.name().organisation
@@ -49,7 +50,7 @@ class IndyService(services: AppServiceHub) : SingletonSerializeAsToken() {
         val wallet = WalletHelper.openOrCreate(walletName, walletPassword)
         logger.debug { "Wallet created for $nodeName" }
 
-        val tailsPath = "tails"
+        val tailsPath = tailsPath ?: "tails"
         val didConfig = DidConfig(did, seed, null, null)
 
         val walletUser = IndySDKWalletUser(wallet, didConfig, tailsPath)
