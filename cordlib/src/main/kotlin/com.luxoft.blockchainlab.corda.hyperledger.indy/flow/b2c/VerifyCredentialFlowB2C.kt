@@ -26,7 +26,7 @@ object VerifyCredentialFlowB2C {
             private val attributes: List<ProofAttribute>,
             private val predicates: List<ProofPredicate>,
             private val indyPartyDID: String,
-            private val nonRevoked: Interval = Interval.now()
+            private val nonRevoked: Interval? = Interval.now()
     ) : FlowLogic<Boolean>() {
 
         @Suspendable

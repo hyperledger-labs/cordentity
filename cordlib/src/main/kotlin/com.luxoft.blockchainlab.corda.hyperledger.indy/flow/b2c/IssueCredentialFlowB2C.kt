@@ -29,8 +29,8 @@ object IssueCredentialFlowB2C {
         private val identifier: String,
         private val credentialDefinitionId: CredentialDefinitionId,
         private val revocationRegistryDefinitionId: RevocationRegistryDefinitionId?,
-        private val credentialProposalProvider: () -> CredentialProposal,
-        private val indyPartyDID: String
+        private val indyPartyDID: String,
+        private val credentialProposalProvider: () -> CredentialProposal
     ) : FlowLogic<Unit>() {
 
         @Suspendable
