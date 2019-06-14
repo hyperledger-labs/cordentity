@@ -24,7 +24,7 @@ import java.util.concurrent.ExecutionException
 class IndySDKWalletUser(
     val wallet: Wallet,
     didConfig: DidConfig = DidConfig(),
-    val tailsPath: String = "tails"
+    private val tailsPath: String = "tails"
 ) : WalletUser {
 
     override val did: String
@@ -412,5 +412,9 @@ class IndySDKWalletUser(
 
     override fun getIdentityDetails(did: String): IdentityDetails {
         return IdentityDetails(did, Did.keyForLocalDid(wallet, did).get(), null, null)
+    }
+
+    override fun getTailsPath(): String {
+        return tailsPath
     }
 }

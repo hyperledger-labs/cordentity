@@ -267,4 +267,11 @@ interface IndyWalletHolder {
      * @return [IdentityDetails]
      */
     fun getIdentityDetails(did: String): IdentityDetails
+
+    /**
+     * Gets TAILS file path
+     *
+     * @return TAILS file path
+     */
+    fun getTailsPath(): String
 }
