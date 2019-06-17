@@ -29,9 +29,6 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
     @Before
     @Throws(Exception::class)
     fun setUp() {
-        WalletHelper.createOrTrunc("Trustee", "123")
-        val trusteeWallet = WalletHelper.openExisting("Trustee", "123")
-
         WalletHelper.createOrTrunc(issuerWalletName, walletPassword)
         issuerWallet = WalletHelper.openExisting(issuerWalletName, walletPassword)
 
@@ -40,9 +37,6 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
 
         WalletHelper.createOrTrunc(proverWalletName, walletPassword)
         proverWallet = WalletHelper.openExisting(proverWalletName, walletPassword)
-
-        // create trustee did
-        val trusteeDidInfo = createTrusteeDid(trusteeWallet)
 
         // create indy users
         val issuerWalletUser = IndySDKWalletUser(issuerWallet)
@@ -58,12 +52,8 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         prover = IndyUser.with(proverLedgerUser).with(proverWalletUser).build()
 
         // set relationships
-        linkIssuerToTrustee(trusteeWallet, trusteeDidInfo, issuerWalletUser.getIdentityDetails())
-        linkIssuerToTrustee(trusteeWallet, trusteeDidInfo, issuer2WalletUser.getIdentityDetails())
-
-        issuer1.addKnownIdentitiesAndStoreOnLedger(prover.walletUser.getIdentityDetails())
-
-        trusteeWallet.closeWallet().get()
+        WalletUtils.grantLedgerRights(pool, issuerWalletUser.getIdentityDetails())
+        WalletUtils.grantLedgerRights(pool, issuer2WalletUser.getIdentityDetails())
     }
 
     @After

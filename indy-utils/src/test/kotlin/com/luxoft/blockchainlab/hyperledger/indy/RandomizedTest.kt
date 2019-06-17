@@ -16,11 +16,6 @@ class RandomizedTest : IndyIntegrationTest() {
     val rng = Random()
 
     fun createIssuers(count: Int): List<Pair<Wallet, SsiUser>> {
-        WalletHelper.createOrTrunc("Trustee", "123")
-        val trusteeWallet = WalletHelper.openExisting("Trustee", "123")
-        // create trustee did
-        val trusteeDidInfo = createTrusteeDid(trusteeWallet)
-
         return (0 until count).map {
             WalletHelper.createOrTrunc("Issuer-$it", "123")
             val issuerWallet = WalletHelper.openExisting("Issuer-$it", "123")
@@ -29,10 +24,10 @@ class RandomizedTest : IndyIntegrationTest() {
             val issuerLedgerUser = IndyPoolLedgerUser(pool, issuerWalletUser.did) { issuerWalletUser.sign(it) }
             val issuerFacade = IndyUser.with(issuerWalletUser).with(issuerLedgerUser).build()
 
-            linkIssuerToTrustee(trusteeWallet, trusteeDidInfo, issuerWalletUser.getIdentityDetails())
+            WalletUtils.grantLedgerRights(pool, issuerWalletUser.getIdentityDetails())
 
             Pair(issuerWallet, issuerFacade)
-        }.also { trusteeWallet.closeWallet().get() }
+        }
     }
 
     fun createEntities(name: String, count: Int) = (0 until count).map {
