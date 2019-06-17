@@ -33,9 +33,9 @@ data class NymResponse(
     }
 
     data class StateProof(
-            val multi_signature: MultiSignature,
-            val proof_nodes: String,
-            val root_hash: String
+        val multiSignature: MultiSignature,
+        val proofNodes: String,
+        val rootHash: String
     )
 
     data class MultiSignature(
@@ -45,10 +45,10 @@ data class NymResponse(
     )
 
     data class Value(
-            val ledger_id: Int,
-            val pool_state_root_hash: String,
-            val state_root_hash: String,
-            val timestamp: Int,
-            val txn_root_hash: String
+        val ledgerId: Int,
+        val poolStateRootHash: String,
+        val stateRootHash: String,
+        val timestamp: Int,
+        val txnRootHash: String
     )
 }

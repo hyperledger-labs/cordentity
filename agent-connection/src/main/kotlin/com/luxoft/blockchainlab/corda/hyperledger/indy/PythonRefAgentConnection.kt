@@ -303,7 +303,7 @@ class PythonRefAgentConnection : AgentConnection {
     /**
      * Waits for incoming connection from whatever party which possesses the invite
      */
-    override fun waitForInvitedParty(invite: String, timeout: Long): Single<IndyPartyConnection> {
+    override fun waitForInvitedParty(invite: String, timeoutMs: Long): Single<IndyPartyConnection> {
         return Single.create { observer ->
             try {
                 if (getConnectionStatus() == AgentConnectionStatus.AGENT_CONNECTED) {
@@ -316,7 +316,7 @@ class PythonRefAgentConnection : AgentConnection {
                     /**
                      * Wait until the STATE has pairwise connection corresponding to the invite.
                      */
-                    waitForPairwiseConnection(pubKey).timeout(timeout, TimeUnit.MILLISECONDS).subscribe({ pairwise ->
+                    waitForPairwiseConnection(pubKey).timeout(timeoutMs, TimeUnit.MILLISECONDS).subscribe({ pairwise ->
                         val theirDid = pairwise["their_did"].asText()
                         val indyParty = IndyParty(webSocket, theirDid,
                                 pairwise["metadata"]["their_endpoint"].asText(),
