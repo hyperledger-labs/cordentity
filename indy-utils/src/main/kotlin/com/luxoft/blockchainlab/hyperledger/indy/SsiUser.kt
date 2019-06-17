@@ -82,7 +82,7 @@ interface SsiUser {
      * @param credentialRequest [CredentialRequestInfo] - [CredentialRequest] and all reliable info
      * @param offer [CredentialOffer] - credential offer
      * @param revocationRegistryId [RevocationRegistryDefinitionId] or [null] - revocation registry definition id
-     * @param proposalProvider lambda returning [Map] of [String] to [CredentialValue] - credential proposal
+     * @param proposalFiller [CredentialProposal].() -> [Unit] - [CredentialProposal] initializer - use attributes["${name}"] inside
      *
      * @return [CredentialInfo] - credential and all reliable data
      */
@@ -124,6 +124,7 @@ interface SsiUser {
      *
      * @param proofRequest [ProofRequest] - proof request created by verifier
      * @param masterSecretId [String]
+     * @param init: [ExtraQueryBuilder].() -> [Unit] - extra query initializer, use attributes["${name}"] = [wql] DSL to create it
      *
      * @return [ProofInfo] - proof and all reliable data
      */
@@ -136,7 +137,7 @@ interface SsiUser {
     /**
      * Verifies [ProofInfo] produced by prover
      *
-     * @param proofReq [ProofRequest] - proof request used by prover to create proof
+     * @param proofReq [ProofRequest] - proof request used by prover to create proof, use [proofRequest] DSL to create it
      * @param proof [ProofInfo] - proof created by prover
      *
      * @return [Boolean] - is proof valid?

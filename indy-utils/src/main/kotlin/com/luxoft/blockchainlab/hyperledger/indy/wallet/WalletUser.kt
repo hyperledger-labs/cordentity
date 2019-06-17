@@ -19,7 +19,8 @@ interface IndyIssuer : IndyWalletHolder {
     /**
      * Signs something using wallet and did
      *
-     * @param
+     * @param data [String] - data to sign
+     * @return [String] - signed data
      */
     fun sign(data: String): String
 

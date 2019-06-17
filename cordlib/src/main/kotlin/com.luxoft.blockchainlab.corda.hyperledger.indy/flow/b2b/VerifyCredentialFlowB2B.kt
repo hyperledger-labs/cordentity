@@ -24,11 +24,11 @@ object VerifyCredentialFlowB2B {
     /**
      * A flow to verify some conditions from [proofRequest]
      *
-     * @param identifier        new unique ID for the new proof to allow searching Proofs by [identifier]
      * @param proverName        node that will prove the credentials
-     * @param proofRequest      proof request - use [proofRequest] builder to get it
+     * @param proofRequest      proof request - use [proofRequest] DSL builder to get it
      *
-     * @returns TRUE if verification succeeds
+     * @returns [Pair] of [String] to [Boolean] - where [first] is proof id, if verification succeed, [null] otherwise,
+     *  and [second] is verification status
      * */
     @InitiatingFlow
     @StartableByRPC

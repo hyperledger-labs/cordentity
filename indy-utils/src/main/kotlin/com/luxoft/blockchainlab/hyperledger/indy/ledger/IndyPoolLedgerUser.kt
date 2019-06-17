@@ -17,7 +17,7 @@ const val RETRY_TIMES: Int = 10
  *
  * @param pool [Pool] - indy pool handle
  * @param did [String] - indy user did
- * @param signProvider - lambda that is used to sign ledger requests
+ * @param signProvider ([String]) -> [String] - lambda that is used to sign ledger requests
  */
 class IndyPoolLedgerUser(val pool: Pool, val did: String, val signProvider: (data: String) -> String) : LedgerUser {
 

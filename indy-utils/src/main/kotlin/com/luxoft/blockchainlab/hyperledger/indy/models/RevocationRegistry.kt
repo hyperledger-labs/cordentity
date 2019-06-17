@@ -80,7 +80,7 @@ data class RevocationRegistryConfig(
  * By possessing some revocation registry definition id id one could also know its:
  *
  * @param did: [String] - the DID of the revocation registry issuer
- * @param credentialDefinitionId: [CredentialDefinitionId] - the id of credential definition which
+ * @param credentialDefinitionIdRaw: [CredentialDefinitionId] - the id of credential definition which
  *  this revocation registry accompanies
  * @param tag: [String] - the tag of the revocation registry definition (used for versioning)
  */
