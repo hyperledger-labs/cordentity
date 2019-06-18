@@ -1,8 +1,6 @@
 package com.luxoft.blockchainlab.hyperledger.indy.models
 
-import com.fasterxml.jackson.annotation.JsonIgnore
-import com.fasterxml.jackson.annotation.JsonInclude
-import com.fasterxml.jackson.annotation.JsonProperty
+import com.fasterxml.jackson.annotation.*
 
 /**
  * Represents a particular attribute of a credential
@@ -148,12 +146,12 @@ data class RequestedCredentials(
 data class RequestedAttributeInfo(
     @JsonProperty("cred_id") val credentialId: String,
     val revealed: Boolean = true,
-    @JsonInclude(JsonInclude.Include.NON_NULL) val timestamp: Long?
+    @JsonInclude(JsonInclude.Include.NON_NULL) val timestamp: Long = Timestamp.now()
 )
 
 data class RequestedPredicateInfo(
     @JsonProperty("cred_id") val credentialId: String,
-    @JsonInclude(JsonInclude.Include.NON_NULL) val timestamp: Long?
+    @JsonInclude(JsonInclude.Include.NON_NULL) val timestamp: Long? = null
 )
 
 /**
@@ -208,6 +206,30 @@ data class RequestedPredicateInfo(
  *         "from": Optional<int>, // timestamp of interval beginning
  *         "to": Optional<int>, // timestamp of interval ending
  *     }
+ *
+ */
+data class ProofRequest(
+    var name: String,
+    var version: String,
+    var nonce: String,
+    val requestedAttributes: MutableMap<String, CredentialAttributeReference> = mutableMapOf(),
+    val requestedPredicates: MutableMap<String, CredentialPredicateReference> = mutableMapOf(),
+    var nonRevoked: Interval? = null
+)
+
+data class CredentialAttributeReference(
+    val name: String,
+    val restrictions: Filter? = null
+)
+
+data class CredentialPredicateReference(
+    val name: String,
+    val p_value: Int,
+    val p_type: String = ">=",
+    val restrictions: Filter? = null
+)
+
+/**
  *     filter:
  *     {
  *         "schema_id": string, (Optional)
@@ -218,31 +240,43 @@ data class RequestedPredicateInfo(
  *         "cred_def_id": string, (Optional)
  *     }
  */
-data class ProofRequest(
-    val version: String,
-    val name: String,
-    val nonce: String,
-    val requestedAttributes: Map<String, CredentialAttributeReference>,
-    val requestedPredicates: Map<String, CredentialPredicateReference>,
-    val nonRevoked: Interval? = null
-)
+data class Filter(
+    //TODO: We are loosing meta info after serialization, need to rework. Can`t serialize because of INDY.
+    @JsonIgnore val attrName: String = "",
+    @JsonProperty("schema_id") var schemaIdRaw: String? = null,
+    var schemaIssuerDid: String? = null,
+    var schemaName: String? = null,
+    var schemaVersion: String? = null,
+    var issuerDid: String? = null,
+    var credDefId: String? = null,
+    @JsonIgnore private val attributes: MutableMap<String, String> = mutableMapOf()
+) {
+    @JsonAnyGetter
+    fun getUnknownAttributes() = attributes
 
-data class CredentialAttributeReference(
-    override val name: String,
-    @JsonProperty("schema_id") override val schemaIdRaw: String
-) : AbstractCredentialReference(name, schemaIdRaw)
+    @JsonAnySetter
+    fun setUnknownAttribute(key: String, value: String) = attributes.put(key, value)
 
-data class CredentialPredicateReference(
-    override val name: String,
-    val p_type: String,
-    val p_value: Int,
-    @JsonProperty("schema_id") override val schemaIdRaw: String
-) : AbstractCredentialReference(name, schemaIdRaw)
+    @JsonIgnore
+    fun isEmpty() = schemaIdRaw == null && schemaIssuerDid == null && schemaName == null && schemaVersion == null
+                && issuerDid == null && credDefId == null && attributes.isEmpty()
 
-abstract class AbstractCredentialReference(
-    open val name: String,
-    @JsonProperty("schema_id") override val schemaIdRaw: String
-) : ContainsSchemaId
+    infix fun FilterProperty.shouldBe(value: String) {
+        when (this) {
+            FilterProperty.SchemaId -> schemaIdRaw = value
+            FilterProperty.SchemaIssuerDid -> schemaIssuerDid = value
+            FilterProperty.SchemaName -> schemaName = value
+            FilterProperty.SchemaVersion -> schemaVersion = value
+            FilterProperty.IssuerDid -> issuerDid = value
+            FilterProperty.CredentialDefinitionId -> credDefId = value
+            FilterProperty.Value -> attributes["attr::$attrName::value"] = value
+        }
+    }
+}
+
+enum class FilterProperty {
+    Value, SchemaId, SchemaIssuerDid, SchemaName, SchemaVersion, IssuerDid, CredentialDefinitionId
+}
 
 /**
  * Represents proof

@@ -87,7 +87,7 @@ class PythonRefAgentConnectionTest {
 
     @Ignore("Requires external services")
     @Test
-    fun `externalTest`() = repeat(Int.MAX_VALUE) {
+    fun `externalTest`() = repeat(1) {
         MasterProcess(masterAgent, invitedPartyAgents).apply { start() }
     }
 }

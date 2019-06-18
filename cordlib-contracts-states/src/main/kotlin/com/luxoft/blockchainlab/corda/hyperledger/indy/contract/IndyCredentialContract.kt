@@ -25,7 +25,7 @@ class IndyCredentialContract : Contract {
             val command = incomingCommand.value
 
             when (command) {
-                is Command.Verify -> verification(tx, signers, command.expectedAttrs)
+                is Command.Verify -> verification(tx, signers)
                 is Command.Issue -> creation(tx, signers)
                 is Command.Revoke -> revocation(tx, signers)
                 else -> throw IllegalArgumentException("Unrecognised command.")
@@ -37,7 +37,7 @@ class IndyCredentialContract : Contract {
         // TODO: should contain 1 input state of type IndyCredential
     }
 
-    private fun verification(tx: LedgerTransaction, signers: Set<PublicKey>, expectedAttrs: List<ExpectedAttr>) =
+    private fun verification(tx: LedgerTransaction, signers: Set<PublicKey>) =
         requireThat {
 
             "No inputs should be consumed when creating the proof." using (tx.inputStates.isEmpty())
@@ -47,10 +47,6 @@ class IndyCredentialContract : Contract {
                 ?: throw IllegalArgumentException("Invalid type of output")
 
             "All of the participants must be signers." using (signers.containsAll(indyProof.participants.map { it.owningKey }))
-
-            expectedAttrs.forEach {
-                "Proof provided for invalid value." using indyProof.proof.isAttributeExists(it.value)
-            }
         }
 
     private fun creation(tx: LedgerTransaction, signers: Set<PublicKey>) = requireThat {
@@ -63,7 +59,7 @@ class IndyCredentialContract : Contract {
 
     interface Command : CommandData {
         class Issue : TypeOnlyCommandData(), Command
-        data class Verify(val expectedAttrs: List<ExpectedAttr>) : Command
+        class Verify : TypeOnlyCommandData(), Command
         class Revoke : TypeOnlyCommandData(), Command
     }
 }

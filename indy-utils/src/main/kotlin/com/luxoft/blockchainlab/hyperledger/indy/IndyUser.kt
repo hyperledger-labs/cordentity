@@ -13,12 +13,15 @@ import com.luxoft.blockchainlab.hyperledger.indy.wallet.WalletUser
  */
 class IndyUser(
     override val walletUser: WalletUser,
-    override val ledgerUser: LedgerUser
+    override val ledgerUser: LedgerUser,
+    //Required for android because it will cause exception in native code and app crash
+    createDefaultMasterSecret: Boolean = true
 ) : SsiUser {
 
     init {
         // we create some master secret by default, but user can create and manage them manually
-        walletUser.createMasterSecret(DEFAULT_MASTER_SECRET_ID)
+        if (createDefaultMasterSecret)
+            walletUser.createMasterSecret(DEFAULT_MASTER_SECRET_ID)
     }
 
     override fun createSchemaAndStoreOnLedger(name: String, version: String, attributes: List<String>): Schema {
@@ -80,9 +83,12 @@ class IndyUser(
         credentialRequest: CredentialRequestInfo,
         offer: CredentialOffer,
         revocationRegistryId: RevocationRegistryDefinitionId?,
-        proposalProvider: () -> CredentialProposal
+        proposalFiller: CredentialProposal.() -> Unit
     ): CredentialInfo {
-        val proposalJson = SerializationUtils.anyToJSON(proposalProvider())
+        val proposal = CredentialProposal()
+        proposal.proposalFiller()
+
+        val proposalJson = SerializationUtils.anyToJSON(proposal.attributes)
         val credentialInfo = walletUser.issueCredential(credentialRequest, proposalJson, offer, revocationRegistryId)
 
         if (revocationRegistryId == null) return credentialInfo
@@ -147,17 +153,6 @@ class IndyUser(
         )
 
         return revocationRegistryEntry
-    }
-
-    override fun createProofRequest(
-        version: String,
-        name: String,
-        attributes: List<CredentialFieldReference>,
-        predicates: List<CredentialPredicate>,
-        nonRevoked: Interval?,
-        nonce: String
-    ): ProofRequest {
-        return walletUser.createProofRequest(version, name, attributes, predicates, nonRevoked, nonce)
     }
 
     override fun createProofFromLedgerData(proofRequest: ProofRequest, masterSecretId: String): ProofInfo {

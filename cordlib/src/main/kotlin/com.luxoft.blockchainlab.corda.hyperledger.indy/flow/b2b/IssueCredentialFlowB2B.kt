@@ -17,6 +17,7 @@ import net.corda.core.identity.Party
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
 import net.corda.core.utilities.unwrap
+import java.util.*
 
 /**
  * Flows to issue Indy credentials
@@ -32,15 +33,10 @@ object IssueCredentialFlowB2B {
      *                                  Must be unique for the given Indy user to allow searching Credentials by `(identifier, issuerDID)`
      *
      * @param credentialDefinitionId    id of the credential definition to create new statement (credential)
-     * @param credentialProposal        credential JSON containing attribute values for each of requested attribute names.
-     *                                  Example:
-     *                                  {
-     *                                      "attr1" : {"raw": "value1", "encoded": "value1_as_int" },
-     *                                      "attr2" : {"raw": "value1", "encoded": "value1_as_int" }
-     *                                  }
-     *                                  See `credValuesJson` in [org.hyperledger.indy.sdk.anoncreds.Anoncreds.issuerCreateCredential]
      *
      * @param proverName                the node that can prove this credential
+     *
+     * @param credentialProposalFiller  special builder that allows you to specify credential attributes in a convenient way
      *
      * @return                          credential id
      *
@@ -51,15 +47,14 @@ object IssueCredentialFlowB2B {
     @InitiatingFlow
     @StartableByRPC
     open class Issuer(
-        private val identifier: String,
+        private val proverName: CordaX500Name,
         private val credentialDefinitionId: CredentialDefinitionId,
         private val revocationRegistryDefinitionId: RevocationRegistryDefinitionId?,
-        private val proverName: CordaX500Name,
-        private val credentialProposalProvider: () -> CredentialProposal
-    ) : FlowLogic<Unit>() {
+        private val credentialProposalFiller: CredentialProposal.() -> Unit
+    ) : FlowLogic<String>() {
 
         @Suspendable
-        override fun call() {
+        override fun call(): String {
             val prover: Party = whoIs(proverName)
             val flowSession: FlowSession = initiateFlow(prover)
 
@@ -72,6 +67,7 @@ object IssueCredentialFlowB2B {
                         throw IndyCredentialMaximumReachedException(revocationRegistryDefinition.state.data.id)
 
                 // issue credential
+                val id = UUID.randomUUID().toString()
                 val offer = indyUser().createCredentialOffer(credentialDefinitionId)
 
                 val signers = listOf(ourIdentity.owningKey, prover.owningKey)
@@ -81,10 +77,10 @@ object IssueCredentialFlowB2B {
                             credentialReq,
                             offer,
                             revocationRegistryDefinitionId,
-                            credentialProposalProvider
+                            credentialProposalFiller
                         )
                         val credentialOut = IndyCredential(
-                            identifier,
+                            id,
                             credentialReq,
                             credential,
                             indyUser().walletUser.getIdentityDetails().did,
@@ -150,6 +146,7 @@ object IssueCredentialFlowB2B {
                 // Notarise and record the transaction in both parties' vaults.
                 subFlow(FinalityFlow(signedTrx))
 
+                return id
             } catch (ex: Exception) {
                 logger.error("Credential has not been issued", ex)
                 throw FlowException(ex.message)

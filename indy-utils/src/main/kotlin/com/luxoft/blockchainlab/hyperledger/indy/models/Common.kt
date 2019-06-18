@@ -24,7 +24,7 @@ object Timestamp {
 data class Interval(val from: Long?, val to: Long) {
     companion object {
         fun allTime() = Interval(null, Timestamp.now())
-        fun now() = Interval(Timestamp.now(), Timestamp.now())
+        fun now(plusMs: Long = 0) = Interval(Timestamp.now() + plusMs, Timestamp.now() + plusMs)
     }
 }
 
@@ -47,6 +47,8 @@ data class IdentityDetails(
     @JsonIgnore val alias: String?,
     @JsonIgnore val role: String?
 )
+
+class IdentityDetailsList : ArrayList<IdentityDetails>()
 
 /**
  * Interface for class that can be constructed from some string data
@@ -117,4 +119,4 @@ typealias CredentialDefinitionProvider = (id: CredentialDefinitionId) -> Credent
 /**
  * Credential proposal - [Map] of [String] (attribute name) to [CredentialValue] (attribute value)
  */
-typealias CredentialProposal = Map<String, CredentialValue>
+data class CredentialProposal(val attributes: MutableMap<String, CredentialValue> = mutableMapOf())
