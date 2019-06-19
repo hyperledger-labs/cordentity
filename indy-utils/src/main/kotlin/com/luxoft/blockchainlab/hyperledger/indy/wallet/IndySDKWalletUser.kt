@@ -7,7 +7,6 @@ import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import com.luxoft.blockchainlab.hyperledger.indy.utils.getRootCause
 import mu.KotlinLogging
 import org.hyperledger.indy.sdk.anoncreds.Anoncreds
-import org.hyperledger.indy.sdk.anoncreds.CredentialsSearch
 import org.hyperledger.indy.sdk.anoncreds.CredentialsSearchForProofReq
 import org.hyperledger.indy.sdk.anoncreds.DuplicateMasterSecretNameException
 import org.hyperledger.indy.sdk.did.Did
@@ -199,14 +198,14 @@ class IndySDKWalletUser private constructor(
         offer: CredentialOffer,
         credentialDefinition: CredentialDefinition,
         revocationRegistryDefinition: RevocationRegistryDefinition?
-    ) {
+    ): String {
         val credentialJson = SerializationUtils.anyToJSON(credentialInfo.credential)
         val credentialRequestMetadataJson = SerializationUtils.anyToJSON(credentialRequest.metadata)
         val credDefJson = SerializationUtils.anyToJSON(credentialDefinition)
         val revRegDefJson = if (revocationRegistryDefinition == null) null
         else SerializationUtils.anyToJSON(revocationRegistryDefinition)
 
-        Anoncreds.proverStoreCredential(
+        return Anoncreds.proverStoreCredential(
             wallet, null, credentialRequestMetadataJson, credentialJson, credDefJson, revRegDefJson
         ).get()
     }
@@ -238,10 +237,13 @@ class IndySDKWalletUser private constructor(
         provideSchema: SchemaProvider,
         provideCredentialDefinition: CredentialDefinitionProvider,
         masterSecretId: String,
+        extraQuery: Map<String, Map<String, Any>>?,
         revocationStateProvider: RevocationStateProvider?
     ): ProofInfo {
         val proofRequestJson = SerializationUtils.anyToJSON(proofRequest)
-        val searchObj = CredentialsSearchForProofReq.open(wallet, proofRequestJson, null).get()
+        val extraQueryJson = if (extraQuery == null) null else SerializationUtils.anyToJSON(extraQuery)
+
+        val searchObj = CredentialsSearchForProofReq.open(wallet, proofRequestJson, extraQueryJson).get()
 
         val allSchemaIds = mutableListOf<SchemaId>()
         val allCredentialDefinitionIds = mutableListOf<CredentialDefinitionId>()

@@ -25,18 +25,16 @@ import java.util.*
 object IssueCredentialFlowB2B {
 
     /**
-     * A flow to issue an Indy credential based on proposal [credProposal]
-     *
-     * [identifier] must be unique for the given Indy user to allow searching Credentials by `(identifier, issuerDID)`
-     *
-     * @param identifier                new unique ID for the new credential.
-     *                                  Must be unique for the given Indy user to allow searching Credentials by `(identifier, issuerDID)`
-     *
-     * @param credentialDefinitionId    id of the credential definition to create new statement (credential)
+     * A flow to issue an Indy credential based on proposal [credentialProposalFiller]
      *
      * @param proverName                the node that can prove this credential
-     *
+     * @param credentialDefinitionId    id of the credential definition to create new statement (credential)
+     * @param revocationRegistryDefinitionId id of the revocation registry definition linked with this credential definition
      * @param credentialProposalFiller  special builder that allows you to specify credential attributes in a convenient way
+     *  example: {
+     *      attributes["name"] = CredentialValue("Alex")
+     *      attributes["age"] = CredentialValue("40")
+     *  }
      *
      * @return                          credential id
      *
