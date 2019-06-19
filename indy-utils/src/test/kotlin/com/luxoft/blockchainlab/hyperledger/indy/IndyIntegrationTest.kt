@@ -2,15 +2,18 @@ package com.luxoft.blockchainlab.hyperledger.indy
 
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.GenesisHelper
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.PoolHelper
+import com.luxoft.blockchainlab.hyperledger.indy.ledger.IndyPoolLedgerUser
 import com.luxoft.blockchainlab.hyperledger.indy.models.IdentityDetails
+import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletUser
 import org.hyperledger.indy.sdk.did.Did
 import org.hyperledger.indy.sdk.did.DidResults
-import org.hyperledger.indy.sdk.ledger.Ledger
 import org.hyperledger.indy.sdk.pool.Pool
 import org.hyperledger.indy.sdk.wallet.Wallet
 import org.junit.AfterClass
 import org.junit.BeforeClass
 import java.io.File
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 
 
 open class IndyIntegrationTest {
@@ -76,15 +79,16 @@ open class IndyIntegrationTest {
         trusteeDidInfo: DidResults.CreateAndStoreMyDidResult,
         issuerDidInfo: IdentityDetails
     ) {
-        val nymRequest = Ledger.buildNymRequest(
-            trusteeDidInfo.did,
-            issuerDidInfo.did,
-            issuerDidInfo.verkey,
-            null,
-            "TRUSTEE"
-        ).get()
-
-        Ledger.signAndSubmitRequest(pool, trusteeWallet, trusteeDidInfo.did, nymRequest).get()
+        IndyPoolLedgerUser(pool, trusteeDidInfo.did) {
+            IndySDKWalletUser(trusteeWallet, trusteeDidInfo.did).sign(it)
+        }.apply {
+            storeNym(issuerDidInfo.copy(role = "TRUSTEE"))
+            val nym = getNym(issuerDidInfo)
+            val nymData = nym.result.getData()
+            assertNotNull(nymData)
+            assertEquals(nymData?.identifier, trusteeDidInfo.did)
+            assertEquals(nymData?.role, "0")
+        }
     }
 
     protected fun createTrusteeDid(wallet: Wallet) = Did.createAndStoreMyDid(wallet, """{"seed":"$TRUSTEE_SEED"}""").get()

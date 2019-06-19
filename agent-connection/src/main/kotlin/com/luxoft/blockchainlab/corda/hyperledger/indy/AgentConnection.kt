@@ -139,10 +139,11 @@ interface AgentConnection {
      * Wait for incoming connection from remote Indy Party that accepted the specific invite
      *
      * @param invite invite string
+     * @param timeout amount of milliseconds to wait for party
      *
      * @return observable ([Single]<>) emitting an [IndyPartyConnection]
      */
-    fun waitForInvitedParty(invite: String): Single<IndyPartyConnection>
+    fun waitForInvitedParty(invite: String, timeout:Long = 60000): Single<IndyPartyConnection>
 
     /**
      * Recalls previously connected Indy Party by its DID and reconstructs corresponding {@code IndyPartyConnection}

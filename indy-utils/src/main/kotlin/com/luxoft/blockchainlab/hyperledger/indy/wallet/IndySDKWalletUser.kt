@@ -2,8 +2,10 @@ package com.luxoft.blockchainlab.hyperledger.indy.wallet
 
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.TailsHelper
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
+import com.luxoft.blockchainlab.hyperledger.indy.utils.PaginatedIterator
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import com.luxoft.blockchainlab.hyperledger.indy.utils.getRootCause
+import mu.KotlinLogging
 import org.hyperledger.indy.sdk.anoncreds.Anoncreds
 import org.hyperledger.indy.sdk.anoncreds.CredentialsSearchForProofReq
 import org.hyperledger.indy.sdk.anoncreds.DuplicateMasterSecretNameException
@@ -11,7 +13,7 @@ import org.hyperledger.indy.sdk.did.Did
 import org.hyperledger.indy.sdk.ledger.Ledger
 import org.hyperledger.indy.sdk.pairwise.Pairwise
 import org.hyperledger.indy.sdk.wallet.Wallet
-import org.slf4j.LoggerFactory
+import org.json.JSONObject
 import java.util.concurrent.ExecutionException
 
 /**
@@ -19,20 +21,25 @@ import java.util.concurrent.ExecutionException
  *  and [org.hyperledger.indy.sdk.anoncreds.Anoncreds] API
  *
  * @param wallet [Wallet] - user's wallet
- * @param didConfig [DidConfig] - what did we should use to perform operations
+ * @param existingDid [String] - what existing did we should use to perform operations, if null then new will be created
+ * @param newDidConfig [DidConfig] - what new did we should create and use to perform operations, if null then we should not create
  * @param tailsPath [String] - path to the directory with tails files (they will be generated when revocation-stuff is done)
  */
-class IndySDKWalletUser(
-    val wallet: Wallet,
-    didConfig: DidConfig = DidConfig(),
-    val tailsPath: String = "tails"
+class IndySDKWalletUser private constructor(
+        val wallet: Wallet,
+        existingDid: String?,
+        newDidConfig: DidConfig?,
+        val tailsPath: String
 ) : WalletUser {
+    constructor(wallet: Wallet, existingDid: String, tailsPath: String = DEFAULT_TAILS_PATH) : this(wallet, existingDid, null, tailsPath)
+    constructor(wallet: Wallet, newDidConfig: DidConfig = DidConfig(), tailsPath: String = DEFAULT_TAILS_PATH) : this(wallet, null, newDidConfig, tailsPath)
 
-    override val did: String
-    override val verkey: String
-    private val logger = LoggerFactory.getLogger(IndySDKWalletUser::class.java)
+    val did: String
+    val verkey: String
+    private val logger = KotlinLogging.logger {}
 
     companion object {
+        val DEFAULT_TAILS_PATH = "tails"
         val SIGNATURE_TYPE = "CL"
         val REVOCATION_REGISTRY_TYPE = "CL_ACCUM"
         val TAG = "TAG_1"
@@ -42,9 +49,14 @@ class IndySDKWalletUser(
     }
 
     init {
-        val didResult = Did.createAndStoreMyDid(wallet, SerializationUtils.anyToJSON(didConfig)).get()
-        did = didResult.did
-        verkey = didResult.verkey
+        if (existingDid != null) {
+            verkey = Did.keyForLocalDid(wallet, existingDid).get()
+            did = existingDid
+        } else {
+            val didResult = Did.createAndStoreMyDid(wallet, SerializationUtils.anyToJSON(newDidConfig)).get()
+            did = didResult.did
+            verkey = didResult.verkey
+        }
     }
 
     override fun sign(data: String): String {
@@ -404,4 +416,15 @@ class IndySDKWalletUser(
     override fun getIdentityDetails(did: String): IdentityDetails {
         return IdentityDetails(did, Did.keyForLocalDid(wallet, did).get(), null, null)
     }
+
+    override fun getCredentials(): Iterator<CredentialReference> {
+        val credentialsSearch = CredentialsSearch.open(wallet, JSONObject().toString()).get()
+
+        return PaginatedIterator(10) {
+            SerializationUtils.jSONToAny<List<RawJsonMap>>(credentialsSearch.fetchNextCredentials(it).get())
+                    .map { SerializationUtils.convertValue<CredentialReference>((it)) }
+        }
+    }
 }
+
+fun Wallet.getOwnIdentities(): List<IdentityDetails> = SerializationUtils.jSONToAny<IdentityDetailsList>(Did.getListMyDidsWithMeta(this).get())

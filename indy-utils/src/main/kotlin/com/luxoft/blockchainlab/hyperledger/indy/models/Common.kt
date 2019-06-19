@@ -47,6 +47,8 @@ data class IdentityDetails(
     @JsonIgnore val role: String?
 )
 
+class IdentityDetailsList : ArrayList<IdentityDetails>()
+
 /**
  * Interface for class that can be constructed from some string data
  */

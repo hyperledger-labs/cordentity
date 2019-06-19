@@ -110,7 +110,7 @@ object IssueCredentialFlowB2C {
                     )
                 } else {
                     TransactionBuilder(whoIsNotary()).withItems(
-                        credentialDefinitionIn,
+                        originalCredentialDefIn,
                         credentialDefinitionOut,
                         credentialDefinitionCmd,
                         newCredentialOut,

@@ -7,6 +7,7 @@ import com.luxoft.blockchainlab.hyperledger.indy.models.*
  * [LedgerUser] is an interface that encapsulates all work related to storing and retrieving of public data
  */
 interface LedgerUser {
+    val did: String
     /**
      * Stores schema on ledger
      *
@@ -47,6 +48,15 @@ interface LedgerUser {
      * @param about [IdentityDetails] - identity details about entity that trustee wants to trust
      */
     fun storeNym(about: IdentityDetails)
+
+    /**
+     * Gets NYM record from ledger. E.g. "This person is trusted"
+     *
+     * @param about [IdentityDetails] - identity details about entity
+     *
+     * @return [String] - NYM details
+     */
+    fun getNym(about: IdentityDetails): NymResponse
 
     /**
      * Check if credential definition exist on ledger

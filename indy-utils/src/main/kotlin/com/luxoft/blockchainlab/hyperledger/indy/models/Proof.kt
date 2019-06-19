@@ -2,7 +2,6 @@ package com.luxoft.blockchainlab.hyperledger.indy.models
 
 import com.fasterxml.jackson.annotation.*
 import com.luxoft.blockchainlab.hyperledger.indy.utils.Filter
-import java.util.*
 
 /**
  * Represents a particular attribute of a credential

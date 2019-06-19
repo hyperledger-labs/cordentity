@@ -21,7 +21,12 @@ class PythonRefAgentConnection : AgentConnection {
     override fun disconnect() {
         if (getConnectionStatus() == AgentConnectionStatus.AGENT_CONNECTED) {
             webSocket.closeBlocking()
-            pollAgentWorker.interrupt()
+            pollAgentWorker?.interrupt() ?: log.warn { "Agent status is connected while pollAgentWorker is null" }
+
+            toProcessPairwiseConnections.clear()
+            awaitingPairwiseConnections.clear()
+            indyParties.clear()
+
             connectionStatus = AgentConnectionStatus.AGENT_DISCONNECTED
         }
     }
@@ -31,7 +36,7 @@ class PythonRefAgentConnection : AgentConnection {
      */
     override fun connect(url: String, login: String, password: String): Single<Unit> {
         disconnect()
-        return Single.create { observer ->
+        return Single.create<Unit> { observer ->
             try {
                 webSocket = AgentWebSocketClient(URI(url), login)
                 webSocket.apply {
@@ -68,7 +73,7 @@ class PythonRefAgentConnection : AgentConnection {
             } catch (e: Throwable) {
                 observer.onError(e)
             }
-        }
+        }.doOnSuccess { pollAgentWorker = createAgentWorker() }
     }
 
     private var connectionStatus: AgentConnectionStatus = AgentConnectionStatus.AGENT_DISCONNECTED
@@ -206,7 +211,9 @@ class PythonRefAgentConnection : AgentConnection {
      * Agent's state polling thread. It resumes whenever [toProcessPairwiseConnections] is non-empty.
      * It also loops by itself when
      */
-    private val pollAgentWorker = thread {
+    private var pollAgentWorker: Thread? = null
+
+    private fun createAgentWorker() = thread {
         fun processStateResponse(stateResponse: ObjectNode) {
             stateResponse["content"]["pairwise_connections"].forEach { pairwise ->
                 try {
@@ -296,7 +303,7 @@ class PythonRefAgentConnection : AgentConnection {
     /**
      * Waits for incoming connection from whatever party which possesses the invite
      */
-    override fun waitForInvitedParty(invite: String): Single<IndyPartyConnection> {
+    override fun waitForInvitedParty(invite: String, timeoutMs: Long): Single<IndyPartyConnection> {
         return Single.create { observer ->
             try {
                 if (getConnectionStatus() == AgentConnectionStatus.AGENT_CONNECTED) {
@@ -309,7 +316,7 @@ class PythonRefAgentConnection : AgentConnection {
                     /**
                      * Wait until the STATE has pairwise connection corresponding to the invite.
                      */
-                    waitForPairwiseConnection(pubKey).timeout(60000, TimeUnit.MILLISECONDS).subscribe({ pairwise ->
+                    waitForPairwiseConnection(pubKey).timeout(timeoutMs, TimeUnit.MILLISECONDS).subscribe({ pairwise ->
                         val theirDid = pairwise["their_did"].asText()
                         val indyParty = IndyParty(webSocket, theirDid,
                                 pairwise["metadata"]["their_endpoint"].asText(),
