@@ -1,6 +1,7 @@
 package com.luxoft.blockchainlab.hyperledger.indy.models
 
 import com.fasterxml.jackson.annotation.*
+import com.luxoft.blockchainlab.hyperledger.indy.utils.Filter
 
 /**
  * Represents a particular attribute of a credential
@@ -228,55 +229,6 @@ data class CredentialPredicateReference(
     val p_type: String = ">=",
     val restrictions: Filter? = null
 )
-
-/**
- *     filter:
- *     {
- *         "schema_id": string, (Optional)
- *         "schema_issuer_did": string, (Optional)
- *         "schema_name": string, (Optional)
- *         "schema_version": string, (Optional)
- *         "issuer_did": string, (Optional)
- *         "cred_def_id": string, (Optional)
- *     }
- */
-data class Filter(
-    //TODO: We are loosing meta info after serialization, need to rework. Can`t serialize because of INDY.
-    @JsonIgnore val attrName: String = "",
-    @JsonProperty("schema_id") var schemaIdRaw: String? = null,
-    var schemaIssuerDid: String? = null,
-    var schemaName: String? = null,
-    var schemaVersion: String? = null,
-    var issuerDid: String? = null,
-    var credDefId: String? = null,
-    @JsonIgnore private val attributes: MutableMap<String, String> = mutableMapOf()
-) {
-    @JsonAnyGetter
-    fun getUnknownAttributes() = attributes
-
-    @JsonAnySetter
-    fun setUnknownAttribute(key: String, value: String) = attributes.put(key, value)
-
-    @JsonIgnore
-    fun isEmpty() = schemaIdRaw == null && schemaIssuerDid == null && schemaName == null && schemaVersion == null
-                && issuerDid == null && credDefId == null && attributes.isEmpty()
-
-    infix fun FilterProperty.shouldBe(value: String) {
-        when (this) {
-            FilterProperty.SchemaId -> schemaIdRaw = value
-            FilterProperty.SchemaIssuerDid -> schemaIssuerDid = value
-            FilterProperty.SchemaName -> schemaName = value
-            FilterProperty.SchemaVersion -> schemaVersion = value
-            FilterProperty.IssuerDid -> issuerDid = value
-            FilterProperty.CredentialDefinitionId -> credDefId = value
-            FilterProperty.Value -> attributes["attr::$attrName::value"] = value
-        }
-    }
-}
-
-enum class FilterProperty {
-    Value, SchemaId, SchemaIssuerDid, SchemaName, SchemaVersion, IssuerDid, CredentialDefinitionId
-}
 
 /**
  * Represents proof

@@ -14,6 +14,20 @@ import org.junit.Test
 class CordentityE2E : CordaTestBase() {
 
     @Test
+    fun `issuer can issue a credential to itself`() {
+        val issuer = createIssuerNodes(trustee, 1).first()
+
+        val schema = issuer.issueRandomSchema(net)
+        val credDef = issuer.issueCredentialDefinition(schema.getSchemaIdObject(), false, net)
+        val cred = issuer.issueRandomCredential(issuer, schema.attributeNames, credDef.getCredentialDefinitionIdObject(), null, net)
+
+        val pr = createRandomProofRequest(cred.second, issuer.getPartyDid(), schema.getSchemaIdObject(), credDef.getCredentialDefinitionIdObject(), null)
+        val result = issuer.verify(issuer, pr, net)
+
+        assert(result.second)
+    }
+
+    @Test
     fun `1 issuer 1 prover 1 verifier 1 credential without revocation`() {
         assert(
             constructTypicalFlow(1, 1, 1, 1, true, false, 2)

@@ -14,6 +14,7 @@ import org.hyperledger.indy.sdk.did.Did
 import org.hyperledger.indy.sdk.ledger.Ledger
 import org.hyperledger.indy.sdk.pairwise.Pairwise
 import org.hyperledger.indy.sdk.wallet.Wallet
+import org.hyperledger.indy.sdk.wallet.WalletItemNotFoundException
 import org.json.JSONObject
 import java.util.concurrent.ExecutionException
 
@@ -198,14 +199,14 @@ class IndySDKWalletUser private constructor(
         offer: CredentialOffer,
         credentialDefinition: CredentialDefinition,
         revocationRegistryDefinition: RevocationRegistryDefinition?
-    ) {
+    ): String {
         val credentialJson = SerializationUtils.anyToJSON(credentialInfo.credential)
         val credentialRequestMetadataJson = SerializationUtils.anyToJSON(credentialRequest.metadata)
         val credDefJson = SerializationUtils.anyToJSON(credentialDefinition)
         val revRegDefJson = if (revocationRegistryDefinition == null) null
         else SerializationUtils.anyToJSON(revocationRegistryDefinition)
 
-        Anoncreds.proverStoreCredential(
+        return Anoncreds.proverStoreCredential(
             wallet, null, credentialRequestMetadataJson, credentialJson, credDefJson, revRegDefJson
         ).get()
     }
@@ -237,10 +238,13 @@ class IndySDKWalletUser private constructor(
         provideSchema: SchemaProvider,
         provideCredentialDefinition: CredentialDefinitionProvider,
         masterSecretId: String,
+        extraQuery: Map<String, Map<String, Any>>?,
         revocationStateProvider: RevocationStateProvider?
     ): ProofInfo {
         val proofRequestJson = SerializationUtils.anyToJSON(proofRequest)
-        val searchObj = CredentialsSearchForProofReq.open(wallet, proofRequestJson, null).get()
+        val extraQueryJson = if (extraQuery == null) null else SerializationUtils.anyToJSON(extraQuery)
+
+        val searchObj = CredentialsSearchForProofReq.open(wallet, proofRequestJson, extraQueryJson).get()
 
         val allSchemaIds = mutableListOf<SchemaId>()
         val allCredentialDefinitionIds = mutableListOf<CredentialDefinitionId>()
@@ -404,7 +408,20 @@ class IndySDKWalletUser private constructor(
     }
 
     override fun addKnownIdentities(identityDetails: IdentityDetails) {
-        Did.storeTheirDid(wallet, SerializationUtils.anyToJSON(identityDetails)).get()
+        //TODO: think of how to get rid of exception handling, may be a problem for android
+        val verkey = Did.keyForLocalDid(wallet, identityDetails.did).exceptionally {
+            if (it is WalletItemNotFoundException) {
+                logger.debug(it) { "Did(${identityDetails.did} was not found in wallet" }
+                null
+            } else throw it
+        }.get()
+        if (verkey == null)
+            Did.storeTheirDid(wallet, SerializationUtils.anyToJSON(identityDetails)).get()
+        else {
+            if (verkey != identityDetails.verkey)
+                throw RuntimeException("Identity(${identityDetails.did},${identityDetails.verkey}) found but old verkey($verkey) is different")
+            logger.info { "Identity(${identityDetails.did},${identityDetails.verkey}) is already known" }
+        }
     }
 
     override fun getIdentityDetails(): IdentityDetails {

@@ -61,33 +61,27 @@ using [CreateCredentialDefinitionFlow](cordapp/README.md#flows):
 Ministry verifies Alice's legal status and issues her a shopping [credential](cordapp/README.md#indy-terminology)
 using [IssueCredentialFlow](cordapp/README.md#flows):
 
-    val credentialProposal = """
-        {
-        "NAME":{"raw":"Alice", "encoded":"119191919"},
-        "BORN":{"raw":"2000",  "encoded":"2000"}
-        }
-        """
-
     ministry.services.startFlow(
-            IssueCredentialFlow.Issuer(
-                    UUID.randomUUID().toString(),
-                    credentialDefinitionId,
-                    credentialProposal,
-                    aliceX500)).resultFuture.get()
+            IssueCredentialFlowB2B.Issuer(aliceX500, credentialDefinitionId, null) {
+                   attributes["NAME"] = CredentialValue("Alice")
+                   attributes["BORN"] = CredentialValue("2000")
+            }
+    ).resultFuture.get()
 
 When Alice comes to grocery store, the store asks Alice to verify that she is legally allowed to buy drinks
 using [VerifyCredentialFlow](cordapp/README.md#flows):
 
-    // Alice.BORN >= currentYear - 18
-    val eighteenYearsAgo = LocalDateTime.now().minusYears(18).year
-    val legalAgePredicate = VerifyCredentialFlow.ProofPredicate(schemaId, credentialDefinitionId, ministryDID, "BORN", eighteenYearsAgo)
+       // Alice.BORN >= currentYear - 18
+        val eighteenYearsAgo = LocalDateTime.now().minusYears(18).year
 
-    val verified = store.services.startFlow(
-            VerifyCredentialFlow.Verifier(
-                    UUID.randomUUID().toString(),
-                    emptyList(),
-                    listOf(legalAgePredicate),
-                    aliceX500)).resultFuture.get()
+        // Use special proof request DSL
+        val proofRequest = proofRequest("legal age proof", "1.0") {
+            proveGreaterThan("BORN", eighteenYearsAgo)
+        }
+
+        val verified = store.services.startFlow(
+            VerifyCredentialFlowB2B.Verifier(aliceX500, proofRequest)
+        ).resultFuture.get()
 
 If the verification succeeds, the store can be sure that Alice's age is above 18.
 

@@ -232,7 +232,6 @@ open class CordaTestBase {
                         if (skip) return@filterLoop
 
                         when (it) {
-                            FilterProperty.Value -> it shouldBe value
                             FilterProperty.CredentialDefinitionId -> it shouldBe payload.credDefId.toString()
                             FilterProperty.SchemaId -> it shouldBe payload.schemaId.toString()
                             FilterProperty.IssuerDid -> it shouldBe payload.issuerDid
@@ -333,7 +332,7 @@ open class CordaTestBase {
 
         val unableToProve = mutableListOf<ProofState>()
 
-        val nonRevoked = if (enableRevocation) Interval.now() else null
+        val nonRevoked = if (enableRevocation) Interval.allTime() else null
 
         verifiers.forEach { verifier ->
             issuerToIssuedCredentials.entries.forEach { (issuer, credentialAndMetadataList) ->
@@ -378,7 +377,7 @@ open class CordaTestBase {
                             issuer.getPartyDid(),
                             credentialAndMetadata.schema.getSchemaIdObject(),
                             credentialAndMetadata.credentialDefinition.getCredentialDefinitionIdObject(),
-                            Interval.now()
+                            Interval.allTime()
                         )
 
                         val prover = provers.first { it.getName() == credentialAndMetadata.prover.first }

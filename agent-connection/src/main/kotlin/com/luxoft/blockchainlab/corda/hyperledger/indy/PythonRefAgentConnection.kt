@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import mu.KotlinLogging
+import net.iharder.Base64
 import rx.Single
 import rx.SingleSubscriber
 import java.net.URI
@@ -95,7 +96,7 @@ class PythonRefAgentConnection : AgentConnection {
 
     private fun getPubkeyFromInvite(invite: String): String {
         val invEncoded = invite.split("?c_i=")[1]
-        val inv = Base64.getDecoder().decode(invEncoded).toString(Charsets.UTF_8)
+        val inv = Base64.decode(invEncoded).toString(Charsets.UTF_8)
         val keyList = SerializationUtils.jSONToAny<Map<String, List<String>>>(inv)["recipientKeys"]
         return keyList?.get(0)!!
     }
