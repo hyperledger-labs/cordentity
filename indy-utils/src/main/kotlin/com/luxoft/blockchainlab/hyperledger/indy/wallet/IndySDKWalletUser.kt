@@ -7,6 +7,7 @@ import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import com.luxoft.blockchainlab.hyperledger.indy.utils.getRootCause
 import mu.KotlinLogging
 import org.hyperledger.indy.sdk.anoncreds.Anoncreds
+import org.hyperledger.indy.sdk.anoncreds.CredentialsSearch
 import org.hyperledger.indy.sdk.anoncreds.CredentialsSearchForProofReq
 import org.hyperledger.indy.sdk.anoncreds.DuplicateMasterSecretNameException
 import org.hyperledger.indy.sdk.did.Did
