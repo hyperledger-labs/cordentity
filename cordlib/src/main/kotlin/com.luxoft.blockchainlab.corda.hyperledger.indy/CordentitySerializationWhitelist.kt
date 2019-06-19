@@ -1,6 +1,8 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy
 
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
+import com.luxoft.blockchainlab.hyperledger.indy.utils.Filter
+import com.luxoft.blockchainlab.hyperledger.indy.utils.FilterProperty
 import net.corda.core.serialization.SerializationWhitelist
 
 

@@ -139,7 +139,8 @@ object IssueCredentialFlowB2B {
                     .verify()
 
                 val selfSignedTx = serviceHub.signInitialTransaction(trxBuilder, ourIdentity.owningKey)
-                val signedTrx = subFlow(CollectSignaturesFlow(selfSignedTx, listOf(flowSession)))
+
+                val signedTrx = flowSession.sendAndReceive<SignedTransaction>(selfSignedTx).unwrap { it }
 
                 // Notarise and record the transaction in both parties' vaults.
                 subFlow(FinalityFlow(signedTrx))
@@ -161,36 +162,41 @@ object IssueCredentialFlowB2B {
                 val issuer = flowSession.counterparty.name
 
                 val offer = flowSession.receive<CredentialOffer>().unwrap { offer -> offer }
-                val sessionDid = subFlow(CreatePairwiseFlowB2B.Prover(issuer))
+                //val sessionDid = subFlow(CreatePairwiseFlowB2B.Prover(issuer))
 
-                val credentialRequestInfo = indyUser().createCredentialRequest(sessionDid, offer)
-                flowSession.send(credentialRequestInfo)
+                val credentialRequestInfo = indyUser().createCredentialRequest(indyUser().walletUser.getIdentityDetails().did, offer)
 
-                val flow = object : SignTransactionFlow(flowSession) {
-                    override fun checkTransaction(stx: SignedTransaction) {
-                        val outputs = stx.tx.toLedgerTransaction(serviceHub).outputs
+                val signedTransaction = flowSession.sendAndReceive<SignedTransaction>(credentialRequestInfo).unwrap { it }
 
-                        outputs.forEach {
-                            val state = it.data
+                /*val signedByMe = if (!signedTransaction.requiredSigningKeys.contains(serviceHub.myInfo.legalIdentitiesAndCerts.first().owningKey)) {
+                    serviceHub.addSignature(signedTransaction)
+                } else {
+                    signedTransaction
+                }*/
 
-                            when (state) {
-                                is IndyCredential -> {
-                                    require(state.credentialRequestInfo == credentialRequestInfo) { "Received incorrect CredentialRequest" }
-                                    indyUser().checkLedgerAndReceiveCredential(
-                                        state.credentialInfo,
-                                        state.credentialRequestInfo,
-                                        offer
-                                    )
-                                }
-                                is IndyCredentialDefinition -> logger.info("Got indy credential definition")
-                                is IndyRevocationRegistryDefinition -> logger.info("Got indy revocation registry")
-                                else -> throw FlowException("Invalid output state. Only IndyCredential, IndyCredentialDefinition and IndyRevocationRegistryDefinition supported")
-                            }
+                val signedByMe = serviceHub.addSignature(signedTransaction)
+
+                val outputs = signedByMe.tx.outputs
+
+                outputs.forEach {
+                    val state = it.data
+
+                    when (state) {
+                        is IndyCredential -> {
+                            require(state.credentialRequestInfo == credentialRequestInfo) { "Received incorrect CredentialRequest" }
+                            indyUser().checkLedgerAndReceiveCredential(
+                                state.credentialInfo,
+                                state.credentialRequestInfo,
+                                offer
+                            )
                         }
+                        is IndyCredentialDefinition -> logger.info("Got indy credential definition")
+                        is IndyRevocationRegistryDefinition -> logger.info("Got indy revocation registry")
+                        else -> throw FlowException("Invalid output state. Only IndyCredential, IndyCredentialDefinition and IndyRevocationRegistryDefinition supported")
                     }
                 }
 
-                subFlow(flow)
+                flowSession.send(signedByMe)
 
             } catch (ex: Exception) {
                 logger.error("Credential has not been issued", ex)

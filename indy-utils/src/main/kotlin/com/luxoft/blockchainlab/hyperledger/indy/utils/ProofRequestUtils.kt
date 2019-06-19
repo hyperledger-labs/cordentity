@@ -222,7 +222,7 @@ fun createRandomProofRequest(nonRevoked: Interval?, vararg payloads: ProofReques
  *     }
  */
 data class Filter(
-    @JsonIgnore val attrName: String,
+    @JsonIgnore val attrName: String = "",
     @JsonProperty("schema_id") var schemaIdRaw: String? = null,
     var schemaIssuerDid: String? = null,
     var schemaName: String? = null,
