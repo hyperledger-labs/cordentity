@@ -13,17 +13,13 @@ internal object EnvironmentUtils {
         }
 
     //Should be similar to  RUST`s implementation
-    private val userHomePath: String get() = System.getenv("HOME")
+    private val userHomePath: String get() = System.getProperty("INDY_HOME") ?: System.getenv("HOME")
 
     fun getIndyHomePath(): String {
-        return System.getProperty("INDY_HOME") ?: "$userHomePath/.indy_client"
+        return "$userHomePath/.indy_client"
     }
 
-    fun getIndyPoolPath(): String {
-        return System.getProperty("INDY_POOL_PATH") ?: "$userHomePath/.indy_client"
-    }
-
-    fun getIndyPoolPath(poolName: String) = getIndyPoolPath() + "/pool/$poolName"
+    fun getIndyPoolPath(poolName: String) = getIndyHomePath() + "/pool/$poolName"
 
     fun getIndyWalletPath(walletName: String) = getIndyHomePath() + "/wallet/$walletName"
 

@@ -2,6 +2,7 @@ package com.luxoft.blockchainlab.hyperledger.indy
 
 import com.luxoft.blockchainlab.hyperledger.indy.ledger.LedgerUser
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
+import com.luxoft.blockchainlab.hyperledger.indy.utils.ExtraQueryBuilder
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletUser
 import com.luxoft.blockchainlab.hyperledger.indy.wallet.WalletUser
@@ -14,12 +15,15 @@ import com.luxoft.blockchainlab.hyperledger.indy.wallet.WalletUser
  */
 class IndyUser(
     override val walletUser: WalletUser,
-    override val ledgerUser: LedgerUser
+    override val ledgerUser: LedgerUser,
+    //Required for android because it will cause exception in native code and app crash
+    createDefaultMasterSecret: Boolean = true
 ) : SsiUser {
 
     init {
         // we create some master secret by default, but user can create and manage them manually
-        walletUser.createMasterSecret(DEFAULT_MASTER_SECRET_ID)
+        if (createDefaultMasterSecret)
+            walletUser.createMasterSecret(DEFAULT_MASTER_SECRET_ID)
     }
 
     override fun createSchemaAndStoreOnLedger(name: String, version: String, attributes: List<String>): Schema {
@@ -107,9 +111,12 @@ class IndyUser(
         credentialRequest: CredentialRequestInfo,
         offer: CredentialOffer,
         revocationRegistryId: RevocationRegistryDefinitionId?,
-        proposalProvider: () -> CredentialProposal
+        proposalFiller: CredentialProposal.() -> Unit
     ): CredentialInfo {
-        val proposalJson = SerializationUtils.anyToJSON(proposalProvider())
+        val proposal = CredentialProposal()
+        proposal.proposalFiller()
+
+        val proposalJson = SerializationUtils.anyToJSON(proposal.attributes)
         val credentialInfo = walletUser.issueCredential(credentialRequest, proposalJson, offer, revocationRegistryId)
 
         if (revocationRegistryId == null) return credentialInfo
@@ -133,7 +140,7 @@ class IndyUser(
         credentialInfo: CredentialInfo,
         credentialRequest: CredentialRequestInfo,
         offer: CredentialOffer
-    ) {
+    ): String {
         val revocationRegistryDefinitionId = credentialInfo.credential.getRevocationRegistryIdObject()
 
         val revocationRegistryDefinition = if (revocationRegistryDefinitionId != null)
@@ -150,7 +157,7 @@ class IndyUser(
                 "Receive credential has been failed"
             )
 
-        walletUser.receiveCredential(
+        return walletUser.receiveCredential(
             credentialInfo,
             credentialRequest,
             offer,
@@ -176,28 +183,23 @@ class IndyUser(
         return revocationRegistryEntry
     }
 
-    override fun createProofRequest(
-        version: String,
-        name: String,
-        attributes: List<CredentialFieldReference>,
-        predicates: List<CredentialPredicate>,
-        nonRevoked: Interval?,
-        nonce: String
-    ): ProofRequest {
-        return walletUser.createProofRequest(version, name, attributes, predicates, nonRevoked, nonce)
-    }
+    override fun createProofFromLedgerData(proofRequest: ProofRequest, masterSecretId: String, init: ExtraQueryBuilder.() -> Unit): ProofInfo {
+        val builder = ExtraQueryBuilder()
+        builder.init()
+        val builderEntries = builder.attributes.entries
+        val extraQuery = if (builderEntries.isEmpty()) null else builderEntries.associate { it.key to it.value.toMap() }
 
-    override fun createProofFromLedgerData(proofRequest: ProofRequest, masterSecretId: String): ProofInfo {
         return walletUser.createProof(
             proofRequest,
             provideSchema = { ledgerUser.retrieveSchema(it)!! },
             provideCredentialDefinition = { ledgerUser.retrieveCredentialDefinition(it)!! },
-            masterSecretId = masterSecretId
+            masterSecretId = masterSecretId,
+            extraQuery = extraQuery
         ) { revRegId, credRevId, interval ->
             val revocationRegistryDefinition = ledgerUser.retrieveRevocationRegistryDefinition(revRegId)
                 ?: throw IndyRevRegNotFoundException(revRegId, "Get revocation state has been failed")
 
-            val response = ledgerUser.retrieveRevocationRegistryDelta(revRegId, interval)
+            val response = ledgerUser.retrieveRevocationRegistryDelta(revRegId, Interval(null, interval.to))
                 ?: throw IndyRevDeltaNotFoundException(revRegId, "Interval is $interval")
             val (timestamp, revRegDelta) = response
 

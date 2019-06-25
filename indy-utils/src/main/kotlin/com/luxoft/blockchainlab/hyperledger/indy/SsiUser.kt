@@ -2,6 +2,7 @@ package com.luxoft.blockchainlab.hyperledger.indy
 
 import com.luxoft.blockchainlab.hyperledger.indy.ledger.LedgerUser
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
+import com.luxoft.blockchainlab.hyperledger.indy.utils.ExtraQueryBuilder
 import com.luxoft.blockchainlab.hyperledger.indy.wallet.WalletUser
 
 const val DEFAULT_MASTER_SECRET_ID = "main"
@@ -93,7 +94,7 @@ interface SsiUser {
      * @param credentialRequest [CredentialRequestInfo] - [CredentialRequest] and all reliable info
      * @param offer [CredentialOffer] - credential offer
      * @param revocationRegistryId [RevocationRegistryDefinitionId] or [null] - revocation registry definition id
-     * @param proposalProvider lambda returning [Map] of [String] to [CredentialValue] - credential proposal
+     * @param proposalFiller [CredentialProposal].() -> [Unit] - [CredentialProposal] initializer - use attributes["${name}"] inside
      *
      * @return [CredentialInfo] - credential and all reliable data
      */
@@ -101,7 +102,7 @@ interface SsiUser {
         credentialRequest: CredentialRequestInfo,
         offer: CredentialOffer,
         revocationRegistryId: RevocationRegistryDefinitionId?,
-        proposalProvider: () -> CredentialProposal
+        proposalFiller: CredentialProposal.() -> Unit
     ): CredentialInfo
 
     /**
@@ -110,12 +111,14 @@ interface SsiUser {
      * @param credentialInfo [CredentialInfo] - credential and all reliable data
      * @param credentialRequest [CredentialRequestInfo] - credential request and all reliable data
      * @param offer [CredentialOffer]
+     *
+     * @return local UUID of the stored credential in the prover's wallet
      */
     fun checkLedgerAndReceiveCredential(
         credentialInfo: CredentialInfo,
         credentialRequest: CredentialRequestInfo,
         offer: CredentialOffer
-    )
+    ): String
 
     /**
      * Revokes previously issued [Credential] using [WalletUser] and [LedgerUser]
@@ -129,43 +132,24 @@ interface SsiUser {
     ): RevocationRegistryEntry
 
     /**
-     * Creates [ProofRequest]. This function has nothing to do with Indy API, it is used just to produce well-shaped data.
-     *
-     * @param version [String] - ???
-     * @param name [String] - name of this proof request
-     * @param attributes [List] of [CredentialFieldReference] - attributes which prover needs to reveal
-     * @param predicates [List] of [CredentialPredicate] - predicates which prover should answer
-     * @param nonRevoked [Interval] or [null] - time interval of [attributes] and [predicates] non-revocation
-     * @param nonce [String] - random value to distinct identical proofs
-     *
-     * @return [ProofRequest]
-     */
-    fun createProofRequest(
-        version: String,
-        name: String,
-        attributes: List<CredentialFieldReference>,
-        predicates: List<CredentialPredicate>,
-        nonRevoked: Interval?,
-        nonce: String = "123123"
-    ): ProofRequest
-
-    /**
      * Creates [ProofInfo] for provided [ProofRequest].
      *
      * @param proofRequest [ProofRequest] - proof request created by verifier
      * @param masterSecretId [String]
+     * @param init: [ExtraQueryBuilder].() -> [Unit] - extra query initializer, use attributes["${name}"] = [wql] DSL to create it
      *
      * @return [ProofInfo] - proof and all reliable data
      */
     fun createProofFromLedgerData(
         proofRequest: ProofRequest,
-        masterSecretId: String = DEFAULT_MASTER_SECRET_ID
+        masterSecretId: String = DEFAULT_MASTER_SECRET_ID,
+        init: ExtraQueryBuilder.() -> Unit = {}
     ): ProofInfo
 
     /**
      * Verifies [ProofInfo] produced by prover
      *
-     * @param proofReq [ProofRequest] - proof request used by prover to create proof
+     * @param proofReq [ProofRequest] - proof request used by prover to create proof, use [proofRequest] DSL to create it
      * @param proof [ProofInfo] - proof created by prover
      *
      * @return [Boolean] - is proof valid?

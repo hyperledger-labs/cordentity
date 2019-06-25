@@ -2,18 +2,21 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy.service
 
 
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.name
-import com.luxoft.blockchainlab.hyperledger.indy.SsiUser
 import com.luxoft.blockchainlab.hyperledger.indy.IndyUser
-import com.luxoft.blockchainlab.hyperledger.indy.helpers.*
+import com.luxoft.blockchainlab.hyperledger.indy.SsiUser
+import com.luxoft.blockchainlab.hyperledger.indy.helpers.ConfigHelper
+import com.luxoft.blockchainlab.hyperledger.indy.helpers.GenesisHelper
+import com.luxoft.blockchainlab.hyperledger.indy.helpers.PoolHelper
+import com.luxoft.blockchainlab.hyperledger.indy.helpers.WalletHelper
 import com.luxoft.blockchainlab.hyperledger.indy.ledger.IndyPoolLedgerUser
 import com.luxoft.blockchainlab.hyperledger.indy.models.DidConfig
 import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletUser
+import com.luxoft.blockchainlab.hyperledger.indy.wallet.getOwnIdentities
 import mu.KotlinLogging
 import net.corda.core.node.AppServiceHub
 import net.corda.core.node.services.CordaService
 import net.corda.core.serialization.SingletonSerializeAsToken
 import java.io.File
-import java.lang.RuntimeException
 
 /**
  * A Corda service for dealing with Indy Ledger infrastructure such as pools, credentials, wallets.
@@ -53,7 +56,15 @@ class IndyService(services: AppServiceHub) : SingletonSerializeAsToken() {
         val tailsPath = tailsPath ?: "tails"
         val didConfig = DidConfig(did, seed, null, null)
 
-        val walletUser = IndySDKWalletUser(wallet, didConfig, tailsPath)
+        val walletUser = if (did != null && wallet.getOwnIdentities().map { it.did }.contains(did))
+            IndySDKWalletUser(wallet, did, tailsPath).also {
+                logger.debug { "Found user with did $did in wallet" }
+            }
+        else
+            IndySDKWalletUser(wallet, didConfig, tailsPath).also {
+                logger.debug { "Created new user with did $did in wallet" }
+            }
+
         logger.debug { "IndyUser object created for $nodeName" }
 
         genesisFilePath ?: throw RuntimeException("Genesis file path should be specified in config")
@@ -64,7 +75,7 @@ class IndyService(services: AppServiceHub) : SingletonSerializeAsToken() {
         val pool = PoolHelper.openOrCreate(genesisFile, poolName)
         logger.debug { "Pool $poolName opened for $nodeName" }
 
-        val ledgerUser = IndyPoolLedgerUser(pool, walletUser.did) { walletUser.sign(it) }
+        val ledgerUser = IndyPoolLedgerUser(pool, walletUser.getIdentityDetails().did) { walletUser.sign(it) }
 
         IndyUser.with(walletUser).with(ledgerUser).build()
     }

@@ -19,7 +19,8 @@ interface IndyIssuer : IndyWalletHolder {
     /**
      * Signs something using wallet and did
      *
-     * @param
+     * @param data [String] - data to sign
+     * @return [String] - signed data
      */
     fun sign(data: String): String
 
@@ -92,6 +93,8 @@ interface IndyProver : IndyWalletHolder {
      * @param offer [CredentialOffer] - credential offer
      * @param credentialDefinition [CredentialDefinition]
      * @param revocationRegistryDefinition [RevocationRegistryDefinition] on [null]
+     *
+     * @return local UUID of the stored credential in the prover's wallet
      */
     fun receiveCredential(
         credentialInfo: CredentialInfo,
@@ -99,12 +102,14 @@ interface IndyProver : IndyWalletHolder {
         offer: CredentialOffer,
         credentialDefinition: CredentialDefinition,
         revocationRegistryDefinition: RevocationRegistryDefinition?
-    )
+    ): String
 
     /**
      * Creates proof for provided proof request
      *
      * @param proofRequest [ProofRequest] - proof request created by verifier
+     * @param extraQuery Map [String] to Map [String] to [Any] - additional WQL query applied to Wallet's credential search
+     *  use [com.luxoft.blockchainlab.hyperledger.indy.utils.wql] to build it nicely (examples in tests)
      * @param provideSchema [SchemaProvider] - provide schema for each credential
      * @param provideCredentialDefinition [CredentialDefinitionProvider] - provide credential definition for each credential
      * @param masterSecretId [String]
@@ -117,6 +122,7 @@ interface IndyProver : IndyWalletHolder {
         provideSchema: SchemaProvider,
         provideCredentialDefinition: CredentialDefinitionProvider,
         masterSecretId: String,
+        extraQuery: Map<String, Map<String, Any>>?,
         revocationStateProvider: RevocationStateProvider?
     ): ProofInfo
 
@@ -210,39 +216,12 @@ interface IndyVerifier {
      * @return [Boolean] - is proof valid?
      */
     fun verifyProof(proofReq: ProofRequest, proof: ProofInfo, usedData: DataUsedInProofJson): Boolean
-
-    /**
-     * Creates proof request. This function has nothing to do with Indy API, it is used just to produce well-shaped data.
-     *
-     * @param version [String] - ???
-     * @param name [String] - name of this proof request
-     * @param attributes [List] of [CredentialFieldReference] - attributes which prover needs to reveal
-     * @param predicates [List] of [CredentialPredicate] - predicates which prover should answer
-     * @param nonRevoked [Interval] or [null] - time interval of [attributes] and [predicates] non-revocation
-     * @param nonce [String]
-     *
-     * @return [ProofRequest]
-     */
-    fun createProofRequest(
-        version: String,
-        name: String,
-        attributes: List<CredentialFieldReference>,
-        predicates: List<CredentialPredicate>,
-        nonRevoked: Interval?,
-        nonce: String = "123123"
-    ): ProofRequest
 }
 
 /**
  * Represents basic entity which has indy wallet
  */
 interface IndyWalletHolder {
-    /**
-     * Each wallet holder should have at least one pair of did/verkey to be able to perform any action
-     */
-    val did: String
-    val verkey: String
-
     /**
      * Creates temporary did which can be used by identity to perform some any operations
      *
@@ -267,6 +246,14 @@ interface IndyWalletHolder {
      * @return [IdentityDetails]
      */
     fun getIdentityDetails(did: String): IdentityDetails
+
+    //TODO: return credentials only for current DID?
+    /**
+     * Gets Iterator [CredentialReference] in this wallet
+     *
+     * @return Iterator<[CredentialReference]>
+     */
+    fun getCredentials(): Iterator<CredentialReference>
 
     /**
      * Gets TAILS file path

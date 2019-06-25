@@ -94,7 +94,7 @@ data class Credential(
     @JsonProperty("rev_reg") val revocationRegistry: RawJsonMap?,
     val witness: RawJsonMap?,
     @JsonProperty("rev_reg_id") override val revocationRegistryIdRaw: String?,
-    val values: CredentialProposal,
+    val values: Map<String, CredentialValue>,
     val signature: Map<String, RawJsonMap?>,
     val signatureCorrectnessProof: RawJsonMap
 ) : ContainsSchemaId, ContainsCredentialDefinitionId, ContainsRevocationRegistryId
@@ -158,4 +158,39 @@ data class CredentialRequestMetadata(
     val masterSecretBlindingData: RawJsonMap,
     val masterSecretName: String,
     val nonce: String
+)
+
+/**
+ * {
+ *  "cred_info":{
+ *      "referent":"0172ac7e-d52f-4b89-b9e8-7e5f618cc841",
+ *      "attrs":{
+ *          "height":"175",
+ *          "age":"28",
+ *          "name":"Alex",
+ *          "sex":"male"
+ *      },
+ *      "schema_id":"Pv7Pud6cAjb9inus556Afq:2:gvt:1.0",
+ *      "cred_def_id":"Pv7Pud6cAjb9inus556Afq:3:CL:17:TAG_1",
+ *      "rev_reg_id":"Pv7Pud6cAjb9inus556Afq:4:Pv7Pud6cAjb9inus556Afq:3:CL:17:TAG_1:CL_ACCUM:REV_TAG_1",
+ *      "cred_rev_id":"1"
+ *  },
+ *  "interval":{
+ *      "from":1557738706,
+ *      "to":1557738706
+ *  }
+ * }
+ */
+data class CredentialForTheRequest(
+    val credInfo: CredInfo,
+    val interval: Interval?
+)
+
+data class CredInfo(
+    val referent: String,
+    val attrs: Map<String, String>,
+    val schemaId: String,
+    val credDefId: String,
+    val revRegId: String?,
+    val credRevId: String?
 )

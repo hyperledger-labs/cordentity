@@ -30,7 +30,7 @@ object IssueCredentialFlowB2C {
         private val credentialDefinitionId: CredentialDefinitionId,
         private val revocationRegistryDefinitionId: RevocationRegistryDefinitionId?,
         private val indyPartyDID: String,
-        private val credentialProposalProvider: () -> CredentialProposal
+        private val credentialProposalFiller: CredentialProposal.() -> Unit
     ) : FlowLogic<Unit>() {
 
         @Suspendable
@@ -54,7 +54,7 @@ object IssueCredentialFlowB2C {
                     credentialRequest,
                     offer,
                     revocationRegistryDefinitionId,
-                    credentialProposalProvider
+                    credentialProposalFiller
                 )
 
                 connectionService().sendCredential(credential, indyPartyDID)
@@ -110,7 +110,7 @@ object IssueCredentialFlowB2C {
                     )
                 } else {
                     TransactionBuilder(whoIsNotary()).withItems(
-                        credentialDefinitionIn,
+                        originalCredentialDefIn,
                         credentialDefinitionOut,
                         credentialDefinitionCmd,
                         newCredentialOut,

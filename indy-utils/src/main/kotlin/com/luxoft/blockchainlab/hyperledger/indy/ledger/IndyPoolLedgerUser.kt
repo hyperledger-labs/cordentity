@@ -17,9 +17,9 @@ const val RETRY_TIMES: Int = 10
  *
  * @param pool [Pool] - indy pool handle
  * @param did [String] - indy user did
- * @param signProvider - lambda that is used to sign ledger requests
+ * @param signProvider ([String]) -> [String] - lambda that is used to sign ledger requests
  */
-class IndyPoolLedgerUser(val pool: Pool, val did: String, val signProvider: (data: String) -> String) : LedgerUser {
+class IndyPoolLedgerUser(val pool: Pool, override val did: String, val signProvider: (data: String) -> String) : LedgerUser {
 
     private val logger = KotlinLogging.logger {}
 
@@ -73,6 +73,17 @@ class IndyPoolLedgerUser(val pool: Pool, val did: String, val signProvider: (dat
         store(nymRequest)
     }
 
+    override fun getNym(about: IdentityDetails): NymResponse {
+        val request = Ledger.buildGetNymRequest(
+                did,
+                about.did
+        ).get()
+
+        val json = Ledger.submitRequest(pool, request).get()
+
+        return SerializationUtils.jSONToAny(json)
+    }
+
     override fun schemaExists(id: SchemaId): Boolean {
         val schemaReq = Ledger.buildGetSchemaRequest(did, id.toString()).get()
 
@@ -83,7 +94,7 @@ class IndyPoolLedgerUser(val pool: Pool, val did: String, val signProvider: (dat
 
             true
         } catch (e: Exception) {
-            logger.error { e }
+            logger.debug { e }
             false
         }
     }
@@ -290,7 +301,7 @@ class IndyPoolLedgerUser(val pool: Pool, val did: String, val signProvider: (dat
                 .map { Pair(it.getRevocationRegistryIdObject()!!, it.timestamp!!) }
                 .distinct()
                 .associate { (revRegId, timestamp) ->
-                    val response = retrieveRevocationRegistryEntry(revRegId, timestamp, delayMs, retryTimes)
+                    val response = retrieveRevocationRegistryDelta(revRegId, Interval(null, timestamp), delayMs, retryTimes)
                         ?: throw RuntimeException("Revocation registry for definition $revRegId at timestamp $timestamp doesn't exist in ledger")
 
                     val (tmstmp, revReg) = response
