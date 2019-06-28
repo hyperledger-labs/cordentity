@@ -8,6 +8,8 @@ services:
       - PORT=8094
     env_file:
       - ./Agent.env
+    networks:
+      - agents
   agent2:
     image: teamblockchain/indy-agent:d64dddf
     ports:
@@ -16,6 +18,8 @@ services:
       - PORT=8095
     env_file:
       - ./Agent.env
+    networks:
+    - agents
   agent3:
     image: teamblockchain/indy-agent:d64dddf
     ports:
@@ -24,6 +28,8 @@ services:
       - PORT=8096
     env_file:
       - ./Agent.env
+    networks:
+      - agents
   agent4:
     image: teamblockchain/indy-agent:d64dddf
     ports:
@@ -32,6 +38,8 @@ services:
       - PORT=8097
     env_file:
       - ./Agent.env
+    networks:
+      - agents
   agent5:
     image: teamblockchain/indy-agent:d64dddf
     ports:
@@ -40,6 +48,8 @@ services:
       - PORT=8098
     env_file:
       - ./Agent.env
+    networks:
+      - agents
   agent6:
     image: teamblockchain/indy-agent:d64dddf
     ports:
@@ -48,3 +58,11 @@ services:
       - PORT=8099
     env_file:
       - ./Agent.env
+    networks:
+      - agents
+networks:
+  agents:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.100.100.0/24
