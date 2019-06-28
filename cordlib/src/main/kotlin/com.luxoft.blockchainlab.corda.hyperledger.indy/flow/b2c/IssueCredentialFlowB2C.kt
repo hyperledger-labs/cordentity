@@ -37,11 +37,11 @@ object IssueCredentialFlowB2C {
         override fun call() {
             try {
                 val revocationRegistryDefinition = if (revocationRegistryDefinitionId == null) null
-                else getRevocationRegistryDefinitionById(revocationRegistryDefinitionId)?.state?.data
+                else getRevocationRegistryDefinitionById(revocationRegistryDefinitionId)
 
                 if (revocationRegistryDefinition != null)
-                    if (!revocationRegistryDefinition.canProduceCredentials())
-                        throw IndyCredentialMaximumReachedException(revocationRegistryDefinition.id)
+                    if (!revocationRegistryDefinition.state.data.canProduceCredentials())
+                        throw IndyCredentialMaximumReachedException(revocationRegistryDefinition.state.data.id)
 
                 // issue credential
                 val offer = indyUser().createCredentialOffer(credentialDefinitionId)
@@ -79,9 +79,8 @@ object IssueCredentialFlowB2C {
                         credentialDefinitionId,
                         "State doesn't exist in Corda vault"
                     )
-                val credentialDefinitionIn = originalCredentialDefIn.state.data
                 val credentialDefinitionOut = StateAndContract(
-                    credentialDefinitionIn,
+                    originalCredentialDefIn.state.data,
                     IndyCredentialDefinitionContract::class.java.name
                 )
                 val credentialDefinitionCmdType = IndyCredentialDefinitionContract.Command.Issue()
@@ -89,7 +88,8 @@ object IssueCredentialFlowB2C {
 
                 val trxBuilder = if (revocationRegistryDefinition != null) {
                     // consume credential definition
-                    val revocationRegistryDefinitionState = revocationRegistryDefinition.requestNewCredential()
+                    val revocationRegistryDefinitionState =
+                        revocationRegistryDefinition.state.data.requestNewCredential()
                     val revocationRegistryDefinitionOut = StateAndContract(
                         revocationRegistryDefinitionState,
                         IndyRevocationRegistryContract::class.java.name
@@ -99,7 +99,7 @@ object IssueCredentialFlowB2C {
 
                     // do stuff
                     TransactionBuilder(whoIsNotary()).withItems(
-                        credentialDefinitionIn,
+                        originalCredentialDefIn,
                         credentialDefinitionOut,
                         credentialDefinitionCmd,
                         newCredentialOut,
