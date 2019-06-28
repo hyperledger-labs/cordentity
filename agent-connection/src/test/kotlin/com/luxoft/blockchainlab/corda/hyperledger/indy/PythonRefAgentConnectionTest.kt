@@ -2,7 +2,6 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy
 
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialOffer
 import com.luxoft.blockchainlab.hyperledger.indy.models.KeyCorrectnessProof
-import org.junit.Ignore
 import org.junit.Test
 import rx.Single
 import kotlin.test.assertEquals
@@ -85,9 +84,8 @@ class PythonRefAgentConnectionTest {
             )
     private val masterAgent = "ws://127.0.0.1:8095/ws"
 
-    @Ignore("Requires external services")
     @Test
-    fun `externalTest`() = repeat(Int.MAX_VALUE) {
+    fun `externalTest`() = repeat(10) {
         MasterProcess(masterAgent, invitedPartyAgents).apply { start() }
     }
 }

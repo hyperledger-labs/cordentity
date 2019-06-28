@@ -1,0 +1,50 @@
+version: '3.6'
+services:
+  agent1:
+    image: teamblockchain/indy-agent:d64dddf
+    ports:
+      - "8094:8094"
+    environment:
+      - PORT=8094
+    env_file:
+      - ./Agent.env
+  agent2:
+    image: teamblockchain/indy-agent:d64dddf
+    ports:
+      - "8095:8095"
+    environment:
+      - PORT=8095
+    env_file:
+      - ./Agent.env
+  agent3:
+    image: teamblockchain/indy-agent:d64dddf
+    ports:
+      - "8096:8096"
+    environment:
+      - PORT=8096
+    env_file:
+      - ./Agent.env
+  agent4:
+    image: teamblockchain/indy-agent:d64dddf
+    ports:
+      - "8097:8097"
+    environment:
+      - PORT=8097
+    env_file:
+      - ./Agent.env
+  agent5:
+    image: teamblockchain/indy-agent:d64dddf
+    ports:
+      - "8098:8098"
+    environment:
+      - PORT=8098
+    env_file:
+      - ./Agent.env
+  agent6:
+    image: teamblockchain/indy-agent:d64dddf
+    ports:
+      - "8099:8099"
+    environment:
+      - PORT=8099
+    env_file:
+      - ./Agent.env
