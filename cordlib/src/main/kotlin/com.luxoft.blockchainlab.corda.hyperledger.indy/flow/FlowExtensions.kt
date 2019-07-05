@@ -24,5 +24,8 @@ fun FlowLogic<Any>.indyUser(): SsiUser {
     return serviceHub.cordaService(IndyService::class.java).indyUser
 }
 
+fun FlowLogic<Any>.tailsReader() = serviceHub.cordaService(IndyService::class.java).tailsReader
+fun FlowLogic<Any>.tailsWriter() = serviceHub.cordaService(IndyService::class.java).tailsWriter
+
 fun NodeInfo.name() = legalIdentities.first().name
 fun FlowLogic<Any>.me() = serviceHub.myInfo.legalIdentities.first()
