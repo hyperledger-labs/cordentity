@@ -42,7 +42,7 @@ class PythonRefAgentConnectionTest {
                     }
                     else acceptInvite(invitationString).subscribe { master ->
                         val tails = master.requestTails(tailsHash).toBlocking().value().tails[tailsHash]
-                        if (tails != tailsHash)
+                        if (tails?.toString(Charsets.UTF_8) != tailsHash)
                             throw AgentConnectionException("Tails file content doesn't match!!! hash $tailsHash, received $tails")
                         val offer = CredentialOffer(proofSchemaId, ":::1", KeyCorrectnessProof("", "", emptyList()), "")
                         master.sendCredentialOffer(offer)
@@ -68,7 +68,8 @@ class PythonRefAgentConnectionTest {
                 val invitedPartiesCompleted = mutableListOf<Single<Boolean>>()
                 invitedPartyAgents.forEach { agentUrl ->
                     val party = InvitedPartyProcess(agentUrl)
-                    Paths.get("tails", party.tailsHash).toFile().apply{ deleteOnExit() }.writeText(party.tailsHash)
+                    Paths.get("tails", party.tailsHash).toFile().apply { deleteOnExit() }
+                        .writeText(party.tailsHash, Charsets.UTF_8)
                     invitedPartiesCompleted.add(Single.create { observer ->
                         generateInvite().subscribe {invitation ->
                             waitForInvitedParty(invitation).subscribe { invitedParty ->

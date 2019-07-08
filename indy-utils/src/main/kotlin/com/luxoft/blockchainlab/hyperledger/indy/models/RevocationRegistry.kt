@@ -71,7 +71,7 @@ data class TailsRequest(
  */
 data class TailsResponse(
     @JsonProperty("tails_hash") val tailsHash: String,
-    val tails: RawJsonMap
+    val tails: Map<String, ByteArray>
 )
 
 data class RevocationState(

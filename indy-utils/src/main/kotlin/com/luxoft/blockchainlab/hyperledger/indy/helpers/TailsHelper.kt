@@ -47,7 +47,7 @@ object TailsHelper {
                 if (file.exists())
                     file.delete()
                 file.createNewFile()
-                file.writeText(content.toString())
+                file.writeBytes(content)
             }
         }
     }
@@ -59,7 +59,7 @@ object TailsHelper {
             return if (!file.exists())
                 TailsResponse(tailsRequest.tailsHash, mapOf())
             else
-                TailsResponse(tailsRequest.tailsHash, mapOf(tailsRequest.tailsHash to file.readText()))
+                TailsResponse(tailsRequest.tailsHash, mapOf(tailsRequest.tailsHash to file.readBytes()))
         }
     }
 }
