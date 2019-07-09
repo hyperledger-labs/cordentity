@@ -4,7 +4,8 @@ import co.paralleluniverse.fibers.Suspendable
 import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialContract
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredentialProof
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.*
-import com.luxoft.blockchainlab.hyperledger.indy.models.*
+import com.luxoft.blockchainlab.hyperledger.indy.models.ProofInfo
+import com.luxoft.blockchainlab.hyperledger.indy.models.ProofRequest
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndContract
 import net.corda.core.flows.*
@@ -71,7 +72,7 @@ object VerifyCredentialFlowB2B {
                 val signedTrx = subFlow(CollectSignaturesFlow(selfSignedTx, listOf(flowSession)))
 
                 // Notarise and record the transaction in both parties' vaults.
-                subFlow(FinalityFlow(signedTrx))
+                finalizeTransaction(signedTrx, listOf(flowSession))
 
                 return Pair(id, true)
 
@@ -98,6 +99,8 @@ object VerifyCredentialFlowB2B {
                 }
 
                 subFlow(flow)
+                if (flowSession.counterparty != me())
+                    subFlow(ReceiveFinalityFlow(flowSession))
 
             } catch (e: Exception) {
                 logger.error("", e)

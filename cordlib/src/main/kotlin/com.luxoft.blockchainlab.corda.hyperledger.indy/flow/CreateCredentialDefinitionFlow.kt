@@ -10,7 +10,10 @@ import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialDefinition
 import com.luxoft.blockchainlab.hyperledger.indy.models.SchemaId
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndContract
-import net.corda.core.flows.*
+import net.corda.core.flows.FlowException
+import net.corda.core.flows.FlowLogic
+import net.corda.core.flows.InitiatingFlow
+import net.corda.core.flows.StartableByRPC
 import net.corda.core.transactions.TransactionBuilder
 
 
@@ -77,7 +80,7 @@ object CreateCredentialDefinitionFlow {
 
                 val selfSignedTx = serviceHub.signInitialTransaction(trxBuilder, ourIdentity.owningKey)
 
-                subFlow(FinalityFlow(selfSignedTx))
+                finalizeTransaction(selfSignedTx)
 
                 return credentialDefinitionObj
 

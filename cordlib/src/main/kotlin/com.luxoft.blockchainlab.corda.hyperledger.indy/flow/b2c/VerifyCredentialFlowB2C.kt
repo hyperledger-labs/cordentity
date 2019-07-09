@@ -3,19 +3,18 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2c
 import co.paralleluniverse.fibers.Suspendable
 import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialContract
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredentialProof
-import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.ProofAttribute
-import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.ProofPredicate
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.finalizeTransaction
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.indyUser
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.whoIsNotary
 import com.luxoft.blockchainlab.corda.hyperledger.indy.service.awaitFiber
 import com.luxoft.blockchainlab.corda.hyperledger.indy.service.connectionService
-import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialFieldReference
-import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialPredicate
-import com.luxoft.blockchainlab.hyperledger.indy.models.Interval
 import com.luxoft.blockchainlab.hyperledger.indy.models.ProofRequest
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndContract
-import net.corda.core.flows.*
+import net.corda.core.flows.FlowException
+import net.corda.core.flows.FlowLogic
+import net.corda.core.flows.InitiatingFlow
+import net.corda.core.flows.StartableByRPC
 import net.corda.core.transactions.TransactionBuilder
 
 
@@ -59,7 +58,7 @@ object VerifyCredentialFlowB2C {
                 val selfSignedTx = serviceHub.signInitialTransaction(trxBuilder)
 
                 // Notarise and record the transaction in both parties' vaults.
-                subFlow(FinalityFlow(selfSignedTx))
+                finalizeTransaction(selfSignedTx)
 
                 return true
 

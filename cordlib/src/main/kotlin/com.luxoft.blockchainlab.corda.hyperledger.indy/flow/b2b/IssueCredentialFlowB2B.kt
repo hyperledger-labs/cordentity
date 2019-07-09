@@ -82,7 +82,7 @@ object IssueCredentialFlowB2B {
                             credentialReq,
                             credential,
                             indyUser().walletUser.getIdentityDetails().did,
-                            listOf(ourIdentity, prover)
+                            listOf(ourIdentity)
                         )
                         StateAndContract(credentialOut, IndyCredentialContract::class.java.name)
                     }
@@ -150,7 +150,7 @@ object IssueCredentialFlowB2B {
                 val signedTrx = flowSession.receive<SignedTransaction>().unwrap { it }
 
                 // Notarise and record the transaction in both parties' vaults.
-                subFlow(FinalityFlow(signedTrx))
+                finalizeTransaction(signedTrx, listOf(flowSession))
 
                 return id
             } catch (ex: Exception) {
@@ -209,6 +209,8 @@ object IssueCredentialFlowB2B {
 
                 flowSession.send(signedByMe)
 
+                if (flowSession.counterparty != me())
+                    subFlow(ReceiveFinalityFlow(flowSession, signedByMe.id))
             } catch (ex: Exception) {
                 logger.error("Credential has not been issued", ex)
                 throw FlowException(ex.message)
