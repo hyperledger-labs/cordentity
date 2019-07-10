@@ -19,6 +19,64 @@ import kotlin.concurrent.thread
 class PythonRefAgentConnection : AgentConnection {
     private val log = KotlinLogging.logger {}
 
+    private lateinit var url: String
+    private lateinit var login: String
+    private lateinit var password: String
+
+    private val doHandshake: (SingleSubscriber<in Unit>, AgentWebSocketClient) -> Unit = { observer, webSocket ->
+        /**
+         * Check the agent's current state.
+         * The agent will respond with the "state" message
+         */
+        webSocket.receiveMessageOfType<State>(MESSAGE_TYPES.STATE_RESPONSE).subscribe({ stateResponse ->
+            try {
+                if (!checkUserLoggedIn(stateResponse, login)) {
+
+                    webSocket.receiveMessageOfType<State>(MESSAGE_TYPES.STATE_RESPONSE).subscribe({ newState ->
+                        try {
+                            if (!checkUserLoggedIn(newState, login)) {
+                                log.error { "Unable to connect to Wallet" }
+                                throw AgentConnectionException("Error connecting to $url")
+                            } else {
+                                observer.onSuccess(Unit)
+                            }
+                        } catch (e: Throwable) {
+                            observer.onError((e))
+                        }
+                    }, { e: Throwable -> observer.onError((e)) })
+
+                    /**
+                     * If the agent is logged in by different user, send the "connect" request
+                     * to take over the connection
+                     */
+                    sendAsJson(WalletConnect(login, password))
+
+                } else {
+                    observer.onSuccess(Unit)
+                }
+            } catch (e: Throwable) {
+                observer.onError((e))
+            }
+        }, { e: Throwable -> observer.onError(e) })
+
+        /**
+         * Send the state request
+         */
+        sendAsJson(StateRequest())
+    }
+
+    private val reconnect: (AgentWebSocketClient) -> Unit = { webSocket ->
+        val reconnecting = Single.create<Unit> { observer ->
+            try {
+                webSocket.reconnectBlocking()
+                doHandshake(observer, webSocket)
+            } catch (e: Throwable) {
+                observer.onError(e)
+            }
+        }
+        reconnecting.toBlocking().value()
+    }
+
     override fun disconnect() {
         if (getConnectionStatus() == AgentConnectionStatus.AGENT_CONNECTED) {
             webSocket.closeBlocking()
@@ -36,40 +94,16 @@ class PythonRefAgentConnection : AgentConnection {
      * Connects to an agent's endpoint
      */
     override fun connect(url: String, login: String, password: String): Single<Unit> {
-        disconnect()
+
+        this.url = url
+        this.login = login
+        this.password = password
         return Single.create<Unit> { observer ->
             try {
-                webSocket = AgentWebSocketClient(URI(url), login)
+                webSocket = AgentWebSocketClient(URI(url), login, this.reconnect)
                 webSocket.apply {
                     connectBlocking()
-                    /**
-                     * Check the agent's current state
-                     */
-                    receiveMessageOfType<State>(MESSAGE_TYPES.STATE_RESPONSE).subscribe({ stateResponse ->
-                        if (!checkUserLoggedIn(stateResponse, login)) {
-                            /**
-                             * If the agent is not yet initialized, send the "connect" request
-                             */
-                            sendAsJson(WalletConnect(login, password))
-                            /**
-                             * The agent will respond with the "state" message which again must be checked
-                             */
-                            receiveMessageOfType<State>(MESSAGE_TYPES.STATE_RESPONSE).subscribe({ newState ->
-                                if (!checkUserLoggedIn(newState, login)) {
-                                    log.error { "Unable to connect to Wallet" }
-                                    throw AgentConnectionException("Error connecting to $url")
-                                } else {
-                                    observer.onSuccess(Unit)
-                                }
-                            }, { e: Throwable -> throw(e) })
-                        } else {
-                            /**
-                             * The agent is already logged in
-                             */
-                            observer.onSuccess(Unit)
-                        }
-                    }, { e: Throwable -> throw(e) })
-                    sendAsJson(StateRequest())
+                    doHandshake(observer, this)
                 }
             } catch (e: Throwable) {
                 observer.onError(e)
@@ -115,6 +149,18 @@ class PythonRefAgentConnection : AgentConnection {
             false
         }
     }
+
+    /**
+     * Returns true if the agent is connected bo by any party.
+     */
+    private fun checkAgentConnectedTo(stateMessage: State?): Boolean =
+        stateMessage?.content?.get("initialized") == true
+
+    /**
+     * Returns true if the agent is connected bo by any party.
+     */
+    private fun checkIfUserLoggedIn(stateMessage: State?, userName: String): Boolean =
+        stateMessage?.content?.get("agent_name") == userName
 
     /**
      * Establishes a connection to remote IndyParty based on the given invite
@@ -420,7 +466,7 @@ data class RequestReceivedMessage(val label: String, val did: String, val endpoi
 data class RequestSendResponseMessage(val did: String, @JsonProperty("@type") val type: String = MESSAGE_TYPES.SEND_RESPONSE)
 data class RequestResponseReceivedMessage(val their_did: String, val history: ObjectNode, @JsonProperty("@type") val type: String)
 data class RequestResponseSentMessage(@JsonProperty("@type") val type: String = MESSAGE_TYPES.RESPONSE_SENT, val label: String, val did: String)
-data class SendMessage(val to: String? = null, val message: TypedBodyMessage? = null, @JsonProperty("@type") val type: String = MESSAGE_TYPES.SEND_MESSAGE)
+data class SendMessage(val to: String? = null, val message: TypedBodyMessage? = null, @JsonProperty("@type") val type: String = MESSAGE_TYPES.SEND_MESSAGE, val from: String? = null)
 data class MessageReceivedMessage(val from: String, val sent_time: String, val content: TypedBodyMessage)
 data class MessageReceived(val id: String?, val with: String?, val message: MessageReceivedMessage, @JsonProperty("@type") val type: String = MESSAGE_TYPES.SEND_MESSAGE)
 data class LoadMessage(val with: String, @JsonProperty("@type") val type: String = MESSAGE_TYPES.GET_MESSAGES)

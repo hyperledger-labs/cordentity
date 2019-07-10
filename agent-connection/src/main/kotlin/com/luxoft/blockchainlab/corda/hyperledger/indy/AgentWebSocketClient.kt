@@ -13,7 +13,7 @@ import rx.schedulers.Schedulers
 import java.net.URI
 import java.util.*
 
-class AgentWebSocketClient(serverUri: URI, private val socketName: String) : WebSocketClient(serverUri) {
+class AgentWebSocketClient(serverUri: URI, private val socketName: String, private val reconnect: (AgentWebSocketClient) -> Unit) : WebSocketClient(serverUri) {
     companion object {
         val scheduler: Scheduler = Schedulers.computation()
     }
@@ -26,6 +26,10 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
 
     override fun onClose(code: Int, reason: String?, remote: Boolean) {
         log.info { "$socketName:AgentConnection closed: $code,$reason,$remote" }
+    }
+
+    override fun onClosing(code: Int, reason: String?, remote: Boolean) {
+        log.info { "$socketName:AgentConnection closing: $code,$reason,$remote" }
     }
 
     private val dataStorage = object {
@@ -157,6 +161,8 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
     fun sendAsJson(obj: Any) {
         val message = SerializationUtils.anyToJSON(obj)
         log.info { "$socketName:SendMessage: $message" }
+        if (!isOpen)
+            this.reconnect(this)
         send(message)
     }
 
@@ -196,7 +202,7 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
 
     inline fun <reified T : Any> receiveClassObject(from: IndyParty) = receiveClassObject(T::class.java, from)
 
-    fun sendClassObject(message: TypedBodyMessage, counterParty: IndyParty) = sendAsJson(SendMessage(counterParty.did, message))
+    fun sendClassObject(message: TypedBodyMessage, counterParty: IndyParty) = sendAsJson(SendMessage(counterParty.did, message, from = counterParty.myDid))
 
     inline fun <reified T : Any> sendClassObject(message: T, counterParty: IndyParty) = sendClassObject(TypedBodyMessage(message, T::class.java.canonicalName), counterParty)
 

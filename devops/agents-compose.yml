@@ -1,0 +1,68 @@
+version: '3.6'
+services:
+  agent1:
+    image: indy-agent:latest
+    ports:
+      - "8094:8094"
+    environment:
+      - PORT=8094
+    env_file:
+      - ./Agent.env
+    networks:
+      - agents
+  agent2:
+    image: indy-agent:latest
+    ports:
+      - "8095:8095"
+    environment:
+      - PORT=8095
+    env_file:
+      - ./Agent.env
+    networks:
+    - agents
+  agent3:
+    image: indy-agent:latest
+    ports:
+      - "8096:8096"
+    environment:
+      - PORT=8096
+    env_file:
+      - ./Agent.env
+    networks:
+      - agents
+  agent4:
+    image: indy-agent:latest
+    ports:
+      - "8097:8097"
+    environment:
+      - PORT=8097
+    env_file:
+      - ./Agent.env
+    networks:
+      - agents
+  agent5:
+    image: indy-agent:latest
+    ports:
+      - "8098:8098"
+    environment:
+      - PORT=8098
+    env_file:
+      - ./Agent.env
+    networks:
+      - agents
+  agent6:
+    image: indy-agent:latest
+    ports:
+      - "8099:8099"
+    environment:
+      - PORT=8099
+    env_file:
+      - ./Agent.env
+    networks:
+      - agents
+networks:
+  agents:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.100.100.0/24

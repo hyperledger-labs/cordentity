@@ -3,26 +3,13 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.TailsHelper
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialOffer
 import com.luxoft.blockchainlab.hyperledger.indy.models.KeyCorrectnessProof
-import org.junit.Ignore
+import com.luxoft.blockchainlab.hyperledger.indy.models.TailsResponse
 import org.junit.Test
 import rx.Single
 import java.io.File
 import kotlin.test.assertEquals
-import java.net.URI
-import java.net.URL
 import java.nio.file.Paths
 import java.util.*
-
-fun agentInitEndpoint(agentUrl: String) {
-    /**
-     * HTTP GET / in order to let the agent (pythonic indy-agent) know its endpoint address
-     * indy-agent.py is incapable of determining its endpoint other than this way
-     */
-    val uri = URI(agentUrl)
-    val rootPath = "http://${uri.host}:${uri.port}/"
-    val rootUrl = URL(rootPath)
-    rootUrl.openConnection().getInputStream().close()
-}
 
 class PythonRefAgentConnectionTest {
 
@@ -34,7 +21,6 @@ class PythonRefAgentConnectionTest {
 
         fun start(invitationString: String) {
             val rand = Random().nextInt()
-            agentInitEndpoint(agentUrl)
             PythonRefAgentConnection().apply {
                 connect(agentUrl, "User$rand", "pass$rand").handle { _, ex ->
                     if (ex != null) {
@@ -62,7 +48,6 @@ class PythonRefAgentConnectionTest {
             val tailsDir = File("tails").apply { deleteOnExit() }
             if (!tailsDir.exists())
                 tailsDir.mkdirs()
-            agentInitEndpoint(agentUrl)
             PythonRefAgentConnection().apply {
                 connect(agentUrl, "User$rand", "pass$rand").toBlocking().value()
                 val invitedPartiesCompleted = mutableListOf<Single<Boolean>>()
@@ -100,9 +85,54 @@ class PythonRefAgentConnectionTest {
             )
     private val masterAgent = "ws://127.0.0.1:8095/ws"
 
-    @Ignore("Requires external services")
     @Test
-    fun `externalTest`() = repeat(Int.MAX_VALUE) {
+    fun `externalTest`() = repeat(10) {
         MasterProcess(masterAgent, invitedPartyAgents).apply { start() }
+    }
+
+    @Test
+    fun `client to server connection is interrupted while exchanging messages`() {
+        val tailsHash = "${Random().nextInt(Int.MAX_VALUE)}"
+        class Client (private val agentUrl: String) {
+            fun connect(invitationString: String) : IndyPartyConnection {
+                val rand = Random().nextInt()
+                val agentConnection = PythonRefAgentConnection()
+                agentConnection.connect(agentUrl, "User$rand", "pass$rand").toBlocking().value()
+                return agentConnection.acceptInvite(invitationString).toBlocking().value()
+            }
+        }
+        class Server (private val agentUrl: String) {
+            fun getInvite() : String {
+                val rand = Random().nextInt()
+                val agentConnection = PythonRefAgentConnection()
+                agentConnection.connect(agentUrl, "User$rand", "pass$rand").toBlocking().value()
+                val invitationString = agentConnection.generateInvite().toBlocking().value()
+                agentConnection.waitForInvitedParty(invitationString).subscribe { invitedParty ->
+                    val partyDid = invitedParty.partyDID()
+                    println("Server: client $partyDid connected")
+                    invitedParty.handleTailsRequestsWith {
+                        TailsResponse(tailsHash, mapOf(tailsHash to tailsHash.toByteArray()))
+                    }
+                }
+                return invitationString
+            }
+        }
+        class ExtraClient (private val agentUrl: String) {
+            fun connect() {
+                val rand = Random().nextInt()
+                val agentConnection = PythonRefAgentConnection()
+                agentConnection.connect(agentUrl, "User$rand", "pass$rand").toBlocking().value()
+            }
+        }
+        val invitationString = Server(masterAgent).getInvite()
+        val clientConnection = Client(invitedPartyAgents[0]).connect(invitationString)
+        println("Client connected the agent. Local DID is ${clientConnection.myDID()}.")
+        repeat(5) {
+            val tails = clientConnection.requestTails(tailsHash).toBlocking().value()
+            println("Tails received: ${tails.tails[tailsHash]}")
+        }
+        ExtraClient(invitedPartyAgents[0]).connect()
+        val tails = clientConnection.requestTails(tailsHash).toBlocking().value()
+        println("Latest tails: ${tails.tails[tailsHash]}")
     }
 }
