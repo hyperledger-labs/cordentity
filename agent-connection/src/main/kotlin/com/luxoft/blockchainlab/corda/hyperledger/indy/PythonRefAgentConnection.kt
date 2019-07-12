@@ -6,8 +6,11 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import mu.KotlinLogging
 import net.iharder.Base64
+import rx.Observable
 import rx.Single
 import rx.SingleSubscriber
+import rx.Subscriber
+import rx.schedulers.Schedulers
 import java.net.URI
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
@@ -23,7 +26,7 @@ class PythonRefAgentConnection : AgentConnection {
     private lateinit var login: String
     private lateinit var password: String
 
-    private val doHandshake: (SingleSubscriber<in Unit>, AgentWebSocketClient) -> Unit = { observer, webSocket ->
+    private fun doHandshake(observer: Subscriber<in Unit>) {
         /**
          * Check the agent's current state.
          * The agent will respond with the "state" message
@@ -38,7 +41,7 @@ class PythonRefAgentConnection : AgentConnection {
                                 log.error { "Unable to connect to Wallet" }
                                 throw AgentConnectionException("Error connecting to $url")
                             } else {
-                                observer.onSuccess(Unit)
+                                observer.onNext(Unit)
                             }
                         } catch (e: Throwable) {
                             observer.onError((e))
@@ -52,7 +55,7 @@ class PythonRefAgentConnection : AgentConnection {
                     sendAsJson(WalletConnect(login, password))
 
                 } else {
-                    observer.onSuccess(Unit)
+                    observer.onNext(Unit)
                 }
             } catch (e: Throwable) {
                 observer.onError((e))
@@ -65,16 +68,31 @@ class PythonRefAgentConnection : AgentConnection {
         sendAsJson(StateRequest())
     }
 
-    private val reconnect: (AgentWebSocketClient) -> Unit = { webSocket ->
-        val reconnecting = Single.create<Unit> { observer ->
-            try {
-                webSocket.reconnectBlocking()
-                doHandshake(observer, webSocket)
-            } catch (e: Throwable) {
-                observer.onError(e)
+    private fun doReconnect() {
+        try {
+            Single.create<Unit> { observer ->
+                Observable.create<Unit> { connectionObserver ->
+                    try {
+                        if (!webSocket.reconnectBlocking())
+                            throw AgentConnectionException(webSocket.reason ?: "Error connecting to $url")
+                        else
+                            doHandshake(connectionObserver)
+                    } catch (e: Throwable) {
+                        connectionObserver.onError(e)
+                    }
+                }.subscribeOn(Schedulers.newThread()).apply {
+                    timeout(10, TimeUnit.SECONDS).subscribe({
+                        observer.onSuccess(it)
+                    }, {
+                        observer.onError(it)
+                    })
+                }
+            }.apply {
+                toBlocking().value()
             }
+        } catch (e: Throwable) {
+            log.error { "Unable to reconnect while trying to send/receive data, due to $e at ${e.stackTrace}" }
         }
-        reconnecting.toBlocking().value()
     }
 
     override fun disconnect() {
@@ -98,17 +116,36 @@ class PythonRefAgentConnection : AgentConnection {
         this.url = url
         this.login = login
         this.password = password
-        return Single.create<Unit> { observer ->
-            try {
-                webSocket = AgentWebSocketClient(URI(url), login, this.reconnect)
-                webSocket.apply {
-                    connectBlocking()
-                    doHandshake(observer, this)
+        return Observable.create<Unit> { resultObserver ->
+            Observable.create<Unit> { connectionObserver ->
+                try {
+                    webSocket = AgentWebSocketClient(URI(url), login)
+                    webSocket.apply {
+                        notifyOnClose {
+                            connectionStatus = AgentConnectionStatus.AGENT_DISCONNECTED
+                        }
+                        onRestoreConnection {
+                            doReconnect()
+                        }
+                        if(!connectBlocking())
+                            throw AgentConnectionException(webSocket.reason ?: "Error connecting to $url")
+                        else
+                            doHandshake(connectionObserver)
+                    }
+                } catch (e: Throwable) {
+                    connectionObserver.onError(e)
                 }
-            } catch (e: Throwable) {
-                observer.onError(e)
+            }.subscribeOn(Schedulers.newThread()).apply {
+                timeout(20, TimeUnit.SECONDS).subscribe({
+                    resultObserver.onNext(it)
+                    resultObserver.onCompleted()
+                    pollAgentWorker = createAgentWorker()
+                    resultObserver.unsubscribe()
+                }, {
+                    resultObserver.onError(it)
+                })
             }
-        }.doOnSuccess { pollAgentWorker = createAgentWorker() }
+        }.subscribeOn(Schedulers.newThread()).toSingle()
     }
 
     private var connectionStatus: AgentConnectionStatus = AgentConnectionStatus.AGENT_DISCONNECTED
@@ -151,22 +188,10 @@ class PythonRefAgentConnection : AgentConnection {
     }
 
     /**
-     * Returns true if the agent is connected bo by any party.
-     */
-    private fun checkAgentConnectedTo(stateMessage: State?): Boolean =
-        stateMessage?.content?.get("initialized") == true
-
-    /**
-     * Returns true if the agent is connected bo by any party.
-     */
-    private fun checkIfUserLoggedIn(stateMessage: State?, userName: String): Boolean =
-        stateMessage?.content?.get("agent_name") == userName
-
-    /**
      * Establishes a connection to remote IndyParty based on the given invite
      */
     override fun acceptInvite(invite: String): Single<IndyPartyConnection> {
-        return Single.create { observer ->
+        val inviteAccepted : Single<IndyPartyConnection> = Single.create { observer ->
             try {
                 if (getConnectionStatus() == AgentConnectionStatus.AGENT_CONNECTED) {
                     /**
@@ -224,6 +249,7 @@ class PythonRefAgentConnection : AgentConnection {
                 observer.onError(e)
             }
         }
+        return inviteAccepted.timeout(20, TimeUnit.SECONDS)
     }
 
     private fun sendAsJson(obj: Any) = webSocket.sendAsJson(obj)
@@ -232,7 +258,7 @@ class PythonRefAgentConnection : AgentConnection {
      * Retrieves a new invite from the agent
      */
     override fun generateInvite(): Single<String> {
-        return Single.create { observer ->
+        val inviteGenerated : Single<String> = Single.create { observer ->
             try {
                 /**
                  * to generate the invite, send "generate_invite" message to the agent, and wait for "invite_generated"
@@ -250,6 +276,7 @@ class PythonRefAgentConnection : AgentConnection {
                 observer.onError(e)
             }
         }
+        return inviteGenerated.timeout(10, TimeUnit.SECONDS)
     }
 
     private val toProcessPairwiseConnections = LinkedBlockingQueue<Pair<String, SingleSubscriber<in JsonNode>>>()
@@ -265,12 +292,8 @@ class PythonRefAgentConnection : AgentConnection {
             stateResponse["content"]["pairwise_connections"].forEach { pairwise ->
                 try {
                     val publicKey = pairwise["metadata"]["connection_key"].asText()
+                    awaitingPairwiseConnections.remove(publicKey)?.onSuccess(pairwise)
 
-                    val observer = awaitingPairwiseConnections.remove(publicKey)
-
-                    if (observer != null) {
-                        observer.onSuccess(pairwise)
-                    }
                 } catch (e: Throwable) {
                     log.warn(e) { "invalid pairwise connection (no connection key) found in the state" }
                 }
@@ -387,7 +410,7 @@ class PythonRefAgentConnection : AgentConnection {
     }
 
     override fun getIndyPartyConnection(partyDID: String): Single<IndyPartyConnection?> {
-        return Single.create { observer ->
+        val indyPartyConnection: Single<IndyPartyConnection?> = Single.create { observer ->
             try {
                 if (getConnectionStatus() == AgentConnectionStatus.AGENT_CONNECTED) {
                     /**
@@ -423,6 +446,7 @@ class PythonRefAgentConnection : AgentConnection {
                 observer.onError(e)
             }
         }
+        return indyPartyConnection.timeout(10, TimeUnit.SECONDS)
     }
 
     private fun sendRequest(key: String) = webSocket.sendAsJson(SendRequestMessage(key))

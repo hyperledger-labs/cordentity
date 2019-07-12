@@ -5,20 +5,41 @@ import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import mu.KotlinLogging
 import org.java_websocket.client.WebSocketClient
 import org.java_websocket.handshake.ServerHandshake
+import rx.*
 import rx.Observable
-import rx.Observer
-import rx.Scheduler
-import rx.Single
 import rx.schedulers.Schedulers
 import java.net.URI
 import java.util.*
 
-class AgentWebSocketClient(serverUri: URI, private val socketName: String, private val reconnect: (AgentWebSocketClient) -> Unit) : WebSocketClient(serverUri) {
+class AgentWebSocketClient(serverUri: URI, private val socketName: String) : WebSocketClient(serverUri) {
     companion object {
         val scheduler: Scheduler = Schedulers.computation()
     }
 
     private val log = KotlinLogging.logger {}
+    var reason: String? = null
+    private lateinit var onCloseSubscriber: Subscriber<in Unit>
+    private lateinit var onRestoreConnection: Subscriber<in Unit>
+
+    fun notifyOnClose(onDisconnect: () -> Unit) {
+        Observable.create<Unit> {
+            onCloseSubscriber = it
+        }.apply {
+            subscribe {
+                onDisconnect()
+            }
+        }
+    }
+
+    fun onRestoreConnection(onRestore: () -> Unit) {
+        Observable.create<Unit> {
+            onRestoreConnection = it
+        }.apply {
+            subscribe {
+                onRestore()
+            }
+        }
+    }
 
     override fun onOpen(handshakedata: ServerHandshake?) {
         log.info { "$socketName:AgentConnection opened: $handshakedata" }
@@ -26,6 +47,9 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String, priva
 
     override fun onClose(code: Int, reason: String?, remote: Boolean) {
         log.info { "$socketName:AgentConnection closed: $code,$reason,$remote" }
+        this.reason = reason
+        dataStorage.cancelAll()
+        onCloseSubscriber.onNext(Unit)
     }
 
     override fun onClosing(code: Int, reason: String?, remote: Boolean) {
@@ -42,13 +66,13 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String, priva
          * message routing map, indexed by subscription key (message-specific), double linked queue of observers
          * for each (message-specific) key
          */
-        private val subscribedObservers = HashMap<String, Queue<Observer<in String>>>()
+        private val subscribedObservers = HashMap<String, Queue<Subscriber<in String>>>()
 
         /**
          * Adds an observer to (FIFO) queue corresponding to the given key.
          * If the queue doesn't exist for the given key, it's been created.
          */
-        private fun addObserver(key: String, observer: Observer<in String>) =
+        private fun addObserver(key: String, observer: Subscriber<in String>) =
                 subscribedObservers.getOrPut(key) { LinkedList() }.add(observer)
 
         /**
@@ -79,15 +103,32 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String, priva
             observer
         }
 
-        fun getMessageOrAddObserver(keyOrType: String, observer: Observer<in String>) = synchronized(this) {
+        fun getMessageOrAddObserver(keyOrType: String, observer: Subscriber<in String>) = synchronized(this) {
             val message = popMessage(keyOrType)
             if (message == null) {
                 /**
                  * if not found, subscribe on messages with the given key
                  */
+                if (isClosed)
+                    onRestoreConnection.onNext(Unit)
+
+                if (isClosed)
+                    observer.onError(AgentConnectionException("WebSocket is disconnected."))
+
                 addObserver(keyOrType, observer)
             }
             message
+        }
+
+        fun cancelAll() = synchronized(this) {
+            subscribedObservers.forEach { key, queue ->
+                while (!queue.isEmpty()) {
+                    queue.poll()?.apply {
+                        if (!this.isUnsubscribed)
+                            onError(AgentConnectionException("WebSocket closed while $socketName observing for $key."))
+                    }
+                }
+            }
         }
     }
 
@@ -148,7 +189,9 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String, priva
          * select the first message observer from the list, which must be non-empty,
          * remove the observer from the queue, emit the serialized message
          */
-        dataStorage.getObserverOrAddMessage(key, message)?.onNext(message)
+        dataStorage.getObserverOrAddMessage(key, message)?.also { observer ->
+            observer.onNext(message)
+        }
     }
 
     override fun onError(ex: Exception?) {
@@ -162,7 +205,9 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String, priva
         val message = SerializationUtils.anyToJSON(obj)
         log.info { "$socketName:SendMessage: $message" }
         if (!isOpen)
-            this.reconnect(this)
+            onRestoreConnection.onNext(Unit)
+        if (!isOpen)
+            throw AgentConnectionException("WebSocket failed to reconnect.")
         send(message)
     }
 
@@ -193,7 +238,10 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String, priva
                 popClassObject(className, from).subscribe({ objectJson ->
                     val classObject: T = SerializationUtils.jSONToAny(objectJson, className)
                     observer.onSuccess(classObject)
-                }, { e: Throwable -> observer.onError(e) })
+                }, {
+                    e: Throwable ->
+                    observer.onError(e)
+                })
             } catch (e: Throwable) {
                 observer.onError(e)
             }
@@ -209,7 +257,7 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String, priva
     /**
      * Pops message by key, subscribes on such message, if the queue is empty
      */
-    private fun popMessage(keyOrType: String, observer: Observer<in String>) {
+    private fun popMessage(keyOrType: String, observer: Subscriber<in String>) {
         dataStorage.getMessageOrAddObserver(keyOrType, observer)?.also {
             observer.onNext(it)
         }
