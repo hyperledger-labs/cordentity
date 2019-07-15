@@ -25,6 +25,7 @@ class PythonRefAgentConnection : AgentConnection {
     private lateinit var url: String
     private lateinit var login: String
     private lateinit var password: String
+    private var operationTimeout: Long = 60000
 
     private fun doHandshake(observer: Subscriber<in Unit>) {
         /**
@@ -38,8 +39,8 @@ class PythonRefAgentConnection : AgentConnection {
                     webSocket.receiveMessageOfType<State>(MESSAGE_TYPES.STATE_RESPONSE).subscribe({ newState ->
                         try {
                             if (!checkUserLoggedIn(newState, login)) {
-                                log.error { "Unable to connect to Wallet" }
-                                throw AgentConnectionException("Error connecting to $url")
+                                log.error { "Unable to connect to Wallet $login" }
+                                throw AgentConnectionException("Error connecting to $url as $login")
                             } else {
                                 observer.onNext(Unit)
                             }
@@ -80,11 +81,15 @@ class PythonRefAgentConnection : AgentConnection {
                     } catch (e: Throwable) {
                         connectionObserver.onError(e)
                     }
-                }.subscribeOn(Schedulers.newThread()).apply {
-                    timeout(10, TimeUnit.SECONDS).subscribe({
+                }.subscribeOn(Schedulers.computation()).apply {
+                    timeout(operationTimeout, TimeUnit.MILLISECONDS).subscribe({
+                        pollAgentWorker = createAgentWorker()
                         observer.onSuccess(it)
+                        observer.unsubscribe()
+
                     }, {
-                        observer.onError(it)
+                        if (!observer.isUnsubscribed)
+                            observer.onError(it)
                     })
                 }
             }.apply {
@@ -95,28 +100,30 @@ class PythonRefAgentConnection : AgentConnection {
         }
     }
 
+    private fun clear() {
+        pollAgentWorker?.interrupt() ?: log.warn { "Agent status is connected while pollAgentWorker is null" }
+        toProcessPairwiseConnections.clear()
+        awaitingPairwiseConnections.clear()
+        indyParties.clear()
+    }
+
     override fun disconnect() {
         if (getConnectionStatus() == AgentConnectionStatus.AGENT_CONNECTED) {
             webSocket.closeBlocking()
-            pollAgentWorker?.interrupt() ?: log.warn { "Agent status is connected while pollAgentWorker is null" }
-
-            toProcessPairwiseConnections.clear()
-            awaitingPairwiseConnections.clear()
-            indyParties.clear()
-
-            connectionStatus = AgentConnectionStatus.AGENT_DISCONNECTED
+            clear()
         }
     }
 
     /**
      * Connects to an agent's endpoint
      */
-    override fun connect(url: String, login: String, password: String): Single<Unit> {
+    override fun connect(url: String, login: String, password: String, timeout: Long): Single<Unit> {
 
         this.url = url
         this.login = login
         this.password = password
-        return Observable.create<Unit> { resultObserver ->
+        this.operationTimeout = timeout
+        return Single.create { resultObserver ->
             Observable.create<Unit> { connectionObserver ->
                 try {
                     webSocket = AgentWebSocketClient(URI(url), login)
@@ -135,17 +142,17 @@ class PythonRefAgentConnection : AgentConnection {
                 } catch (e: Throwable) {
                     connectionObserver.onError(e)
                 }
-            }.subscribeOn(Schedulers.newThread()).apply {
-                timeout(20, TimeUnit.SECONDS).subscribe({
-                    resultObserver.onNext(it)
-                    resultObserver.onCompleted()
+            }.subscribeOn(Schedulers.computation()).apply {
+                timeout(operationTimeout, TimeUnit.MILLISECONDS).subscribe({
                     pollAgentWorker = createAgentWorker()
+                    resultObserver.onSuccess(it)
                     resultObserver.unsubscribe()
                 }, {
-                    resultObserver.onError(it)
+                    if (!resultObserver.isUnsubscribed)
+                        resultObserver.onError(it)
                 })
             }
-        }.subscribeOn(Schedulers.newThread()).toSingle()
+        }
     }
 
     private var connectionStatus: AgentConnectionStatus = AgentConnectionStatus.AGENT_DISCONNECTED
@@ -214,7 +221,7 @@ class PythonRefAgentConnection : AgentConnection {
                             /**
                              * Wait until connection_key appears in the STATE
                              */
-                            waitForPairwiseConnection(pubKey).timeout(60000, TimeUnit.MILLISECONDS).subscribe({ pairwise ->
+                            waitForPairwiseConnection(pubKey).timeout(operationTimeout, TimeUnit.MILLISECONDS).subscribe({ pairwise ->
                                 val theirDid = pairwise["their_did"].asText()
                                 val indyParty = IndyParty(webSocket, theirDid,
                                         pairwise["metadata"]["their_endpoint"].asText(),
@@ -249,7 +256,7 @@ class PythonRefAgentConnection : AgentConnection {
                 observer.onError(e)
             }
         }
-        return inviteAccepted.timeout(20, TimeUnit.SECONDS)
+        return inviteAccepted.timeout(operationTimeout, TimeUnit.MILLISECONDS)
     }
 
     private fun sendAsJson(obj: Any) = webSocket.sendAsJson(obj)
@@ -266,7 +273,7 @@ class PythonRefAgentConnection : AgentConnection {
                  */
                 webSocket.receiveMessageOfType<ReceiveInviteMessage>(MESSAGE_TYPES.INVITE_GENERATED).subscribe({ msg ->
                     observer.onSuccess(msg.invite)
-                }, { e: Throwable -> throw(e) })
+                }, { e: Throwable -> observer.onError(e) })
                 /**
                  * After subscription, send the "generate_invite" request
                  */
@@ -276,7 +283,7 @@ class PythonRefAgentConnection : AgentConnection {
                 observer.onError(e)
             }
         }
-        return inviteGenerated.timeout(10, TimeUnit.SECONDS)
+        return inviteGenerated.timeout(operationTimeout, TimeUnit.MILLISECONDS)
     }
 
     private val toProcessPairwiseConnections = LinkedBlockingQueue<Pair<String, SingleSubscriber<in JsonNode>>>()
@@ -446,7 +453,7 @@ class PythonRefAgentConnection : AgentConnection {
                 observer.onError(e)
             }
         }
-        return indyPartyConnection.timeout(10, TimeUnit.SECONDS)
+        return indyPartyConnection.timeout(operationTimeout, TimeUnit.MILLISECONDS)
     }
 
     private fun sendRequest(key: String) = webSocket.sendAsJson(SendRequestMessage(key))
