@@ -146,10 +146,10 @@ class PythonRefAgentConnectionTest {
         }
     }
     class ExtraClient (private val agentUrl: String) {
-        fun connect(timeout: Long = 10000) : Single<Unit>  {
+        fun connect(timeoutMs: Long = 10000) : Single<Unit>  {
             val rand = Random().nextInt()
             val agentConnection = PythonRefAgentConnection()
-            return agentConnection.connect(agentUrl, "User$rand", "pass$rand", timeout)
+            return agentConnection.connect(agentUrl, "User$rand", "pass$rand", timeoutMs)
         }
     }
 
@@ -161,11 +161,11 @@ class PythonRefAgentConnectionTest {
         println("Client connected the agent. Local DID is ${clientConnection.myDID()}.")
         repeat(5) {
             val tails = clientConnection.requestTails(tailsHash).toBlocking().value()
-            println("Tails received: ${tails.tails[tailsHash]}")
+            println("Tails received: ${tails.tails[tailsHash]?.toString()}")
         }
         ExtraClient(invitedPartyAgents[0]).connect().toBlocking().value()
         val tails = clientConnection.requestTails(tailsHash).toBlocking().value()
-        println("Latest tails: ${tails.tails[tailsHash]}")
+        println("Latest tails: ${tails.tails[tailsHash]?.toString()}")
     }
 
     @Test

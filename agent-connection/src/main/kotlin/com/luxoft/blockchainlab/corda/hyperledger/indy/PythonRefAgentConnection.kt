@@ -17,6 +17,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
 class PythonRefAgentConnection : AgentConnection {
@@ -25,7 +26,8 @@ class PythonRefAgentConnection : AgentConnection {
     private lateinit var url: String
     private lateinit var login: String
     private lateinit var password: String
-    private var operationTimeout: Long = 60000
+    private var operationTimeoutMs: Long = 60000
+    private val isReconnecting = AtomicBoolean(false)
 
     private fun doHandshake(observer: Subscriber<in Unit>) {
         /**
@@ -71,29 +73,43 @@ class PythonRefAgentConnection : AgentConnection {
 
     private fun doReconnect() {
         try {
-            Single.create<Unit> { observer ->
-                Observable.create<Unit> { connectionObserver ->
-                    try {
-                        if (!webSocket.reconnectBlocking())
-                            throw AgentConnectionException(webSocket.reason ?: "Error connecting to $url")
-                        else
-                            doHandshake(connectionObserver)
-                    } catch (e: Throwable) {
-                        connectionObserver.onError(e)
-                    }
-                }.subscribeOn(Schedulers.computation()).apply {
-                    timeout(operationTimeout, TimeUnit.MILLISECONDS).subscribe({
-                        pollAgentWorker = createAgentWorker()
-                        observer.onSuccess(it)
-                        observer.unsubscribe()
+            if (isReconnecting.compareAndSet(false, true)) {
+                val single = Single.create<Unit> { observer ->
+                    Observable.create<Unit> { connectionObserver ->
+                        try {
+                            if (!webSocket.reconnectBlocking())
+                                throw AgentConnectionException(webSocket.reason ?: "Error connecting to $url")
+                            else
+                                doHandshake(connectionObserver)
+                        } catch (e: Throwable) {
+                            connectionObserver.onError(e)
+                        }
+                    }.subscribeOn(Schedulers.computation()).apply {
+                        timeout(operationTimeoutMs, TimeUnit.MILLISECONDS).subscribe({
+                            pollAgentWorker = createAgentWorker()
+                            observer.onSuccess(it)
+                            observer.unsubscribe()
 
+                        }, {
+                            if (!observer.isUnsubscribed)
+                                observer.onError(it)
+                        })
+                    }
+                }
+                val onSuccess: (Unit)->Unit = { isReconnecting.set(false) }
+                var onError: ((Throwable)->Unit)? = null
+                var retryTimeoutMs: Long = 1000
+                onError = {
+                    Thread.sleep(retryTimeoutMs)
+                    if (retryTimeoutMs * 2 < this.operationTimeoutMs)
+                        retryTimeoutMs *= 2
+                    single.subscribe({
+                        onSuccess(Unit)
                     }, {
-                        if (!observer.isUnsubscribed)
-                            observer.onError(it)
+                        onError!!(it)
                     })
                 }
-            }.apply {
-                toBlocking().value()
+                single.subscribe({ onSuccess(Unit) }, { onError!!(it)})
             }
         } catch (e: Throwable) {
             log.error { "Unable to reconnect while trying to send/receive data, due to $e at ${e.stackTrace}" }
@@ -117,12 +133,12 @@ class PythonRefAgentConnection : AgentConnection {
     /**
      * Connects to an agent's endpoint
      */
-    override fun connect(url: String, login: String, password: String, timeout: Long): Single<Unit> {
+    override fun connect(url: String, login: String, password: String, timeoutMs: Long): Single<Unit> {
 
         this.url = url
         this.login = login
         this.password = password
-        this.operationTimeout = timeout
+        this.operationTimeoutMs = timeoutMs
         return Single.create { resultObserver ->
             Observable.create<Unit> { connectionObserver ->
                 try {
@@ -143,7 +159,7 @@ class PythonRefAgentConnection : AgentConnection {
                     connectionObserver.onError(e)
                 }
             }.subscribeOn(Schedulers.computation()).apply {
-                timeout(operationTimeout, TimeUnit.MILLISECONDS).subscribe({
+                timeout(operationTimeoutMs, TimeUnit.MILLISECONDS).subscribe({
                     pollAgentWorker = createAgentWorker()
                     resultObserver.onSuccess(it)
                     resultObserver.unsubscribe()
@@ -221,7 +237,7 @@ class PythonRefAgentConnection : AgentConnection {
                             /**
                              * Wait until connection_key appears in the STATE
                              */
-                            waitForPairwiseConnection(pubKey).timeout(operationTimeout, TimeUnit.MILLISECONDS).subscribe({ pairwise ->
+                            waitForPairwiseConnection(pubKey).timeout(operationTimeoutMs, TimeUnit.MILLISECONDS).subscribe({ pairwise ->
                                 val theirDid = pairwise["their_did"].asText()
                                 val indyParty = IndyParty(webSocket, theirDid,
                                         pairwise["metadata"]["their_endpoint"].asText(),
@@ -256,7 +272,7 @@ class PythonRefAgentConnection : AgentConnection {
                 observer.onError(e)
             }
         }
-        return inviteAccepted.timeout(operationTimeout, TimeUnit.MILLISECONDS)
+        return inviteAccepted.timeout(operationTimeoutMs, TimeUnit.MILLISECONDS)
     }
 
     private fun sendAsJson(obj: Any) = webSocket.sendAsJson(obj)
@@ -283,7 +299,7 @@ class PythonRefAgentConnection : AgentConnection {
                 observer.onError(e)
             }
         }
-        return inviteGenerated.timeout(operationTimeout, TimeUnit.MILLISECONDS)
+        return inviteGenerated.timeout(operationTimeoutMs, TimeUnit.MILLISECONDS)
     }
 
     private val toProcessPairwiseConnections = LinkedBlockingQueue<Pair<String, SingleSubscriber<in JsonNode>>>()
@@ -453,7 +469,7 @@ class PythonRefAgentConnection : AgentConnection {
                 observer.onError(e)
             }
         }
-        return indyPartyConnection.timeout(operationTimeout, TimeUnit.MILLISECONDS)
+        return indyPartyConnection.timeout(operationTimeoutMs, TimeUnit.MILLISECONDS)
     }
 
     private fun sendRequest(key: String) = webSocket.sendAsJson(SendRequestMessage(key))
