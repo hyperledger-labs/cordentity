@@ -1,96 +1,59 @@
 package com.luxoft.blockchainlab.hyperledger.indy
 
-import com.luxoft.blockchainlab.hyperledger.indy.helpers.GenesisHelper
-import com.luxoft.blockchainlab.hyperledger.indy.helpers.PoolHelper
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.WalletHelper
+import com.luxoft.blockchainlab.hyperledger.indy.ledger.IndyPoolLedgerUser
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
-import com.luxoft.blockchainlab.hyperledger.indy.utils.StorageUtils
+import com.luxoft.blockchainlab.hyperledger.indy.utils.*
+import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletUser
 import junit.framework.Assert.assertFalse
-import org.hyperledger.indy.sdk.did.Did
-import org.hyperledger.indy.sdk.did.DidResults
-import org.hyperledger.indy.sdk.pool.Pool
+import junit.framework.Assert.assertTrue
 import org.hyperledger.indy.sdk.wallet.Wallet
 import org.junit.*
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
-import java.io.File
-import java.lang.RuntimeException
 
 
 class AnoncredsDemoTest : IndyIntegrationTest() {
-    private val masterSecretId = "masterSecretId"
-    private val gvtCredentialValues = GVT_CRED_VALUES
-    private val xyzCredentialValues =
-        """{"status":{"raw":"partial","encoded":"51792877103171595686471452153480627530895"},"period":{"raw":"8","encoded":"8"}}"""
-
     private val walletPassword = "password"
     private val issuerWalletName = "issuerWallet"
     private val issuer2WalletName = "issuer2Wallet"
     private val proverWalletName = "proverWallet"
 
     private lateinit var issuerWallet: Wallet
+    private lateinit var issuer1: SsiUser
+
     private lateinit var issuer2Wallet: Wallet
+    private lateinit var issuer2: SsiUser
+
     private lateinit var proverWallet: Wallet
-    private lateinit var issuerDidInfo: DidResults.CreateAndStoreMyDidResult
-    private lateinit var issuer2DidInfo: DidResults.CreateAndStoreMyDidResult
-    private lateinit var proverDidInfo: DidResults.CreateAndStoreMyDidResult
-    private lateinit var issuer1: IndyUser
-    private lateinit var issuer2: IndyUser
-    private lateinit var prover: IndyUser
-
-    companion object {
-        private lateinit var pool: Pool
-        private lateinit var poolName: String
-
-        @JvmStatic
-        @BeforeClass
-        fun setUpTest() {
-            // Create and Open Pool
-            poolName = PoolHelper.DEFAULT_POOL_NAME
-            val genesisFile = File(TEST_GENESIS_FILE_PATH)
-            if (!GenesisHelper.exists(genesisFile))
-                throw RuntimeException("Genesis file $TEST_GENESIS_FILE_PATH doesn't exist")
-
-            PoolHelper.createOrTrunc(genesisFile, poolName)
-            pool = PoolHelper.openExisting(poolName)
-        }
-
-        @JvmStatic
-        @AfterClass
-        fun tearDownTest() {
-            // Close pool
-            pool.closePoolLedger().get()
-            Pool.deletePoolLedgerConfig(poolName)
-        }
-    }
+    private lateinit var prover: SsiUser
 
     @Before
     @Throws(Exception::class)
     fun setUp() {
-        // Issuer Create and Open Wallet
         WalletHelper.createOrTrunc(issuerWalletName, walletPassword)
         issuerWallet = WalletHelper.openExisting(issuerWalletName, walletPassword)
 
         WalletHelper.createOrTrunc(issuer2WalletName, walletPassword)
         issuer2Wallet = WalletHelper.openExisting(issuer2WalletName, walletPassword)
 
-        // Prover Create and Open Wallet
         WalletHelper.createOrTrunc(proverWalletName, walletPassword)
         proverWallet = WalletHelper.openExisting(proverWalletName, walletPassword)
 
-        val trusteeDidInfo = createTrusteeDid(issuerWallet)
-        issuerDidInfo = createDid(issuerWallet)
-        linkIssuerToTrustee(trusteeDidInfo.did, issuerWallet, issuerDidInfo)
+        // create indy users
+        val issuerWalletUser = IndySDKWalletUser(issuerWallet)
+        val issuerLedgerUser = IndyPoolLedgerUser(pool, issuerWalletUser.did) { issuerWalletUser.sign(it) }
+        issuer1 = IndyUser.with(issuerWalletUser).with(issuerLedgerUser).build()
 
-        issuer2DidInfo = createDid(issuer2Wallet)
-        linkIssuerToTrustee(trusteeDidInfo.did, issuerWallet, issuer2DidInfo)
+        val issuer2WalletUser = IndySDKWalletUser(issuer2Wallet)
+        val issuer2LedgerUser = IndyPoolLedgerUser(pool, issuer2WalletUser.did) { issuer2WalletUser.sign(it) }
+        issuer2 = IndyUser.with(issuer2LedgerUser).with(issuer2WalletUser).build()
 
-        proverDidInfo = createDid(proverWallet)
-        linkProverToIssuer(issuerDidInfo.did, issuerWallet, proverDidInfo)
+        val proverWalletUser = IndySDKWalletUser(proverWallet)
+        val proverLedgerUser = IndyPoolLedgerUser(pool, proverWalletUser.did) { proverWalletUser.sign(it) }
+        prover = IndyUser.with(proverLedgerUser).with(proverWalletUser).build()
 
-        issuer1 = IndyUser(pool, issuerWallet, issuerDidInfo.did, tailsPath = "tails")
-        issuer2 = IndyUser(pool, issuer2Wallet, issuer2DidInfo.did, tailsPath = "tails")
-        prover = IndyUser(pool, proverWallet, proverDidInfo.did, tailsPath = "tails")
+        // set relationships
+        WalletUtils.grantLedgerRights(pool, issuerWalletUser.getIdentityDetails())
+        WalletUtils.grantLedgerRights(pool, issuer2WalletUser.getIdentityDetails())
     }
 
     @After
@@ -104,196 +67,274 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         proverWallet.closeWallet().get()
     }
 
-    private fun createTrusteeDid(wallet: Wallet) = Did.createAndStoreMyDid(wallet, """{"seed":"$TRUSTEE_SEED"}""").get()
-    private fun createDid(wallet: Wallet) = Did.createAndStoreMyDid(wallet, "{}").get()
-
-    private fun linkIssuerToTrustee(
-        trusteeDid: String,
-        issuerWallet: Wallet,
-        issuerDidInfo: DidResults.CreateAndStoreMyDidResult
-    ) {
-        val target = IdentityDetails(issuerDidInfo.did, issuerDidInfo.verkey, null, "TRUSTEE")
-        LedgerService.addNym(trusteeDid, pool, issuerWallet, target)
-    }
-
-    private fun linkProverToIssuer(
-        issuerDid: String,
-        issuerWallet: Wallet,
-        proverDidInfo: DidResults.CreateAndStoreMyDidResult
-    ) {
-        val target = IdentityDetails(proverDidInfo.did, proverDidInfo.verkey, null, null)
-        LedgerService.addNym(issuerDid, pool, issuerWallet, target)
-    }
-
     @Test
     @Throws(Exception::class)
     fun `revocation works fine`() {
-        val gvtSchema = issuer1.createSchema(GVT_SCHEMA_NAME, SCHEMA_VERSION, GVT_SCHEMA_ATTRIBUTES)
-        val credDef = issuer1.createCredentialDefinition(gvtSchema.getSchemaIdObject(), true)
-        val revocationRegistry = issuer1.createRevocationRegistry(credDef.getCredentialDefinitionIdObject())
+        val gvtSchema = issuer1.createSchemaAndStoreOnLedger(GVT_SCHEMA_NAME, SCHEMA_VERSION, GVT_SCHEMA_ATTRIBUTES)
+        val credDef = issuer1.createCredentialDefinitionAndStoreOnLedger(gvtSchema.getSchemaIdObject(), true)
+        val revocationRegistry =
+            issuer1.createRevocationRegistryAndStoreOnLedger(credDef.getCredentialDefinitionIdObject(), 5)
+
         val credOffer = issuer1.createCredentialOffer(credDef.getCredentialDefinitionIdObject())
-        val credReq = prover.createCredentialRequest(prover.did, credOffer)
-        val credentialInfo = issuer1.issueCredential(credReq, gvtCredentialValues, credOffer)
-        prover.receiveCredential(credentialInfo, credReq, credOffer)
+        val credReq = prover.createCredentialRequest(prover.walletUser.getIdentityDetails().did, credOffer)
+        val credentialInfo = issuer1.issueCredentialAndUpdateLedger(
+            credReq,
+            credOffer,
+            revocationRegistry.definition.getRevocationRegistryIdObject()
+        ) {
+            attributes["sex"] = CredentialValue("male")
+            attributes["name"] = CredentialValue("Alex")
+            attributes["height"] = CredentialValue("175")
+            attributes["age"] = CredentialValue("28")
+        }
+        prover.checkLedgerAndReceiveCredential(credentialInfo, credReq, credOffer)
 
-        Thread.sleep(3000)
+        val proofReq = proofRequest("proof_req", "0.1") {
+            reveal("name") { "name" shouldBe "Alex" }
+            reveal("sex")
+            proveGreaterThan("age", 18)
+            proveNonRevocation(Interval.allTime())
+        }
 
-        val field_name = CredentialFieldReference("name", gvtSchema.id, credDef.id)
-        val field_sex = CredentialFieldReference("sex", gvtSchema.id, credDef.id)
-        val field_age = CredentialFieldReference("age", gvtSchema.id, credDef.id)
-        val proofReq = IndyUser.createProofRequest(
-            version = "0.1",
-            name = "proof_req_0.1",
-            attributes = listOf(field_name, field_sex),
-            predicates = listOf(CredentialPredicate(field_age, 18)),
-            nonRevoked = Interval.now()
-        )
+        val proof = prover.createProofFromLedgerData(proofReq)
 
-        val proof = prover.createProof(proofReq)
+        assertTrue(issuer1.verifyProofWithLedgerData(proofReq, proof))
 
-        val usedData = IndyUser.getDataUsedInProof(DID_MY1, pool, proofReq, proof)
-        assertEquals("Alex", proof.getAttribyteValue("name")!!.raw)
-        assertTrue(IndyUser.verifyProof(proofReq, proof, usedData))
-
-        issuer1.revokeCredential(
+        issuer1.revokeCredentialAndUpdateLedger(
             credentialInfo.credential.getRevocationRegistryIdObject()!!,
             credentialInfo.credRevocId!!
         )
-        Thread.sleep(3000)
 
-        val proofReqAfterRevocation = IndyUser.createProofRequest(
-            version = "0.1",
-            name = "proof_req_0.1",
-            attributes = listOf(field_name, field_sex),
-            predicates = listOf(CredentialPredicate(field_age, 18)),
-            nonRevoked = Interval.now()
-        )
-        val proofAfterRevocation = prover.createProof(proofReqAfterRevocation)
+        val proofReqAfterRevocation = proofRequest("proof_req", "0.2") {
+            reveal("name") { "name" shouldBe "Alex" }
+            reveal("sex")
+            proveGreaterThan("age", 18)
+            proveNonRevocation(Interval.allTime())
+        }
 
-        val usedDataAfterRevocation =
-            IndyUser.getDataUsedInProof(DID_MY1, pool, proofReqAfterRevocation, proofAfterRevocation)
+        val proofAfterRevocation = prover.createProofFromLedgerData(proofReqAfterRevocation)
 
-        assertFalse(IndyUser.verifyProof(proofReqAfterRevocation, proofAfterRevocation, usedDataAfterRevocation))
+        assertFalse(issuer1.verifyProofWithLedgerData(proofReqAfterRevocation, proofAfterRevocation))
+    }
+
+    @Test
+    fun `issuer issues 1 credential verifier tries to verify it several times`() {
+        // init metadata and issue credential
+        val schema = issuer1.createSchemaAndStoreOnLedger(GVT_SCHEMA_NAME, SCHEMA_VERSION, GVT_SCHEMA_ATTRIBUTES)
+        val credDef = issuer1.createCredentialDefinitionAndStoreOnLedger(schema.getSchemaIdObject(), false)
+
+        val credOffer = issuer1.createCredentialOffer(credDef.getCredentialDefinitionIdObject())
+        val credReq = prover.createCredentialRequest(prover.walletUser.getIdentityDetails().did, credOffer)
+        val credInfo = issuer1.issueCredentialAndUpdateLedger(credReq, credOffer, null) {
+            attributes["sex"] = CredentialValue("male")
+            attributes["name"] = CredentialValue("Alex")
+            attributes["height"] = CredentialValue("175")
+            attributes["age"] = CredentialValue("28")
+        }
+        prover.checkLedgerAndReceiveCredential(credInfo, credReq, credOffer)
+
+        // repeating this stuff for 3 times
+        for (i in (0 until 3)) {
+            val proofReq = proofRequest("proof_req", "0.$i") {
+                reveal("name") { "name" shouldBe "Alex" }
+                reveal("sex")
+                proveGreaterThan("age", 18)
+            }
+
+            val proof = prover.createProofFromLedgerData(proofReq)
+
+            assertTrue(issuer1.verifyProofWithLedgerData(proofReq, proof))
+        }
+    }
+
+    @Test
+    fun `issuer issues 5 similar credentials verifier tries to verify all`() {
+        System.setProperty(org.slf4j.impl.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "TRACE")
+
+        // init metadata and issue credential
+        val schema = issuer1.createSchemaAndStoreOnLedger(GVT_SCHEMA_NAME, SCHEMA_VERSION, GVT_SCHEMA_ATTRIBUTES)
+        val credDef = issuer1.createCredentialDefinitionAndStoreOnLedger(schema.getSchemaIdObject(), true)
+        val revReg = issuer1.createRevocationRegistryAndStoreOnLedger(credDef.getCredentialDefinitionIdObject(), 5)
+        val revRegId = revReg.definition.getRevocationRegistryIdObject()
+
+        // issue first credential
+        for (i in 0..3) {
+            val credOffer1 = issuer1.createCredentialOffer(credDef.getCredentialDefinitionIdObject())
+            val credReq1 = prover.createCredentialRequest(prover.walletUser.getIdentityDetails().did, credOffer1)
+            val credInfo1 = issuer1.issueCredentialAndUpdateLedger(credReq1, credOffer1, revRegId) {
+                attributes["sex"] = CredentialValue("male")
+                attributes["name"] = CredentialValue("Alex$i")
+                attributes["height"] = CredentialValue("${i+175}")
+                attributes["age"] = CredentialValue("${i+28}")
+            }
+            val storedCredentialId = prover.checkLedgerAndReceiveCredential(credInfo1, credReq1, credOffer1)
+
+            // verify first credential
+            val proofReq1 = proofRequest("proof_req", "0.1") {
+                reveal("name") {
+                    "name" shouldBe "Alex$i"
+                }
+                reveal("sex") {
+                    "name" shouldBe "Alex$i"
+                }
+                proveGreaterThan("age", 18) { "name" shouldBe "Alex$i" }
+                proveNonRevocation(Interval.allTime())
+            }
+
+            val proof1 = prover.createProofFromLedgerData(proofReq1)
+            var proof1Valid = issuer1.verifyProofWithLedgerData(proofReq1, proof1)
+            assert(proof1Valid) {"Proof1 is invalid for Alex$i"}
+        }
+        //issuer1.revokeCredentialAndUpdateLedger(revReg.definition.getRevocationRegistryIdObject()!!, credInfo1.credRevocId!!)
+
+        // issue second credential
+        val credOffer2 = issuer1.createCredentialOffer(credDef.getCredentialDefinitionIdObject())
+        val credReq2 = prover.createCredentialRequest(prover.walletUser.getIdentityDetails().did, credOffer2)
+
+        val credInfo2 = issuer1.issueCredentialAndUpdateLedger(credReq2, credOffer2, revRegId) {
+            attributes["sex"] = CredentialValue("female")
+            attributes["name"] = CredentialValue("Alice")
+            attributes["height"] = CredentialValue("158")
+            attributes["age"] = CredentialValue("17")
+        }
+
+        prover.checkLedgerAndReceiveCredential(credInfo2, credReq2, credOffer2)
+
+        // verify second credential
+        val proofReq2 = proofRequest("proof_req", "0.1") {
+            reveal("name") { "sex" shouldBe "female" }
+            reveal("age") { "sex" shouldBe "female" }
+            proveNonRevocation(Interval.allTime())
+        }
+
+        val proof2 = prover.createProofFromLedgerData(proofReq2) {
+            attributes["age"] = wql {
+                "name" eq "Alice"
+            }
+        }
+
+        assert(issuer1.verifyProofWithLedgerData(proofReq2, proof2)) { "Proof is not valid for Alice" }
     }
 
     @Test
     @Throws(Exception::class)
     fun `1 issuer 1 prover 1 credential setup works fine`() {
-        val gvtSchema = issuer1.createSchema(GVT_SCHEMA_NAME, SCHEMA_VERSION, GVT_SCHEMA_ATTRIBUTES)
-        val credDef = issuer1.createCredentialDefinition(gvtSchema.getSchemaIdObject(), false)
+        val gvtSchema = issuer1.createSchemaAndStoreOnLedger(GVT_SCHEMA_NAME, SCHEMA_VERSION, GVT_SCHEMA_ATTRIBUTES)
+        val credDef = issuer1.createCredentialDefinitionAndStoreOnLedger(gvtSchema.getSchemaIdObject(), false)
         val credOffer = issuer1.createCredentialOffer(credDef.getCredentialDefinitionIdObject())
-        val credReq = prover.createCredentialRequest(prover.did, credOffer)
-        val credentialInfo = issuer1.issueCredential(credReq, gvtCredentialValues, credOffer)
-        prover.receiveCredential(credentialInfo, credReq, credOffer)
+        val credReq = prover.createCredentialRequest(prover.walletUser.getIdentityDetails().did, credOffer)
+        val credentialInfo = issuer1.issueCredentialAndUpdateLedger(credReq, credOffer, null) {
+            attributes["sex"] = CredentialValue("male")
+            attributes["name"] = CredentialValue("Alex")
+            attributes["height"] = CredentialValue("175")
+            attributes["age"] = CredentialValue("28")
+        }
+        prover.checkLedgerAndReceiveCredential(credentialInfo, credReq, credOffer)
 
-        val field_name = CredentialFieldReference("name", gvtSchema.id, credDef.id)
-        val field_sex = CredentialFieldReference("sex", gvtSchema.id, credDef.id)
-        val field_age = CredentialFieldReference("age", gvtSchema.id, credDef.id)
-        val proofReq = IndyUser.createProofRequest(
-            version = "0.1",
-            name = "proof_req_0.1",
-            attributes = listOf(field_name, field_sex),
-            predicates = listOf(CredentialPredicate(field_age, 18)),
-            nonRevoked = null
-        )
+        val proofReq = proofRequest("proof_req", "0.1") {
+            reveal("name") { "name" shouldBe "Alex" }
+            reveal("sex")
+            proveGreaterThan("age", 18)
+        }
 
-        val proof = prover.createProof(proofReq)
+        val proof = prover.createProofFromLedgerData(proofReq)
 
-        val usedData = IndyUser.getDataUsedInProof(DID_MY1, pool, proofReq, proof)
-
-        assertEquals("Alex", proof.getAttribyteValue("name")!!.raw)
-        assertTrue(IndyUser.verifyProof(proofReq, proof, usedData))
+        assertTrue(issuer1.verifyProofWithLedgerData(proofReq, proof))
     }
 
     @Test
     @Throws(Exception::class)
     fun `2 issuers 1 prover 2 credentials setup works fine`() {
-        val schema1 = issuer1.createSchema(GVT_SCHEMA_NAME, SCHEMA_VERSION, GVT_SCHEMA_ATTRIBUTES)
-        val credDef1 = issuer1.createCredentialDefinition(schema1.getSchemaIdObject(), false)
+        val schema1 = issuer1.createSchemaAndStoreOnLedger(GVT_SCHEMA_NAME, SCHEMA_VERSION, GVT_SCHEMA_ATTRIBUTES)
+        val credDef1 = issuer1.createCredentialDefinitionAndStoreOnLedger(schema1.getSchemaIdObject(), false)
 
-        val schema2 = issuer2.createSchema(XYZ_SCHEMA_NAME, SCHEMA_VERSION, XYZ_SCHEMA_ATTRIBUTES)
-        val credDef2 = issuer2.createCredentialDefinition(schema2.getSchemaIdObject(), false)
+        val schema2 = issuer2.createSchemaAndStoreOnLedger(XYZ_SCHEMA_NAME, SCHEMA_VERSION, XYZ_SCHEMA_ATTRIBUTES)
+        val credDef2 = issuer2.createCredentialDefinitionAndStoreOnLedger(schema2.getSchemaIdObject(), false)
         val gvtCredOffer = issuer1.createCredentialOffer(credDef1.getCredentialDefinitionIdObject())
         val xyzCredOffer = issuer2.createCredentialOffer(credDef2.getCredentialDefinitionIdObject())
 
-        val gvtCredReq = prover.createCredentialRequest(prover.did, gvtCredOffer)
-        val gvtCredential = issuer1.issueCredential(gvtCredReq, gvtCredentialValues, gvtCredOffer)
-        prover.receiveCredential(gvtCredential, gvtCredReq, gvtCredOffer)
+        val gvtCredReq = prover.createCredentialRequest(prover.walletUser.getIdentityDetails().did, gvtCredOffer)
+        val gvtCredential = issuer1.issueCredentialAndUpdateLedger(gvtCredReq, gvtCredOffer, null) {
+            attributes["sex"] = CredentialValue("male")
+            attributes["name"] = CredentialValue("Alex")
+            attributes["height"] = CredentialValue("175")
+            attributes["age"] = CredentialValue("28")
+        }
+        prover.checkLedgerAndReceiveCredential(gvtCredential, gvtCredReq, gvtCredOffer)
 
-        val xyzCredReq = prover.createCredentialRequest(prover.did, xyzCredOffer)
-        val xyzCredential = issuer2.issueCredential(xyzCredReq, xyzCredentialValues, xyzCredOffer)
-        prover.receiveCredential(xyzCredential, xyzCredReq, xyzCredOffer)
+        val xyzCredReq = prover.createCredentialRequest(prover.walletUser.getIdentityDetails().did, xyzCredOffer)
+        val xyzCredential = issuer2.issueCredentialAndUpdateLedger(xyzCredReq, xyzCredOffer, null) {
+            attributes["status"] = CredentialValue("partial")
+            attributes["period"] = CredentialValue("8")
+        }
+        prover.checkLedgerAndReceiveCredential(xyzCredential, xyzCredReq, xyzCredOffer)
 
-        val field_name = CredentialFieldReference("name", schema1.id, credDef1.id)
-        val field_age = CredentialFieldReference("age", schema1.id, credDef1.id)
-        val field_status = CredentialFieldReference("status", schema2.id, credDef2.id)
-        val field_period = CredentialFieldReference("period", schema2.id, credDef2.id)
+        val proofReq = proofRequest("proof_req", "0.1") {
+            reveal("name")
+            reveal("status")
+            proveGreaterThan("period", 5)
+            proveGreaterThan("age", 18)
+        }
 
-        val proofReq = IndyUser.createProofRequest(
-            version = "0.1",
-            name = "proof_req_0.1",
-            attributes = listOf(field_name, field_status),
-            predicates = listOf(CredentialPredicate(field_age, 18), CredentialPredicate(field_period, 5)),
-            nonRevoked = null
-        )
+        val proof = prover.createProofFromLedgerData(proofReq) {
+            attributes["name"] = wql {
+                "name" eq "Alex"
+            }
 
-        val proof = prover.createProof(proofReq)
+            attributes["status"] = wql {
+                "status" eq "partial"
+            }
+        }
 
         // Verifier verify Proof
-        val revealedAttr0 = proof.getAttribyteValue("name")!!
-        assertEquals("Alex", revealedAttr0.raw)
-
-        val revealedAttr1 = proof.getAttribyteValue("status")!!
-        assertEquals("partial", revealedAttr1.raw)
-
-        val usedData = prover.getDataUsedInProof(proofReq, proof)
-
-        assertTrue(IndyUser.verifyProof(proofReq, proof, usedData))
+        assertTrue(issuer1.verifyProofWithLedgerData(proofReq, proof))
     }
 
     @Test
     @Throws(Exception::class)
     fun `1 issuer 1 prover 2 credentials setup works fine`() {
-        val gvtSchema = issuer1.createSchema(GVT_SCHEMA_NAME, SCHEMA_VERSION, GVT_SCHEMA_ATTRIBUTES)
-        val gvtCredDef = issuer1.createCredentialDefinition(gvtSchema.getSchemaIdObject(), false)
+        val gvtSchema = issuer1.createSchemaAndStoreOnLedger(GVT_SCHEMA_NAME, SCHEMA_VERSION, GVT_SCHEMA_ATTRIBUTES)
+        val gvtCredDef = issuer1.createCredentialDefinitionAndStoreOnLedger(gvtSchema.getSchemaIdObject(), false)
 
-        val xyzSchema = issuer1.createSchema(XYZ_SCHEMA_NAME, SCHEMA_VERSION, XYZ_SCHEMA_ATTRIBUTES)
-        val xyzCredDef = issuer1.createCredentialDefinition(xyzSchema.getSchemaIdObject(), false)
+        val xyzSchema = issuer1.createSchemaAndStoreOnLedger(XYZ_SCHEMA_NAME, SCHEMA_VERSION, XYZ_SCHEMA_ATTRIBUTES)
+        val xyzCredDef = issuer1.createCredentialDefinitionAndStoreOnLedger(xyzSchema.getSchemaIdObject(), false)
         val gvtCredOffer = issuer1.createCredentialOffer(gvtCredDef.getCredentialDefinitionIdObject())
         val xyzCredOffer = issuer1.createCredentialOffer(xyzCredDef.getCredentialDefinitionIdObject())
 
-        val gvtCredReq = prover.createCredentialRequest(prover.did, gvtCredOffer)
-        val gvtCredential = issuer1.issueCredential(gvtCredReq, gvtCredentialValues, gvtCredOffer)
-        prover.receiveCredential(gvtCredential, gvtCredReq, gvtCredOffer)
+        val gvtCredReq = prover.createCredentialRequest(prover.walletUser.getIdentityDetails().did, gvtCredOffer)
+        val gvtCredential = issuer1.issueCredentialAndUpdateLedger(gvtCredReq, gvtCredOffer, null) {
+            attributes["sex"] = CredentialValue("male")
+            attributes["name"] = CredentialValue("Alex")
+            attributes["height"] = CredentialValue("175")
+            attributes["age"] = CredentialValue("28")
+        }
+        prover.checkLedgerAndReceiveCredential(gvtCredential, gvtCredReq, gvtCredOffer)
 
-        val xyzCredReq = prover.createCredentialRequest(prover.did, xyzCredOffer)
-        val xyzCredential = issuer1.issueCredential(xyzCredReq, xyzCredentialValues, xyzCredOffer)
-        prover.receiveCredential(xyzCredential, xyzCredReq, xyzCredOffer)
+        val xyzCredReq = prover.createCredentialRequest(prover.walletUser.getIdentityDetails().did, xyzCredOffer)
+        val xyzCredential = issuer1.issueCredentialAndUpdateLedger(xyzCredReq, xyzCredOffer, null) {
+            attributes["status"] = CredentialValue("partial")
+            attributes["period"] = CredentialValue("8")
+        }
+        prover.checkLedgerAndReceiveCredential(xyzCredential, xyzCredReq, xyzCredOffer)
 
-        val field_name = CredentialFieldReference("name", gvtSchema.id, gvtCredDef.id)
-        val field_age = CredentialFieldReference("age", gvtSchema.id, gvtCredDef.id)
-        val field_status = CredentialFieldReference("status", xyzSchema.id, xyzCredDef.id)
-        val field_period = CredentialFieldReference("period", xyzSchema.id, xyzCredDef.id)
+        val proofReq = proofRequest("proof_req", "0.1") {
+            reveal("name")
+            reveal("status")
+            proveGreaterThan("period", 5)
+            proveGreaterThan("age", 18)
+        }
 
-        val proofReq = IndyUser.createProofRequest(
-            version = "0.1",
-            name = "proof_req_0.1",
-            attributes = listOf(field_name, field_status),
-            predicates = listOf(CredentialPredicate(field_age, 18), CredentialPredicate(field_period, 5)),
-            nonRevoked = null
-        )
+        val proof = prover.createProofFromLedgerData(proofReq) {
+            attributes["name"] = wql {
+                "name" eq "Alex"
+            }
 
-        val proof = prover.createProof(proofReq)
+            attributes["status"] = wql {
+                "status" eq "partial"
+            }
+        }
 
         // Verifier verify Proof
-        val revealedAttr0 = proof.getAttribyteValue("name")!!
-        assertEquals("Alex", revealedAttr0.raw)
-
-        val revealedAttr1 = proof.getAttribyteValue("status")!!
-        assertEquals("partial", revealedAttr1.raw)
-
-        val usedData = prover.getDataUsedInProof(proofReq, proof)
-
-        assertTrue(IndyUser.verifyProof(proofReq, proof, usedData))
+        assertTrue(issuer1.verifyProofWithLedgerData(proofReq, proof))
     }
 }

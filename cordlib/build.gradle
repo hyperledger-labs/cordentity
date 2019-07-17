@@ -12,6 +12,8 @@ dependencies {
     compile project(":cordentity-cordlib-contracts-states")
     compile project(':cordentity-indy-utils')
     compile project(':cordentity-agent-connection')
+    //Guava v19 is required for serialization compatibility. Later versions of this library use v20+.
+    implementation 'co.paralleluniverse:quasar-kotlin:0.7.6'
 
     testImplementation "io.mockk:mockk:1.9.1"
     testImplementation "com.nhaarman:mockito-kotlin:1.5.0"

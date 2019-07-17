@@ -1,7 +1,8 @@
 package com.luxoft.blockchainlab.hyperledger.indy.models
 
-import com.fasterxml.jackson.annotation.JsonGetter
 import com.fasterxml.jackson.annotation.JsonProperty
+import java.math.BigInteger
+import java.nio.charset.StandardCharsets
 
 /**
  * Represents credential offer structure from.
@@ -98,7 +99,12 @@ data class Credential(
     val signatureCorrectnessProof: RawJsonMap
 ) : ContainsSchemaId, ContainsCredentialDefinitionId, ContainsRevocationRegistryId
 
-data class CredentialValue(val raw: String, val encoded: String)
+data class CredentialValue(
+    val raw: String,
+    val encoded: String = if (raw.toLongOrNull() == null)
+        BigInteger(raw.toByteArray(StandardCharsets.UTF_8)).toString(10)
+    else raw
+)
 
 data class CredentialInfo(val credential: Credential, val credRevocId: String?, val revocRegDeltaJson: String?)
 
@@ -152,4 +158,39 @@ data class CredentialRequestMetadata(
     val masterSecretBlindingData: RawJsonMap,
     val masterSecretName: String,
     val nonce: String
+)
+
+/**
+ * {
+ *  "cred_info":{
+ *      "referent":"0172ac7e-d52f-4b89-b9e8-7e5f618cc841",
+ *      "attrs":{
+ *          "height":"175",
+ *          "age":"28",
+ *          "name":"Alex",
+ *          "sex":"male"
+ *      },
+ *      "schema_id":"Pv7Pud6cAjb9inus556Afq:2:gvt:1.0",
+ *      "cred_def_id":"Pv7Pud6cAjb9inus556Afq:3:CL:17:TAG_1",
+ *      "rev_reg_id":"Pv7Pud6cAjb9inus556Afq:4:Pv7Pud6cAjb9inus556Afq:3:CL:17:TAG_1:CL_ACCUM:REV_TAG_1",
+ *      "cred_rev_id":"1"
+ *  },
+ *  "interval":{
+ *      "from":1557738706,
+ *      "to":1557738706
+ *  }
+ * }
+ */
+data class CredentialForTheRequest(
+    val credInfo: CredInfo,
+    val interval: Interval?
+)
+
+data class CredInfo(
+    val referent: String,
+    val attrs: Map<String, String>,
+    val schemaId: String,
+    val credDefId: String,
+    val revRegId: String?,
+    val credRevId: String?
 )

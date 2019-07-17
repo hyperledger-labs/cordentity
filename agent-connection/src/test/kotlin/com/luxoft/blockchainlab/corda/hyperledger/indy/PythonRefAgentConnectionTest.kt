@@ -2,73 +2,92 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy
 
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialOffer
 import com.luxoft.blockchainlab.hyperledger.indy.models.KeyCorrectnessProof
-import org.junit.Before
 import org.junit.Ignore
 import org.junit.Test
-import java.util.concurrent.CompletableFuture
+import rx.Single
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import java.net.URI
 import java.net.URL
+import java.util.*
+
+fun agentInitEndpoint(agentUrl: String) {
+    /**
+     * HTTP GET / in order to let the agent (pythonic indy-agent) know its endpoint address
+     * indy-agent.py is incapable of determining its endpoint other than this way
+     */
+    val uri = URI(agentUrl)
+    val rootPath = "http://${uri.host}:${uri.port}/"
+    val rootUrl = URL(rootPath)
+    rootUrl.openConnection().getInputStream().close()
+}
 
 class PythonRefAgentConnectionTest {
 
-    private fun agentInitEndpoint(agentUrl: String) {
-        /**
-         * HTTP GET / in order to let the agent (pythonic indy-agent) know its endpoint address
-         * indy-agent.py is incapable of determining its endpoint other than this way
-         */
-        val uri = URI(agentUrl)
-        val rootPath = "http://" + uri.host + ":" + uri.port + "/"
-        val rootUrl = URL(rootPath)
-        rootUrl.openConnection().getInputStream().close()
+    class InvitedPartyProcess (
+            private val agentUrl: String,
+            val proofSchemaId: String = "${Random().nextInt()}:::1"
+            ) {
+
+        fun start(invitationString: String) {
+            val rand = Random().nextInt()
+            agentInitEndpoint(agentUrl)
+            PythonRefAgentConnection().apply {
+                connect(agentUrl, "User$rand", "pass$rand").handle { _, ex ->
+                    if (ex != null) {
+                        throw AgentConnectionException(ex.message!!)
+                    }
+                    else acceptInvite(invitationString).subscribe { master ->
+                        val offer = CredentialOffer(proofSchemaId, ":::1", KeyCorrectnessProof("", "", emptyList()), "")
+                        master.sendCredentialOffer(offer)
+                        disconnect()
+                    }
+                }
+            }
+        }
     }
 
-    private lateinit var agentUrl1:String
-    private lateinit var agentUrl2:String
+    class MasterProcess (
+            private val agentUrl: String,
+            private val invitedPartyAgents: List<String>) {
 
-    @Before
-    fun preInit(){
-        agentUrl1 = "ws://127.0.0.1:8094/ws"
-        agentInitEndpoint(agentUrl1)
-        agentUrl2 = "ws://127.0.0.1:8095/ws"
-        agentInitEndpoint(agentUrl2)
+        fun start() {
+            val rand = Random().nextInt()
+            agentInitEndpoint(agentUrl)
+            PythonRefAgentConnection().apply {
+                connect(agentUrl, "User$rand", "pass$rand").toBlocking().value()
+                val invitedPartiesCompleted = mutableListOf<Single<Boolean>>()
+                invitedPartyAgents.forEach { agentUrl ->
+                    val party = InvitedPartyProcess(agentUrl)
+                    invitedPartiesCompleted.add(Single.create { observer ->
+                        generateInvite().subscribe {invitation ->
+                            waitForInvitedParty(invitation).subscribe { invitedParty ->
+                                invitedParty.receiveCredentialOffer().subscribe { proof ->
+                                    assertEquals(proof?.schemaIdRaw, party.proofSchemaId)
+                                    observer.onSuccess(true)
+                                }
+                            }
+                            party.start(invitation)
+                        }
+                    })
+                }
+                Single.zip(invitedPartiesCompleted) {}.toBlocking().value()
+                disconnect()
+            }
+        }
     }
+
+    private val invitedPartyAgents = listOf(
+            "ws://127.0.0.1:8094/ws",
+            "ws://127.0.0.1:8096/ws",
+            "ws://127.0.0.1:8097/ws",
+            "ws://127.0.0.1:8098/ws",
+            "ws://127.0.0.1:8099/ws"
+            )
+    private val masterAgent = "ws://127.0.0.1:8095/ws"
+
     @Ignore("Requires external services")
     @Test
-    fun `externalTest`() {
-        val agent95completed = CompletableFuture<Unit>()
-        val agent94completed = CompletableFuture<Unit>()
-        val agent95 = PythonRefAgentConnection().apply { connect(agentUrl1,"user95","pass95") }
-        val inviteMsg = agent95.generateInvite()
-        CompletableFuture.runAsync {
-            agent95.run {
-                waitForInvitedParty()
-                val proof = receiveCredentialOffer()
-                val proof2 = receiveCredentialOffer()
-                val proof3 = receiveCredentialOffer()
-                assertEquals(proof.schemaIdRaw,"1")
-                assertEquals(proof2.schemaIdRaw,"2")
-                assertEquals(proof3.schemaIdRaw,"3")
-
-            }
-        }.handle { t, u ->
-            if (u != null) u.printStackTrace()
-            assertNull(u)
-            agent95completed.complete(Unit)
-        }
-
-        val agent94 = PythonRefAgentConnection().apply {
-            connect(agentUrl2,"user94","pass94")
-            acceptInvite(inviteMsg)
-            sendCredentialOffer(CredentialOffer("1", "", KeyCorrectnessProof("", "", emptyList()), ""))
-            sendCredentialOffer(CredentialOffer("2", "", KeyCorrectnessProof("", "", emptyList()), ""))
-            sendCredentialOffer(CredentialOffer("3", "", KeyCorrectnessProof("", "", emptyList()), ""))
-            agent94completed.complete(Unit)
-        }
-
-        CompletableFuture.allOf(agent94completed,agent95completed).get()
-        agent95.disconnect()
-        agent94.disconnect()
+    fun `externalTest`() = repeat(Int.MAX_VALUE) {
+        MasterProcess(masterAgent, invitedPartyAgents).apply { start() }
     }
 }

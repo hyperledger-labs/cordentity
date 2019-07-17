@@ -1,13 +1,8 @@
 package com.luxoft.blockchainlab.hyperledger.indy.utils
 
-import org.apache.commons.io.FileUtils
-import org.apache.commons.io.FileUtils.getUserDirectoryPath
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.Paths
-import java.util.*
-import kotlin.math.absoluteValue
 
 
 internal object EnvironmentUtils {
@@ -17,8 +12,11 @@ internal object EnvironmentUtils {
             return testPoolIp ?: "127.0.0.1"
         }
 
+    //Should be similar to  RUST`s implementation
+    private val userHomePath: String get() = System.getProperty("INDY_HOME") ?: System.getenv("HOME")
+
     fun getIndyHomePath(): String {
-        return getUserDirectoryPath() + "/.indy_client/"
+        return "$userHomePath/.indy_client"
     }
 
     fun getIndyPoolPath(poolName: String) = getIndyHomePath() + "/pool/$poolName"
@@ -26,15 +24,15 @@ internal object EnvironmentUtils {
     fun getIndyWalletPath(walletName: String) = getIndyHomePath() + "/wallet/$walletName"
 
     fun getIndyHomePath(filename: String): String {
-        return getIndyHomePath() + filename
+        return "${getIndyHomePath()}/$filename"
     }
 
     internal fun getTmpPath(): String {
-        return FileUtils.getTempDirectoryPath() + "/indy/"
+        return System.getProperty("INDY_TMP") ?: System.getProperty("java.io.tmpdir") + "/indy"
     }
 
     internal fun getTmpPath(filename: String): String {
-        return getTmpPath() + filename
+        return "${getTmpPath()}/$filename"
     }
 
     @Throws(IOException::class)

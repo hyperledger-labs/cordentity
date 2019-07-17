@@ -1,8 +1,7 @@
 package com.luxoft.blockchainlab.hyperledger.indy.models
 
-import com.fasterxml.jackson.annotation.JsonIgnore
-import com.fasterxml.jackson.annotation.JsonInclude
-import com.fasterxml.jackson.annotation.JsonProperty
+import com.fasterxml.jackson.annotation.*
+import com.luxoft.blockchainlab.hyperledger.indy.utils.Filter
 
 /**
  * Represents a particular attribute of a credential
@@ -148,12 +147,12 @@ data class RequestedCredentials(
 data class RequestedAttributeInfo(
     @JsonProperty("cred_id") val credentialId: String,
     val revealed: Boolean = true,
-    @JsonInclude(JsonInclude.Include.NON_NULL) val timestamp: Long?
+    @JsonInclude(JsonInclude.Include.NON_NULL) val timestamp: Long = Timestamp.now()
 )
 
 data class RequestedPredicateInfo(
     @JsonProperty("cred_id") val credentialId: String,
-    @JsonInclude(JsonInclude.Include.NON_NULL) val timestamp: Long?
+    @JsonInclude(JsonInclude.Include.NON_NULL) val timestamp: Long? = null
 )
 
 /**
@@ -208,41 +207,28 @@ data class RequestedPredicateInfo(
  *         "from": Optional<int>, // timestamp of interval beginning
  *         "to": Optional<int>, // timestamp of interval ending
  *     }
- *     filter:
- *     {
- *         "schema_id": string, (Optional)
- *         "schema_issuer_did": string, (Optional)
- *         "schema_name": string, (Optional)
- *         "schema_version": string, (Optional)
- *         "issuer_did": string, (Optional)
- *         "cred_def_id": string, (Optional)
- *     }
+ *
  */
 data class ProofRequest(
-    val version: String,
-    val name: String,
-    val nonce: String,
-    val requestedAttributes: Map<String, CredentialAttributeReference>,
-    val requestedPredicates: Map<String, CredentialPredicateReference>,
-    val nonRevoked: Interval? = null
+    var name: String,
+    var version: String,
+    var nonce: String,
+    val requestedAttributes: MutableMap<String, CredentialAttributeReference> = mutableMapOf(),
+    val requestedPredicates: MutableMap<String, CredentialPredicateReference> = mutableMapOf(),
+    var nonRevoked: Interval? = null
 )
 
 data class CredentialAttributeReference(
-    override val name: String,
-    @JsonProperty("schema_id") override val schemaIdRaw: String
-) : AbstractCredentialReference(name, schemaIdRaw)
+    val name: String,
+    val restrictions: Filter? = null
+)
 
 data class CredentialPredicateReference(
-    override val name: String,
-    val p_type: String,
+    val name: String,
     val p_value: Int,
-    @JsonProperty("schema_id") override val schemaIdRaw: String
-) : AbstractCredentialReference(name, schemaIdRaw)
-
-abstract class AbstractCredentialReference(
-    open val name: String,
-    @JsonProperty("schema_id") override val schemaIdRaw: String
-) : ContainsSchemaId
+    val p_type: String = ">=",
+    val restrictions: Filter? = null
+)
 
 /**
  * Represents proof
@@ -418,7 +404,10 @@ data class ProofInfo(
     fun isAttributeExists(value: String) = proofData.requestedProof.revealedAttrs.values.any { it.raw == value }
 
     @JsonIgnore
-    fun getAttribyteValue(attrName: String) = proofData.requestedProof.revealedAttrs[attrName]
+    fun getAttributeValue(attrName: String) = proofData.requestedProof.revealedAttrs[attrName]
+
+    @JsonIgnore
+    operator fun get(attrName: String) = getAttributeValue(attrName)
 }
 
 data class ProofIdentifier(

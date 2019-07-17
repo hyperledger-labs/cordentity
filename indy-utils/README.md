@@ -2,7 +2,7 @@
 
 Convenient wrappers for [indy-sdk](https://github.com/hyperledger/indy-sdk) API 
 
-Indy-utils works with indy-sdk version 1.7.0
+Indy-utils works with indy-sdk version 1.7.0+
 
 ## Build
 

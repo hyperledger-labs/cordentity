@@ -5,7 +5,7 @@ buildscript {
     ext.quasar_version = '0.7.9'
     ext.junit_version = '4.12'
     ext.kotlin_version = '1.2.30'
-    ext.indy_version = "1.7.0"
+    ext.indy_version = "1.8.2"
     ext.jackson_version = '2.9.7'
 
     repositories {
@@ -44,6 +44,18 @@ subprojects {
         }
     }
 
+    //Required by JitPack for source packing
+    apply plugin: 'maven'
+
+    task sourcesJar(type: Jar, dependsOn: classes) {
+        classifier = 'sources'
+        from sourceSets.main.allSource
+    }
+
+    artifacts {
+        archives sourcesJar
+    }
+
     dependencies {
         implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:${kotlin_version}"
         implementation "org.jetbrains.kotlin:kotlin-reflect:${kotlin_version}"
@@ -51,6 +63,8 @@ subprojects {
         compile 'com.github.alexeykoren:konfig:2.0.4'
 
         implementation 'io.github.microutils:kotlin-logging:1.6.22'
+        //Version should be same with one used by corda node.
+        implementation 'io.reactivex:rxjava:1.2.4'
 
         testImplementation "org.jetbrains.kotlin:kotlin-test:$kotlin_version"
         testImplementation "junit:junit:$junit_version"

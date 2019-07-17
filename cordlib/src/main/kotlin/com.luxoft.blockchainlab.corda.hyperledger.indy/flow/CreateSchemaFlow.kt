@@ -4,6 +4,7 @@ import co.paralleluniverse.fibers.Suspendable
 import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndySchemaContract
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndySchema
 import com.luxoft.blockchainlab.hyperledger.indy.IndySchemaAlreadyExistsException
+import com.luxoft.blockchainlab.hyperledger.indy.models.Schema
 import com.luxoft.blockchainlab.hyperledger.indy.models.SchemaId
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndContract
@@ -29,18 +30,19 @@ object CreateSchemaFlow {
         private val schemaName: String,
         private val schemaVersion: String,
         private val schemaAttributes: List<String>
-    ) : FlowLogic<SchemaId>() {
+    ) : FlowLogic<Schema>() {
 
         @Suspendable
-        override fun call(): SchemaId {
+        override fun call(): Schema {
             try {
                 // check if schema already exists
-                if (indyUser().ledgerService.isSchemaExist(schemaName, schemaVersion))
+                val schemaId = SchemaId(indyUser().walletUser.getIdentityDetails().did, schemaName, schemaVersion)
+                if (indyUser().ledgerUser.schemaExists(schemaId))
                     throw IndySchemaAlreadyExistsException(schemaName, schemaVersion)
 
                 // create schema
-                val schemaObj = indyUser().createSchema(schemaName, schemaVersion, schemaAttributes)
-                val schema = IndySchema(schemaObj.id, listOf(ourIdentity))
+                val schemaObj = indyUser().createSchemaAndStoreOnLedger(schemaName, schemaVersion, schemaAttributes)
+                val schema = IndySchema(schemaObj.getSchemaIdObject(), listOf(ourIdentity))
                 val schemaOut = StateAndContract(schema, IndySchemaContract::class.java.name)
 
                 val newSchemaCmdType = IndySchemaContract.Command.Create()
@@ -57,7 +59,7 @@ object CreateSchemaFlow {
 
                 subFlow(FinalityFlow(selfSignedTx))
 
-                return schemaObj.getSchemaIdObject()
+                return schemaObj
 
             } catch (t: Throwable) {
                 logger.error("New schema creating has been failed", t)
