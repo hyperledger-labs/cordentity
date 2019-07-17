@@ -122,10 +122,10 @@ class PythonRefAgentConnectionTest {
     }
 
     class Client (private val agentUrl: String) {
-        fun connect(invitationString: String) : IndyPartyConnection {
+        fun connect(invitationString: String, timeoutMs: Long = 10000) : IndyPartyConnection {
             val rand = Random().nextInt()
             val agentConnection = PythonRefAgentConnection()
-            agentConnection.connect(agentUrl, "User$rand", "pass$rand").toBlocking().value()
+            agentConnection.connect(agentUrl, "User$rand", "pass$rand", timeoutMs).toBlocking().value()
             return agentConnection.acceptInvite(invitationString).toBlocking().value()
         }
     }
@@ -157,7 +157,7 @@ class PythonRefAgentConnectionTest {
     fun `client reconnects to server when the connection is interrupted `() {
         val tailsHash = "${Random().nextInt(Int.MAX_VALUE)}"
         val invitationString = Server(masterAgent, tailsHash).getInvite()
-        val clientConnection = Client(invitedPartyAgents[0]).connect(invitationString)
+        val clientConnection = Client(invitedPartyAgents[0]).connect(invitationString, 2000)
         println("Client connected the agent. Local DID is ${clientConnection.myDID()}.")
         repeat(5) {
             val tails = clientConnection.requestTails(tailsHash).toBlocking().value()

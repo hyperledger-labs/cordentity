@@ -19,7 +19,7 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
     private val log = KotlinLogging.logger {}
     var reason: String? = null
     private lateinit var onCloseSubscriber: Subscriber<in Unit>
-    private lateinit var onRestoreConnection: Subscriber<in Unit>
+    private lateinit var onRestoreConnection: Subscriber<in Boolean>
 
     fun notifyOnClose(onDisconnect: () -> Unit) {
         Observable.create<Unit> {
@@ -31,12 +31,12 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
         }
     }
 
-    fun onRestoreConnection(onRestore: () -> Unit) {
-        Observable.create<Unit> {
+    fun onRestoreConnection(onRestore: (Boolean) -> Boolean) {
+        Observable.create<Boolean> {
             onRestoreConnection = it
         }.apply {
             subscribe {
-                onRestore()
+                onRestore(it)
             }
         }
     }
@@ -48,8 +48,8 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
     override fun onClose(code: Int, reason: String?, remote: Boolean) {
         log.info { "$socketName:AgentConnection closed: $code,$reason,$remote" }
         this.reason = reason
-        dataStorage.cancelAll()
         onCloseSubscriber.onNext(Unit)
+        onRestoreConnection.onNext(false) // reconnect in non-blocking mode
     }
 
     override fun onClosing(code: Int, reason: String?, remote: Boolean) {
@@ -110,10 +110,7 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
                  * if not found, subscribe on messages with the given key
                  */
                 if (isClosed)
-                    onRestoreConnection.onNext(Unit)
-
-                if (isClosed)
-                    observer.onError(AgentConnectionException("WebSocket is disconnected."))
+                    onRestoreConnection.onNext(false) // notify in non-blocking mode
 
                 addObserver(keyOrType, observer)
             }
@@ -205,10 +202,11 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
         val message = SerializationUtils.anyToJSON(obj)
         log.info { "$socketName:SendMessage: $message" }
         if (!isOpen)
-            onRestoreConnection.onNext(Unit)
-        if (!isOpen)
+            onRestoreConnection.onNext(true) // notify in blocking mode
+        if (!isOpen) {
+            dataStorage.cancelAll()
             throw AgentConnectionException("WebSocket failed to reconnect.")
-        send(message)
+        } else send(message)
     }
 
     /**

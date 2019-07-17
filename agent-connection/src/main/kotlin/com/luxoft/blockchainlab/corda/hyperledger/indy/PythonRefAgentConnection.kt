@@ -28,6 +28,7 @@ class PythonRefAgentConnection : AgentConnection {
     private lateinit var password: String
     private var operationTimeoutMs: Long = 60000
     private val isReconnecting = AtomicBoolean(false)
+    private val stopReconnecting = AtomicBoolean(false)
 
     private fun doHandshake(observer: Subscriber<in Unit>) {
         /**
@@ -71,49 +72,73 @@ class PythonRefAgentConnection : AgentConnection {
         sendAsJson(StateRequest())
     }
 
-    private fun doReconnect() {
+    private fun doReconnect(blockingMode: Boolean) : Boolean {
+        var reconnected = false
         try {
             if (isReconnecting.compareAndSet(false, true)) {
+                var retryTimeoutMs: Long = 100
                 val single = Single.create<Unit> { observer ->
+                    log.error { "Will attempt to reconnect $login to $url in ${retryTimeoutMs}ms" }
+                    Thread.sleep(retryTimeoutMs)
                     Observable.create<Unit> { connectionObserver ->
                         try {
-                            if (!webSocket.reconnectBlocking())
-                                throw AgentConnectionException(webSocket.reason ?: "Error connecting to $url")
-                            else
-                                doHandshake(connectionObserver)
+                            //simulate connection timeout
+                            Thread.sleep(3000)
+                            if (!observer.isUnsubscribed) {
+                                if (!webSocket.reconnectBlocking())
+                                    throw AgentConnectionException(webSocket.reason ?: "Error connecting to $url")
+                                else
+                                    doHandshake(connectionObserver)
+                            }
                         } catch (e: Throwable) {
                             connectionObserver.onError(e)
                         }
                     }.subscribeOn(Schedulers.computation()).apply {
                         timeout(operationTimeoutMs, TimeUnit.MILLISECONDS).subscribe({
                             pollAgentWorker = createAgentWorker()
+                            reconnected = true
                             observer.onSuccess(it)
                             observer.unsubscribe()
-
                         }, {
-                            if (!observer.isUnsubscribed)
+                            if (!observer.isUnsubscribed) {
                                 observer.onError(it)
+                                observer.unsubscribe()
+                            }
                         })
                     }
                 }
-                val onSuccess: (Unit)->Unit = { isReconnecting.set(false) }
+                val onSuccess: (Unit)->Unit = {
+                    log.info { "Reconnected to $url with login $login" }
+                    isReconnecting.set(false)
+                }
                 var onError: ((Throwable)->Unit)? = null
-                var retryTimeoutMs: Long = 1000
                 onError = {
-                    Thread.sleep(retryTimeoutMs)
-                    if (retryTimeoutMs * 2 < this.operationTimeoutMs)
-                        retryTimeoutMs *= 2
-                    single.subscribe({
-                        onSuccess(Unit)
-                    }, {
-                        onError!!(it)
-                    })
+                    if (!stopReconnecting.compareAndSet(true, false)) {
+                        if (retryTimeoutMs * 2 < this.operationTimeoutMs) retryTimeoutMs *= 2
+                        log.error { "Connection attempt for $login failed with $it, increasing the reconnection timeout (${retryTimeoutMs}ms)" }
+                        single.subscribe({ onSuccess(Unit) }, { onError!!(it) })
+                    } else isReconnecting.set(false)
                 }
                 single.subscribe({ onSuccess(Unit) }, { onError!!(it)})
+            }
+            if (blockingMode) {
+                Observable.create<Boolean> {
+                    while (isReconnecting.get()) { Thread.sleep(100) }
+                    it.onNext(reconnected)
+                }.subscribeOn(Schedulers.computation()).apply {
+                    timeout(30000, TimeUnit.MILLISECONDS).subscribe({
+                        if (!it)
+                            log.error { "All reconnection attempts for login $login failed" }
+                    }, {
+                        log.error { "Reconnection in blocking mode for login $login failed with exception: $it" }
+                        stopReconnecting.set(true)
+                    })
+                }.toBlocking().first()
             }
         } catch (e: Throwable) {
             log.error { "Unable to reconnect while trying to send/receive data, due to $e at ${e.stackTrace}" }
         }
+        return reconnected
     }
 
     private fun clear() {
@@ -147,8 +172,8 @@ class PythonRefAgentConnection : AgentConnection {
                         notifyOnClose {
                             connectionStatus = AgentConnectionStatus.AGENT_DISCONNECTED
                         }
-                        onRestoreConnection {
-                            doReconnect()
+                        onRestoreConnection {isBlocking ->
+                            doReconnect(isBlocking)
                         }
                         if(!connectBlocking())
                             throw AgentConnectionException(webSocket.reason ?: "Error connecting to $url")
