@@ -2,7 +2,6 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2c
 
 import co.paralleluniverse.fibers.Suspendable
 import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialContract
-import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialDefinitionContract
 import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyRevocationRegistryContract
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredential
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.getCredentialDefinitionById
@@ -70,7 +69,6 @@ object IssueCredentialFlowB2C {
                     indyUser().walletUser.getIdentityDetails().did,
                     listOf(ourIdentity)
                 )
-                val newCredentialOut = StateAndContract(credentialOut, IndyCredentialContract::class.java.name)
 
                 val signers = listOf(ourIdentity.owningKey)
 
@@ -83,12 +81,6 @@ object IssueCredentialFlowB2C {
                         credentialDefinitionId,
                         "State doesn't exist in Corda vault"
                     )
-                val credentialDefinitionOut = StateAndContract(
-                    originalCredentialDefIn.state.data,
-                    IndyCredentialDefinitionContract::class.java.name
-                )
-                val credentialDefinitionCmdType = IndyCredentialDefinitionContract.Command.Issue()
-                val credentialDefinitionCmd = Command(credentialDefinitionCmdType, signers)
 
                 val trxBuilder = if (revocationRegistryDefinition != null) {
                     // consume credential definition
@@ -102,24 +94,20 @@ object IssueCredentialFlowB2C {
                     val revocationRegistryDefinitionCmd = Command(revocationRegistryDefinitionCmdType, signers)
 
                     // do stuff
-                    TransactionBuilder(whoIsNotary()).withItems(
-                        originalCredentialDefIn,
-                        credentialDefinitionOut,
-                        credentialDefinitionCmd,
-                        newCredentialOut,
-                        newCredentialCmd,
-                        revocationRegistryDefinition,
-                        revocationRegistryDefinitionOut,
-                        revocationRegistryDefinitionCmd
-                    )
+                    TransactionBuilder(whoIsNotary())
+                        .addOutputState(credentialOut)
+                        .addCommand(newCredentialCmd)
+                        .addReferenceState(originalCredentialDefIn.referenced())
+                        .withItems(
+                            revocationRegistryDefinition,
+                            revocationRegistryDefinitionOut,
+                            revocationRegistryDefinitionCmd
+                        )
                 } else {
-                    TransactionBuilder(whoIsNotary()).withItems(
-                        originalCredentialDefIn,
-                        credentialDefinitionOut,
-                        credentialDefinitionCmd,
-                        newCredentialOut,
-                        newCredentialCmd
-                    )
+                    TransactionBuilder(whoIsNotary())
+                        .addOutputState(credentialOut)
+                        .addCommand(newCredentialCmd)
+                        .addReferenceState(originalCredentialDefIn.referenced())
                 }
 
                 trxBuilder.toWireTransaction(serviceHub)

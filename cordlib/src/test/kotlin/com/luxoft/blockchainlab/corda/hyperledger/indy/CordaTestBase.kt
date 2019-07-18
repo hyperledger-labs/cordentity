@@ -107,7 +107,10 @@ open class CordaTestBase {
 
         val networkParameters = MockNetworkParameters(
             cordappsForAllNodes = cordappsForPackages("com.luxoft.blockchainlab.corda.hyperledger.indy"),
-            networkParameters = testNetworkParameters(maxTransactionSize = 10485760 * 5)
+            networkParameters = testNetworkParameters(
+                maxTransactionSize = 10485760 * 5,
+                minimumPlatformVersion = 4
+            )
         )
         net = MockNetwork(networkParameters)
 
