@@ -49,7 +49,8 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
         log.info { "$socketName:AgentConnection closed: $code,$reason,$remote" }
         this.reason = reason
         onCloseSubscriber.onNext(Unit)
-        onRestoreConnection.onNext(false) // reconnect in non-blocking mode
+        if (remote)
+            onRestoreConnection.onNext(false) // reconnect in non-blocking mode
     }
 
     override fun onClosing(code: Int, reason: String?, remote: Boolean) {
