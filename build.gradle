@@ -1,21 +1,22 @@
 buildscript {
     ext.corda_release_group = 'net.corda'
-    ext.corda_release_version = '3.1-corda'
-    ext.corda_gradle_plugins_version = '3.0.9'
-    ext.quasar_version = '0.7.9'
+    ext.corda_release_version = '4.1'
+    ext.corda_gradle_plugins_version = '4.0.42'
+    ext.quasar_version = '0.7.10'
     ext.junit_version = '4.12'
-    ext.kotlin_version = '1.2.30'
+    ext.kotlin_version = '1.2.71'
     ext.indy_version = "1.8.2"
     ext.jackson_version = '2.9.7'
 
     repositories {
         jcenter()
+        maven { url "https://plugins.gradle.org/m2/" }
     }
 
     dependencies {
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${kotlin_version}"
-        classpath "net.corda.plugins:cordapp:${corda_gradle_plugins_version}"
-        classpath "net.corda.plugins:quasar-utils:${corda_gradle_plugins_version}"
+        classpath "net.corda.plugins:cordapp:$corda_gradle_plugins_version"
+        classpath "net.corda.plugins:quasar-utils:$corda_gradle_plugins_version"
     }
 }
 
@@ -28,6 +29,7 @@ subprojects {
         maven { url 'https://jitpack.io' }
         maven { url 'https://ci-artifactory.corda.r3cev.com/artifactory/corda-releases' }
         maven { url 'https://repo.sovrin.org/repository/maven-releases' }
+        maven { url "https://repo.gradle.org/gradle/libs-releases-local/" }
     }
 
     apply plugin: 'kotlin'

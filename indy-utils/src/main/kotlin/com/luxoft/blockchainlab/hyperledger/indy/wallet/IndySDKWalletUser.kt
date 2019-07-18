@@ -31,7 +31,7 @@ class IndySDKWalletUser private constructor(
         val wallet: Wallet,
         existingDid: String?,
         newDidConfig: DidConfig?,
-        val tailsPath: String
+        private val tailsPath: String
 ) : WalletUser {
     constructor(wallet: Wallet, existingDid: String, tailsPath: String = DEFAULT_TAILS_PATH) : this(wallet, existingDid, null, tailsPath)
     constructor(wallet: Wallet, newDidConfig: DidConfig = DidConfig(), tailsPath: String = DEFAULT_TAILS_PATH) : this(wallet, null, newDidConfig, tailsPath)
@@ -430,6 +430,10 @@ class IndySDKWalletUser private constructor(
 
     override fun getIdentityDetails(did: String): IdentityDetails {
         return IdentityDetails(did, Did.keyForLocalDid(wallet, did).get(), null, null)
+    }
+
+    override fun getTailsPath(): String {
+        return tailsPath
     }
 
     override fun getCredentials(): Iterator<CredentialReference> {

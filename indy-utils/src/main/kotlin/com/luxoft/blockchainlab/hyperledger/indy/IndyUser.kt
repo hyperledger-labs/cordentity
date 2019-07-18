@@ -4,6 +4,7 @@ import com.luxoft.blockchainlab.hyperledger.indy.ledger.LedgerUser
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
 import com.luxoft.blockchainlab.hyperledger.indy.utils.ExtraQueryBuilder
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
+import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletUser
 import com.luxoft.blockchainlab.hyperledger.indy.wallet.WalletUser
 
 
@@ -45,6 +46,32 @@ class IndyUser(
         return credentialDefinition
     }
 
+    /**
+     * Returns revocation registry info ([RevocationRegistryInfo]) for credential definition if there's one on ledger.
+     * Otherwise returns null
+     *
+     * @param credentialDefinitionId    credential definition id
+     *
+     * @return                          created
+     */
+    override fun getRevocationRegistryDefinition(
+            credentialDefinitionId: CredentialDefinitionId
+    ): RevocationRegistryDefinition? {
+
+        val revRegId = credentialDefinitionId.getPossibleRevocationRegistryDefinitionId(IndySDKWalletUser.REVOCATION_TAG)
+        return ledgerUser.retrieveRevocationRegistryDefinition(revRegId)
+    }
+
+    /**
+     * Creates revocation registry for credential definition if there's no one in ledger
+     * (usable only for those credential definition for which enableRevocation = true)
+     *
+     * @param credentialDefinitionId    credential definition id
+     * @param maxCredentialNumber       maximum number of credentials which can be issued for this credential definition
+     *                                  (example) driver agency can produce only 1000 driver licences per year
+     *
+     * @return                          created
+     */
     override fun createRevocationRegistryAndStoreOnLedger(
         credentialDefinitionId: CredentialDefinitionId,
         maxCredentialNumber: Int

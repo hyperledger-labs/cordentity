@@ -58,6 +58,22 @@ data class RevocationRegistryEntry(
     val value: RawJsonMap
 )
 
+/**
+ * Tails request message format. The request is sent over IndyPartyConnection between Indy parties.
+ */
+data class TailsRequest(
+    @JsonProperty("tails_hash") val tailsHash: String
+)
+
+/**
+ * Tails response message format. Contains JSON-serialized tails file for the given tailsHash.
+ * The message object is sent over IndyPartyConnection between Indy parties.
+ */
+data class TailsResponse(
+    @JsonProperty("tails_hash") val tailsHash: String,
+    val tails: Map<String, ByteArray>
+)
+
 data class RevocationState(
     val witness: RawJsonMap,
     @JsonProperty("rev_reg") val revocationRegistry: RawJsonMap,

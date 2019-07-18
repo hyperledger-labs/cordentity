@@ -2,26 +2,25 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy
 
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.CreateCredentialDefinitionFlow
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.CreateSchemaFlow
-import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.*
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.IssueCredentialFlowB2B
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.VerifyCredentialFlowB2B
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.name
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialValue
-import com.luxoft.blockchainlab.hyperledger.indy.utils.WalletUtils
 import com.luxoft.blockchainlab.hyperledger.indy.utils.proofRequest
 import com.luxoft.blockchainlab.hyperledger.indy.utils.proveGreaterThan
 import net.corda.core.identity.CordaX500Name
-import net.corda.node.internal.StartedNode
-import net.corda.testing.node.internal.InternalMockNetwork
-import net.corda.testing.node.internal.InternalMockNetwork.MockNode
+import net.corda.testing.node.StartedMockNode
 import org.junit.Before
 import org.junit.Ignore
 import org.junit.Test
 import java.time.LocalDateTime
 
 
-class ReadmeExampleTest : CordaTestBase() {
+class ReadmeExampleTest : CordentityTestBase() {
 
-    private lateinit var issuer: StartedNode<MockNode>
-    private lateinit var alice: StartedNode<MockNode>
-    private lateinit var bob: StartedNode<MockNode>
+    private lateinit var issuer: StartedMockNode
+    private lateinit var alice: StartedMockNode
+    private lateinit var bob: StartedMockNode
 
     @Before
     fun setup() {
@@ -30,20 +29,20 @@ class ReadmeExampleTest : CordaTestBase() {
         alice = createPartyNode(CordaX500Name("Alice", "London", "GB"))
         bob = createPartyNode(CordaX500Name("Bob", "London", "GB"))
 
-        trustee.setPermissions(issuer, net)
+        trustee.setPermissions(issuer)
     }
 
     @Test
     @Ignore("The test not represents the logic it should")
     fun `grocery store example`() {
-        val ministry: StartedNode<InternalMockNetwork.MockNode> = issuer
-        val alice: StartedNode<MockNode> = alice
-        val store: StartedNode<MockNode> = bob
+        val ministry: StartedMockNode = issuer
+        val alice: StartedMockNode = alice
+        val store: StartedMockNode = bob
 
         // Each Corda node has a X500 name:
 
-        val ministryX500 = ministry.getName()
-        val aliceX500 = alice.getName()
+        val ministryX500 = ministry.info.name()
+        val aliceX500 = alice.info.name()
 
         // And each Indy node has a DID, a.k.a Decentralized ID:
 
@@ -52,33 +51,30 @@ class ReadmeExampleTest : CordaTestBase() {
 
         // To allow customers and shops to communicate, Ministry issues a shopping scheme:
 
-        val schema = ministry.services.startFlow(
-            net,
+        val schema = ministry.runFlow(
             CreateSchemaFlow.Authority(
                 "shopping scheme",
                 "1.0",
                 listOf("NAME", "BORN")
             )
-        ).resultFuture.get()
+        ).get()
         val schemaId = schema.getSchemaIdObject()
 
         // Ministry creates a credential definition for the shopping scheme:
 
-        val credentialDefinition = ministry.services.startFlow(
-            net,
+        val credentialDefinition = ministry.runFlow(
             CreateCredentialDefinitionFlow.Authority(schemaId, enableRevocation = false)
-        ).resultFuture.get()
+        ).get()
         val credentialDefinitionId = credentialDefinition.getCredentialDefinitionIdObject()
 
         // Ministry verifies Alice's legal status and issues her a shopping credential:
 
-        ministry.services.startFlow(
-            net,
+        ministry.runFlow(
             IssueCredentialFlowB2B.Issuer(aliceX500, credentialDefinitionId, null) {
                 attributes["NAME"] = CredentialValue("Alice")
                 attributes["BORN"] = CredentialValue("2000")
             }
-        ).resultFuture.get()
+        ).get()
 
         // When Alice comes to grocery store, the store asks Alice to verify that she is legally allowed to buy drinks:
 
@@ -90,10 +86,9 @@ class ReadmeExampleTest : CordaTestBase() {
             proveGreaterThan("BORN", eighteenYearsAgo)
         }
 
-        val verified = store.services.startFlow(
-            net,
+        val verified = store.runFlow(
             VerifyCredentialFlowB2B.Verifier(aliceX500, proofRequest)
-        ).resultFuture.get()
+        ).get()
 
         // If the verification succeeds, the store can be sure that Alice's age is above 18.
 

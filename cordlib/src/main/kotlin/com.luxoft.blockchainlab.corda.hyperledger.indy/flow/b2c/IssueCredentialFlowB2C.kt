@@ -7,6 +7,7 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyRevocationRe
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredential
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.getCredentialDefinitionById
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.getRevocationRegistryDefinitionById
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.finalizeTransaction
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.indyUser
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.whoIsNotary
 import com.luxoft.blockchainlab.corda.hyperledger.indy.service.awaitFiber
@@ -18,7 +19,10 @@ import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialProposal
 import com.luxoft.blockchainlab.hyperledger.indy.models.RevocationRegistryDefinitionId
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndContract
-import net.corda.core.flows.*
+import net.corda.core.flows.FlowException
+import net.corda.core.flows.FlowLogic
+import net.corda.core.flows.InitiatingFlow
+import net.corda.core.flows.StartableByRPC
 import net.corda.core.transactions.TransactionBuilder
 
 
@@ -37,11 +41,11 @@ object IssueCredentialFlowB2C {
         override fun call() {
             try {
                 val revocationRegistryDefinition = if (revocationRegistryDefinitionId == null) null
-                else getRevocationRegistryDefinitionById(revocationRegistryDefinitionId)?.state?.data
+                else getRevocationRegistryDefinitionById(revocationRegistryDefinitionId)
 
                 if (revocationRegistryDefinition != null)
-                    if (!revocationRegistryDefinition.canProduceCredentials())
-                        throw IndyCredentialMaximumReachedException(revocationRegistryDefinition.id)
+                    if (!revocationRegistryDefinition.state.data.canProduceCredentials())
+                        throw IndyCredentialMaximumReachedException(revocationRegistryDefinition.state.data.id)
 
                 // issue credential
                 val offer = indyUser().createCredentialOffer(credentialDefinitionId)
@@ -79,9 +83,8 @@ object IssueCredentialFlowB2C {
                         credentialDefinitionId,
                         "State doesn't exist in Corda vault"
                     )
-                val credentialDefinitionIn = originalCredentialDefIn.state.data
                 val credentialDefinitionOut = StateAndContract(
-                    credentialDefinitionIn,
+                    originalCredentialDefIn.state.data,
                     IndyCredentialDefinitionContract::class.java.name
                 )
                 val credentialDefinitionCmdType = IndyCredentialDefinitionContract.Command.Issue()
@@ -89,7 +92,8 @@ object IssueCredentialFlowB2C {
 
                 val trxBuilder = if (revocationRegistryDefinition != null) {
                     // consume credential definition
-                    val revocationRegistryDefinitionState = revocationRegistryDefinition.requestNewCredential()
+                    val revocationRegistryDefinitionState =
+                        revocationRegistryDefinition.state.data.requestNewCredential()
                     val revocationRegistryDefinitionOut = StateAndContract(
                         revocationRegistryDefinitionState,
                         IndyRevocationRegistryContract::class.java.name
@@ -99,7 +103,7 @@ object IssueCredentialFlowB2C {
 
                     // do stuff
                     TransactionBuilder(whoIsNotary()).withItems(
-                        credentialDefinitionIn,
+                        originalCredentialDefIn,
                         credentialDefinitionOut,
                         credentialDefinitionCmd,
                         newCredentialOut,
@@ -125,7 +129,7 @@ object IssueCredentialFlowB2C {
                 val selfSignedTx = serviceHub.signInitialTransaction(trxBuilder, ourIdentity.owningKey)
 
                 // Notarise and record the transaction in both parties' vaults.
-                subFlow(FinalityFlow(selfSignedTx))
+                finalizeTransaction(selfSignedTx)
             } catch (ex: Exception) {
                 logger.error("Credential has not been issued", ex)
                 throw FlowException(ex.message)
