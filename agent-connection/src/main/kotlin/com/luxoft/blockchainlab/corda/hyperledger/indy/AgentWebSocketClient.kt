@@ -2,7 +2,6 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy
 
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
-import com.sun.org.apache.xpath.internal.operations.Bool
 import mu.KotlinLogging
 import org.java_websocket.client.WebSocketClient
 import org.java_websocket.handshake.ServerHandshake

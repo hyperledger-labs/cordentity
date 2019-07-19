@@ -4,12 +4,19 @@ import com.luxoft.blockchainlab.hyperledger.indy.helpers.TailsHelper
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialOffer
 import com.luxoft.blockchainlab.hyperledger.indy.models.KeyCorrectnessProof
 import com.luxoft.blockchainlab.hyperledger.indy.models.TailsResponse
+import org.java_websocket.WebSocket
+import org.java_websocket.client.WebSocketClient
+import org.java_websocket.exceptions.InvalidDataException
+import org.java_websocket.handshake.ClientHandshake
+import org.java_websocket.handshake.ServerHandshake
 import org.junit.Test
 import rx.Observable
 import rx.Single
 import rx.schedulers.Schedulers
 import java.io.File
+import java.lang.Exception
 import java.lang.RuntimeException
+import java.net.URI
 import kotlin.test.assertEquals
 import java.nio.file.Paths
 import java.util.*
@@ -243,9 +250,27 @@ class PythonRefAgentConnectionTest {
         /**
          * break the clientConnection in the middle of the exchange
          */
-        ExtraClient(invitedPartyAgents[0]).apply {
-            connect().toBlocking().value()
-            disconnect()
+        try {
+            val conn = object : WebSocketClient(URI(invitedPartyAgents[0])) {
+                override fun onClose(code: Int, reason: String?, remote: Boolean) {
+                    println("!!!Closed WebSocket with code $code, reason $reason")
+                }
+                override fun onError(ex: Exception?) {
+                    println("!!!WebSocket Error: $ex")
+                }
+                override fun onMessage(message: String?) {
+                    println("!!!Message received: $message")
+                }
+                override fun onOpen(handshakedata: ServerHandshake?) {
+                    println("!!!WebSocket opened")
+                }
+                override fun onWebsocketHandshakeReceivedAsClient(conn: WebSocket?, request: ClientHandshake?, response: ServerHandshake?) {
+                    throw InvalidDataException(1006)
+                }
+            }
+            conn.connect()
+        } catch (e: Throwable) {
+            e.printStackTrace()
         }
         Thread.sleep(7000)
         /**
