@@ -2,6 +2,7 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy
 
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
+import com.sun.org.apache.xpath.internal.operations.Bool
 import mu.KotlinLogging
 import org.java_websocket.client.WebSocketClient
 import org.java_websocket.handshake.ServerHandshake
@@ -18,28 +19,27 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
 
     private val log = KotlinLogging.logger {}
     var reason: String? = null
-    private lateinit var onCloseSubscriber: Subscriber<in Unit>
+
+    private lateinit var onCloseSubscriber: Subscriber<in Boolean>
+    private val onCloseEmitter = Observable.create<Boolean> { subscriber ->
+        onCloseSubscriber = subscriber
+    }
+    /**
+     * Observable that emits TRUE when socket is closed remotely, otherwise FALSE when the socket closed due to an error
+     */
+    fun onSocketCloseSubscription(): Observable<Boolean> = onCloseEmitter
+
     private lateinit var onRestoreConnection: Subscriber<in Boolean>
-
-    fun notifyOnClose(onDisconnect: () -> Unit) {
-        Observable.create<Unit> {
-            onCloseSubscriber = it
-        }.apply {
-            subscribe {
-                onDisconnect()
-            }
-        }
+    private val onClosedSocketOperationEmitter = Observable.create<Boolean> { subscriber ->
+        onRestoreConnection = subscriber
     }
-
-    fun onRestoreConnection(onRestore: (Boolean) -> Boolean) {
-        Observable.create<Boolean> {
-            onRestoreConnection = it
-        }.apply {
-            subscribe {
-                onRestore(it)
-            }
-        }
-    }
+    /**
+     * Observable that emits TRUE when there's an operation on the closed socket which requires the connection to be
+     * restored immediately (in blocking mode), otherwise emits FALSE when there's an operation which doesn't require
+     * immediate reconnection (for example, socket read()) so that connection restore procedure would be scheduled or
+     * executed in non-blocking mode
+     */
+    fun onClosedSocketOperation(): Observable<Boolean> = onClosedSocketOperationEmitter
 
     override fun onOpen(handshakedata: ServerHandshake?) {
         log.info { "$socketName:AgentConnection opened: $handshakedata" }
@@ -48,9 +48,7 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
     override fun onClose(code: Int, reason: String?, remote: Boolean) {
         log.info { "$socketName:AgentConnection closed: $code,$reason,$remote" }
         this.reason = reason
-        onCloseSubscriber.onNext(Unit)
-        if (remote)
-            onRestoreConnection.onNext(false) // reconnect in non-blocking mode
+        onCloseSubscriber.onNext(remote)
     }
 
     override fun onClosing(code: Int, reason: String?, remote: Boolean) {

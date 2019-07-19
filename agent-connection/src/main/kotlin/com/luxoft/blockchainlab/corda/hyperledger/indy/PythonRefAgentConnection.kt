@@ -6,10 +6,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import mu.KotlinLogging
 import net.iharder.Base64
+import rx.*
 import rx.Observable
-import rx.Single
-import rx.SingleSubscriber
-import rx.Subscriber
 import rx.schedulers.Schedulers
 import java.net.URI
 import java.util.*
@@ -20,6 +18,22 @@ import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
+/**
+ * Implements Indy Agent Connection transport ([AgentConnection]).
+ * Whenever the socket is closed on the remote side, the connection is scheduled to re-establish.
+ * A dual-mode reconnection procedure ([doReconnect]) is called asynchronously with increasing delay between
+ * attempts, when the underlying WebSocket reports it's been closed from remote. It is also called asynchronously
+ * when the caller requests to listen for a certain message. When the caller requests to transmit a message,
+ * the calling thread blocks for [operationTimeoutMs] or until the connection is re-established, whichever happens first.
+ * The timeout is set in [connect] method (default value is 60000ms, i.e. 1 minute).
+ * [TimeoutException] is thrown when no response is received within this timeframe.
+ * The transport is therefore capable to survive network outages that happen for example when the device loses the network
+ * coverage. It should be kept in mind that when the Agent (PythonRefAgent) has queued certain quantity of messages to be
+ * sent to the client, and the connection was broken, the agent will route the queued messages to the first incoming
+ * client, so that if another client connects to the Agent within the time of outage, it will consume messages pertaining
+ * to the client that has been recently disconnected. This inevitably leads to loss of data. Avoid the situation when
+ * multiple clients concurrently connect to a single Agent.
+ */
 class PythonRefAgentConnection : AgentConnection {
     private val log = KotlinLogging.logger {}
 
@@ -29,7 +43,14 @@ class PythonRefAgentConnection : AgentConnection {
     private var operationTimeoutMs: Long = 60000
     private val isReconnecting = AtomicBoolean(false)
     private val stopReconnecting = AtomicBoolean(false)
+    private lateinit var onCloseSubscription: Subscription
+    private lateinit var onReconnectSubscription: Subscription
 
+    /**
+     * Private method sends the CONNECT message with appropriate login/password if the client is not logged in.
+     * Otherwise returns success (notifies the [observer]).
+     * @param observer an object implementing [Subscriber]<Unit> that is notified with the handshake result.
+     */
     private fun doHandshake(observer: Subscriber<in Unit>) {
         /**
          * Check the agent's current state.
@@ -164,8 +185,8 @@ class PythonRefAgentConnection : AgentConnection {
         /**
          * reset event handlers
          */
-        webSocket.onRestoreConnection { it }
-        webSocket.notifyOnClose {}
+        onCloseSubscription.unsubscribe()
+        onReconnectSubscription.unsubscribe()
 
         if (getConnectionStatus() == AgentConnectionStatus.AGENT_CONNECTED) {
             webSocket.closeBlocking()
@@ -193,10 +214,12 @@ class PythonRefAgentConnection : AgentConnection {
                 try {
                     webSocket = AgentWebSocketClient(URI(url), login)
                     webSocket.apply {
-                        notifyOnClose {
+                        onCloseSubscription = onSocketCloseSubscription().subscribe { isRemote ->
                             connectionStatus = AgentConnectionStatus.AGENT_DISCONNECTED
+                            if (isRemote)
+                                doReconnect(false) // reconnect in non-blocking mode
                         }
-                        onRestoreConnection {isBlocking ->
+                        onReconnectSubscription = onClosedSocketOperation().subscribe { isBlocking ->
                             doReconnect(isBlocking)
                         }
                         if(!connectBlocking())
