@@ -224,8 +224,7 @@ class PythonRefAgentConnection : AgentConnection {
                     webSocket.apply {
                         onCloseSubscription = onSocketCloseSubscription().subscribe { isRemote ->
                             connectionStatus = AgentConnectionStatus.AGENT_DISCONNECTED
-                            if (isRemote)
-                                doReconnect(false) // reconnect in non-blocking mode
+                            doReconnect(false) // reconnect in non-blocking mode
                         }
                         onReconnectSubscription = onClosedSocketOperation().subscribe { isBlocking ->
                             doReconnect(isBlocking)

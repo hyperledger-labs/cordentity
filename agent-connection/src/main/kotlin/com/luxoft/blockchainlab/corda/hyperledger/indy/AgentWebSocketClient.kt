@@ -48,6 +48,7 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
         log.info { "$socketName:AgentConnection closed: $code,$reason,$remote" }
         this.reason = reason
         onCloseSubscriber.onNext(remote)
+        dataStorage.count()
     }
 
     override fun onClosing(code: Int, reason: String?, remote: Boolean) {
@@ -95,7 +96,7 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
         fun getObserverOrAddMessage(key: String, message: String) = synchronized(this) {
             val observer = popObserver(key)
             if (observer == null) {
-                log.warn { "Unexpected message ($key,$message)" }
+                log.warn { "$socketName: Unexpected message ($key,$message)" }
                 storeMessage(key, message)
             }
             observer
@@ -123,6 +124,16 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
                             onError(AgentConnectionException("WebSocket closed while $socketName observing for $key."))
                     }
                 }
+            }
+        }
+        fun count() = synchronized(this) {
+            subscribedObservers.forEach { key, queue ->
+                if (queue.size > 0)
+                    println("Observing queue size for key: $key is ${queue.size}")
+            }
+            receivedMessages.forEach { key, queue ->
+                if (queue.size > 0)
+                    println("Message queue size for key: $key is ${queue.size}")
             }
         }
     }

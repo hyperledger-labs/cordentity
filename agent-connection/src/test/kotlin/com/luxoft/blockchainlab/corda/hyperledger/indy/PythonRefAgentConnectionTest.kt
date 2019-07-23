@@ -4,25 +4,23 @@ import com.luxoft.blockchainlab.hyperledger.indy.helpers.TailsHelper
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialOffer
 import com.luxoft.blockchainlab.hyperledger.indy.models.KeyCorrectnessProof
 import com.luxoft.blockchainlab.hyperledger.indy.models.TailsResponse
-import org.java_websocket.WebSocket
-import org.java_websocket.client.WebSocketClient
-import org.java_websocket.exceptions.InvalidDataException
-import org.java_websocket.handshake.ClientHandshake
-import org.java_websocket.handshake.ServerHandshake
+import com.yunusoksuz.tcpproxy.Connection
 import org.junit.Test
 import rx.Observable
 import rx.Single
 import rx.schedulers.Schedulers
 import java.io.File
-import java.lang.Exception
 import java.lang.RuntimeException
-import java.net.URI
 import kotlin.test.assertEquals
 import java.nio.file.Paths
 import java.util.*
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.test.assertNotEquals
+import java.net.ServerSocket
+import java.net.Socket
+import java.net.SocketException
+import kotlin.concurrent.thread
+import kotlin.math.absoluteValue
 
 class PythonRefAgentConnectionTest {
 
@@ -39,7 +37,7 @@ class PythonRefAgentConnectionTest {
                     if (ex != null) {
                         println("Error connecting User-$rand to $agentUrl: ${ex.message!!}")
                     } else {
-                        acceptInvite(invitationString).subscribe { master ->
+                        acceptInvite(invitationString).subscribe ({ master ->
                             val tails = master.requestTails(tailsHash).toBlocking().value().tails[tailsHash]
                             if (tails?.toString(Charsets.UTF_8) != tailsHash)
                                 println("Tails file content doesn't match!!! hash $tailsHash, received $tails")
@@ -49,7 +47,9 @@ class PythonRefAgentConnectionTest {
                                 println("Client User$rand completed successfully")
                             }
                             disconnect()
-                        }
+                        }, {
+                            println("!!!Error accepting invite: $it")
+                        })
                     }
                 }
             }
@@ -79,13 +79,14 @@ class PythonRefAgentConnectionTest {
                                 invitedParty.handleTailsRequestsWith {
                                     TailsHelper.DefaultReader(tailsDir.absolutePath).read(it)
                                 }
-                                invitedParty.receiveCredentialOffer().subscribe { proof ->
-                                    assertEquals(proof?.schemaIdRaw, party.proofSchemaId)
+                                invitedParty.receiveCredentialOffer().subscribe { credOffer ->
+                                    assertEquals(credOffer?.schemaIdRaw, party.proofSchemaId)
                                     observer.onNext(true)
                                     observer.onCompleted()
                                 }
                             }, {
                                 observer.onNext(false)
+                                println("Error while waiting for invited party: $it")
                                 observer.onCompleted()
                             })
                             party.start(invitation)
@@ -144,6 +145,7 @@ class PythonRefAgentConnectionTest {
     }
     class Server (private val agentUrl: String, private val tailsHash: String) {
         private lateinit var agentConnection: PythonRefAgentConnection
+        private var i = AtomicInteger(0)
         fun getInvite() : String {
             val rand = Random().nextInt()
             agentConnection = PythonRefAgentConnection()
@@ -153,6 +155,7 @@ class PythonRefAgentConnectionTest {
                 val partyDid = invitedParty.partyDID()
                 println("Server: client $partyDid connected")
                 invitedParty.handleTailsRequestsWith {
+                    println("Server received Tails request ${i.incrementAndGet()}")
                     TailsResponse(tailsHash, mapOf(tailsHash to tailsHash.toByteArray()))
                 }
             }
@@ -224,6 +227,40 @@ class PythonRefAgentConnectionTest {
         if (!testOk) throw RuntimeException("Test failed")
     }
 
+    class ProxyConnection(private val localPort: Int, private val remotePort: Int) {
+        private lateinit var serverSocket: ServerSocket
+        private lateinit var socket: Socket
+        private lateinit var proxyThread: Thread
+        private lateinit var listener: Thread
+        private lateinit var proxyConnection: Connection
+        fun connect() {
+            serverSocket = ServerSocket(localPort)
+            listener = thread {
+                while (!Thread.currentThread().isInterrupted) {
+                    try {
+                        socket = serverSocket.accept()
+                        proxyConnection = Connection(socket, "127.0.0.1", remotePort)
+                        proxyThread = Thread(proxyConnection).apply { start() }
+                    } catch (e: SocketException) {}
+                }
+            }
+        }
+        fun disconnect() {
+            listener.interrupt()
+            serverSocket.close()
+            if (!socket.isClosed)
+                socket.shutdownOutput()
+            val serverConnectionSocket = proxyConnection.javaClass.getDeclaredField("serverConnection").run {
+                isAccessible = true
+                get(proxyConnection)
+            } as Socket
+            if (!serverConnectionSocket.isClosed)
+                serverConnectionSocket.shutdownInput()
+            Thread.sleep(100)
+            proxyThread.interrupt()
+        }
+    }
+
     /**
      * Some of the messages are consumed by a different client, connected in the middle of the message exchange
      */
@@ -231,51 +268,100 @@ class PythonRefAgentConnectionTest {
     fun `the connection is lost in the middle of asynchronous message exchange, some messages are lost`() {
         val tailsHash = "${Random().nextInt(Int.MAX_VALUE)}"
         val invitationString = Server(masterAgent, tailsHash).getInvite()
-        val clientConnection = Client(invitedPartyAgents[0]).connect(invitationString)
+        val proxyConnection = ProxyConnection(8085, 8094).apply { connect(); Thread.sleep(200) }
+
+        val client = Client("ws://127.0.0.1:8085/ws")
+        val clientConnection = client.connect(invitationString)
         println("Client connected the agent. Local DID is ${clientConnection.myDID()}.")
-        val i = AtomicInteger(100)
-        repeat(100) {
+        val i = AtomicInteger(200)
+        repeat(200) {
             /**
              * asynchronously request 100 messages
              */
-            clientConnection.requestTails(tailsHash).subscribe({tails ->
+            clientConnection.requestTails(tailsHash)
+                    .subscribeOn(Schedulers.newThread())
+                    .subscribe({ tails ->
                 /**
                  * atomically decrement the counter of received message upon receipt
                  */
-                println("Tails received: ${tails.tails[tailsHash]?.toString()}, ${i.getAndDecrement()} messages left")
-            }, {
-
+                println("Tails received: ${tails.tails[tailsHash]?.toString()}, ${i.decrementAndGet()} messages left")
+            }, { e ->
+                println("!!!Error $e\n- while receiving tails on iteration $it")
             })
         }
         /**
          * break the clientConnection in the middle of the exchange
          */
-        try {
-            val conn = object : WebSocketClient(URI(invitedPartyAgents[0])) {
-                override fun onClose(code: Int, reason: String?, remote: Boolean) {
-                    println("!!!Closed WebSocket with code $code, reason $reason")
-                }
-                override fun onError(ex: Exception?) {
-                    println("!!!WebSocket Error: $ex")
-                }
-                override fun onMessage(message: String?) {
-                    println("!!!Message received: $message")
-                }
-                override fun onOpen(handshakedata: ServerHandshake?) {
-                    println("!!!WebSocket opened")
-                }
-                override fun onWebsocketHandshakeReceivedAsClient(conn: WebSocket?, request: ClientHandshake?, response: ServerHandshake?) {
-                    throw InvalidDataException(1006)
-                }
-            }
-            conn.connect()
-        } catch (e: Throwable) {
-            e.printStackTrace()
-        }
+        proxyConnection.disconnect()
+        Thread.sleep(500)
+        proxyConnection.connect()
         Thread.sleep(7000)
+
+        client.disconnect()
         /**
-         * Some of the messages should have been lost
+         * None of the messages should have been lost
          */
-        assert(i.get() < 50)
+        assert(i.get() == 0)
     }
+
+    class ProxyProcess(private val proxiesList: List<Pair<Int, Int>>) {
+        private var proxyConnections: MutableList<ProxyConnection> = mutableListOf()
+        private var randomFailures: Thread? = null
+        fun start() {
+            proxiesList.forEach { pair ->
+                val (input, output) = pair
+                proxyConnections.add(ProxyConnection(input, output).apply { connect() })
+            }
+            randomFailures = Thread {
+                try {
+                    while (!Thread.currentThread().isInterrupted) {
+                        Thread.sleep(Random().nextLong().absoluteValue % 8000)
+                        randomReset()
+                    }
+                } catch (e: InterruptedException) {
+                }
+            }.apply { start() }
+        }
+        private fun randomReset() {
+            proxyConnections[Random().nextInt().absoluteValue % proxyConnections.size].apply {
+                disconnect()
+                Thread.sleep(500)
+                connect()
+            }
+        }
+        fun stop() {
+            if (randomFailures?.isAlive == true)
+                    randomFailures?.interrupt()
+            proxyConnections.forEach {
+                it.disconnect()
+            }
+            proxyConnections.removeAll { true }
+        }
+    }
+
+    private val invitedPartyAgentsProxies = listOf(
+            "ws://127.0.0.1:8084/ws",
+            "ws://127.0.0.1:8086/ws",
+            "ws://127.0.0.1:8087/ws",
+            "ws://127.0.0.1:8088/ws",
+            "ws://127.0.0.1:8089/ws"
+    )
+    private val proxiesConfig = listOf(
+            Pair(8084, 8094),
+            Pair(8086, 8096),
+            Pair(8087, 8097),
+            Pair(8088, 8098),
+            Pair(8089, 8099)
+    )
+//    @Test
+    fun `main load test with randomized proxy connection failures`() {
+        val proxies = ProxyProcess(proxiesConfig).apply { start() }
+        repeat(10) {
+            val master = MasterProcess(masterAgent, invitedPartyAgentsProxies).apply { start() }
+            if (!master.testOk)
+                throw AgentConnectionException("Master process didn't complete Ok")
+        }
+        proxies.stop()
+    }
+
 }
