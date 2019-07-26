@@ -13,7 +13,10 @@ dependencies {
 
     testCompile "$corda_release_group:corda-node-driver:${corda_release_version}"
 
-    cordapp project(":cordentity-cordapp-contracts-states")
+    //TODO: there is bug which excludes cordentity-indy-utils from cordapp, because it is dependency of dependency cordapp
+    cordapp(project(":cordentity-cordapp-contracts-states")) {
+        transitive = false
+    }
     compile project(':cordentity-indy-utils')
 
     compile (project(':cordentity-cordlib')){
