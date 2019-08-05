@@ -2,11 +2,11 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2c
 
 import co.paralleluniverse.fibers.Suspendable
 import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialContract
-import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialDefinitionContract
 import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyRevocationRegistryContract
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredential
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.getCredentialDefinitionById
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.getRevocationRegistryDefinitionById
+import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.finalizeTransaction
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.indyUser
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.whoIsNotary
 import com.luxoft.blockchainlab.corda.hyperledger.indy.service.awaitFiber
@@ -18,7 +18,10 @@ import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialProposal
 import com.luxoft.blockchainlab.hyperledger.indy.models.RevocationRegistryDefinitionId
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndContract
-import net.corda.core.flows.*
+import net.corda.core.flows.FlowException
+import net.corda.core.flows.FlowLogic
+import net.corda.core.flows.InitiatingFlow
+import net.corda.core.flows.StartableByRPC
 import net.corda.core.transactions.TransactionBuilder
 
 
@@ -66,7 +69,6 @@ object IssueCredentialFlowB2C {
                     indyUser().walletUser.getIdentityDetails().did,
                     listOf(ourIdentity)
                 )
-                val newCredentialOut = StateAndContract(credentialOut, IndyCredentialContract::class.java.name)
 
                 val signers = listOf(ourIdentity.owningKey)
 
@@ -79,12 +81,6 @@ object IssueCredentialFlowB2C {
                         credentialDefinitionId,
                         "State doesn't exist in Corda vault"
                     )
-                val credentialDefinitionOut = StateAndContract(
-                    originalCredentialDefIn.state.data,
-                    IndyCredentialDefinitionContract::class.java.name
-                )
-                val credentialDefinitionCmdType = IndyCredentialDefinitionContract.Command.Issue()
-                val credentialDefinitionCmd = Command(credentialDefinitionCmdType, signers)
 
                 val trxBuilder = if (revocationRegistryDefinition != null) {
                     // consume credential definition
@@ -98,24 +94,20 @@ object IssueCredentialFlowB2C {
                     val revocationRegistryDefinitionCmd = Command(revocationRegistryDefinitionCmdType, signers)
 
                     // do stuff
-                    TransactionBuilder(whoIsNotary()).withItems(
-                        originalCredentialDefIn,
-                        credentialDefinitionOut,
-                        credentialDefinitionCmd,
-                        newCredentialOut,
-                        newCredentialCmd,
-                        revocationRegistryDefinition,
-                        revocationRegistryDefinitionOut,
-                        revocationRegistryDefinitionCmd
-                    )
+                    TransactionBuilder(whoIsNotary())
+                        .addOutputState(credentialOut)
+                        .addCommand(newCredentialCmd)
+                        .addReferenceState(originalCredentialDefIn.referenced())
+                        .withItems(
+                            revocationRegistryDefinition,
+                            revocationRegistryDefinitionOut,
+                            revocationRegistryDefinitionCmd
+                        )
                 } else {
-                    TransactionBuilder(whoIsNotary()).withItems(
-                        originalCredentialDefIn,
-                        credentialDefinitionOut,
-                        credentialDefinitionCmd,
-                        newCredentialOut,
-                        newCredentialCmd
-                    )
+                    TransactionBuilder(whoIsNotary())
+                        .addOutputState(credentialOut)
+                        .addCommand(newCredentialCmd)
+                        .addReferenceState(originalCredentialDefIn.referenced())
                 }
 
                 trxBuilder.toWireTransaction(serviceHub)
@@ -125,7 +117,7 @@ object IssueCredentialFlowB2C {
                 val selfSignedTx = serviceHub.signInitialTransaction(trxBuilder, ourIdentity.owningKey)
 
                 // Notarise and record the transaction in both parties' vaults.
-                subFlow(FinalityFlow(selfSignedTx))
+                finalizeTransaction(selfSignedTx)
             } catch (ex: Exception) {
                 logger.error("Credential has not been issued", ex)
                 throw FlowException(ex.message)

@@ -1,5 +1,7 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy.contract
 
+import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredentialDefinition
+import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndySchema
 import net.corda.core.contracts.CommandData
 import net.corda.core.contracts.Contract
 import net.corda.core.contracts.TypeOnlyCommandData
@@ -18,35 +20,23 @@ class IndyCredentialDefinitionContract : Contract {
 
             when (command) {
                 is Command.Create -> creation(tx, signers)
-                is Command.Consume -> consummation(tx, signers)
-                is Command.Issue -> issuance(tx, signers)
                 else -> throw IllegalArgumentException("Unrecognised command.")
             }
         }
     }
 
     private fun creation(tx: LedgerTransaction, signers: Set<PublicKey>) = requireThat {
-        // TODO: should contain 1 input and 1 output states of type IndySchema (similar)
-        // TODO: should contain 1 output state of type IndyCredentialDefinition
-        // TODO: state of type IndyCredentialDefinition should have currentCredNumber == 0 and maxCredNumber > 0
-    }
+        val credDef = tx.outputsOfType<IndyCredentialDefinition>()
+        val schema = tx.referenceInputsOfType<IndySchema>()
 
-    private fun consummation(tx: LedgerTransaction, signers: Set<PublicKey>) = requireThat {
-        // TODO: should contain 1 input and 1 output states of type IndySchema (similar)
-    }
-
-    private fun issuance(tx: LedgerTransaction, signers: Set<PublicKey>) = requireThat {
-
+        "Should contain one output IndyCredentialDefinition state" using (credDef.size == 1)
+        "Should contain one referent IndySchema state" using (schema.size == 1)
+        "Shouldn't contain any other state" using
+                (tx.inputStates.isEmpty() && tx.outputStates.size == 1 && tx.referenceStates.size == 1)
     }
 
     interface Command : CommandData {
         // when we create new credential definition
         class Create : TypeOnlyCommandData(), Command
-
-        // when we issue new revocation registry
-        class Consume : TypeOnlyCommandData(), Command
-
-        // when we issue new credential
-        class Issue : TypeOnlyCommandData(), Command
     }
 }
