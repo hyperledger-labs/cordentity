@@ -254,4 +254,11 @@ interface IndyWalletHolder {
      * @return Iterator<[CredentialReference]>
      */
     fun getCredentials(): Iterator<CredentialReference>
+
+    /**
+     * Gets TAILS file path
+     *
+     * @return TAILS file path
+     */
+    fun getTailsPath(): String
 }

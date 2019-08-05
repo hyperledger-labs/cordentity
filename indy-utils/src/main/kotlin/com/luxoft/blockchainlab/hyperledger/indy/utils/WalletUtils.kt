@@ -15,7 +15,6 @@ object WalletUtils {
     private val trusteeWallet: Wallet by lazy {
         WalletHelper.createOrTrunc("trustee","trustee")
         val wallet = WalletHelper.openExisting("trustee", "trustee")
-        makeTrustee(wallet)
 
         wallet
     }

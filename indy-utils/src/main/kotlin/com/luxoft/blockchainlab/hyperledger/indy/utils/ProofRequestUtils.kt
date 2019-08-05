@@ -206,6 +206,14 @@ fun createRandomProofRequest(nonRevoked: Interval?, vararg payloads: ProofReques
             applyPayloadRandomly(it)
         }
 
+        requestedAttributes.keys.intersect(requestedPredicates.keys).forEach {
+            val keepAttribute = rng.nextBoolean()
+            if (keepAttribute)
+                requestedPredicates.remove(it)
+            else
+                requestedAttributes.remove(it)
+        }
+
         if (nonRevoked != null) proveNonRevocation(nonRevoked)
     }
 }

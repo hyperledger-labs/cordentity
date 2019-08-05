@@ -140,7 +140,14 @@ object IssueCredentialFlowB2B {
 
                 val selfSignedTx = serviceHub.signInitialTransaction(trxBuilder, ourIdentity.owningKey)
 
-                val signedTrx = flowSession.sendAndReceive<SignedTransaction>(selfSignedTx).unwrap { it }
+                flowSession.send(selfSignedTx)
+                revocationRegistryDefinition?.also {
+                    val revocationRegistryDefinition =
+                        indyUser().ledgerUser.retrieveRevocationRegistryDefinition(it.state.data.id)
+                    val tailsHash = revocationRegistryDefinition!!.value["tailsHash"].toString()
+                    flowSession.send(tailsReader().read(TailsRequest(tailsHash)))
+                }
+                val signedTrx = flowSession.receive<SignedTransaction>().unwrap { it }
 
                 // Notarise and record the transaction in both parties' vaults.
                 subFlow(FinalityFlow(signedTrx))
@@ -191,7 +198,11 @@ object IssueCredentialFlowB2B {
                             )
                         }
                         is IndyCredentialDefinition -> logger.info("Got indy credential definition")
-                        is IndyRevocationRegistryDefinition -> logger.info("Got indy revocation registry")
+                        is IndyRevocationRegistryDefinition -> {
+                            //TODO: Make secure
+                            flowSession.receive<TailsResponse>().unwrap { tailsWriter().write(it) }
+                            logger.info("Got indy revocation registry")
+                        }
                         else -> throw FlowException("Invalid output state. Only IndyCredential, IndyCredentialDefinition and IndyRevocationRegistryDefinition supported")
                     }
                 }

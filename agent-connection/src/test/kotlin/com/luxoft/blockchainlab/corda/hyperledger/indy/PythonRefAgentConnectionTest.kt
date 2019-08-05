@@ -1,13 +1,16 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy
 
+import com.luxoft.blockchainlab.hyperledger.indy.helpers.TailsHelper
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialOffer
 import com.luxoft.blockchainlab.hyperledger.indy.models.KeyCorrectnessProof
 import org.junit.Ignore
 import org.junit.Test
 import rx.Single
+import java.io.File
 import kotlin.test.assertEquals
 import java.net.URI
 import java.net.URL
+import java.nio.file.Paths
 import java.util.*
 
 fun agentInitEndpoint(agentUrl: String) {
@@ -25,7 +28,8 @@ class PythonRefAgentConnectionTest {
 
     class InvitedPartyProcess (
             private val agentUrl: String,
-            val proofSchemaId: String = "${Random().nextInt()}:::1"
+            val proofSchemaId: String = "${Random().nextInt()}:::1",
+            val tailsHash: String = "${Random().nextInt(Int.MAX_VALUE)}"
             ) {
 
         fun start(invitationString: String) {
@@ -37,6 +41,9 @@ class PythonRefAgentConnectionTest {
                         throw AgentConnectionException(ex.message!!)
                     }
                     else acceptInvite(invitationString).subscribe { master ->
+                        val tails = master.requestTails(tailsHash).toBlocking().value().tails[tailsHash]
+                        if (tails?.toString(Charsets.UTF_8) != tailsHash)
+                            throw AgentConnectionException("Tails file content doesn't match!!! hash $tailsHash, received $tails")
                         val offer = CredentialOffer(proofSchemaId, ":::1", KeyCorrectnessProof("", "", emptyList()), "")
                         master.sendCredentialOffer(offer)
                         disconnect()
@@ -52,15 +59,23 @@ class PythonRefAgentConnectionTest {
 
         fun start() {
             val rand = Random().nextInt()
+            val tailsDir = File("tails").apply { deleteOnExit() }
+            if (!tailsDir.exists())
+                tailsDir.mkdirs()
             agentInitEndpoint(agentUrl)
             PythonRefAgentConnection().apply {
                 connect(agentUrl, "User$rand", "pass$rand").toBlocking().value()
                 val invitedPartiesCompleted = mutableListOf<Single<Boolean>>()
                 invitedPartyAgents.forEach { agentUrl ->
                     val party = InvitedPartyProcess(agentUrl)
+                    Paths.get("tails", party.tailsHash).toFile().apply { deleteOnExit() }
+                        .writeText(party.tailsHash, Charsets.UTF_8)
                     invitedPartiesCompleted.add(Single.create { observer ->
                         generateInvite().subscribe {invitation ->
                             waitForInvitedParty(invitation).subscribe { invitedParty ->
+                                invitedParty.handleTailsRequestsWith {
+                                    TailsHelper.DefaultReader(tailsDir.absolutePath).read(it)
+                                }
                                 invitedParty.receiveCredentialOffer().subscribe { proof ->
                                     assertEquals(proof?.schemaIdRaw, party.proofSchemaId)
                                     observer.onSuccess(true)

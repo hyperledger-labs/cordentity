@@ -4,10 +4,7 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy.service
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.name
 import com.luxoft.blockchainlab.hyperledger.indy.IndyUser
 import com.luxoft.blockchainlab.hyperledger.indy.SsiUser
-import com.luxoft.blockchainlab.hyperledger.indy.helpers.ConfigHelper
-import com.luxoft.blockchainlab.hyperledger.indy.helpers.GenesisHelper
-import com.luxoft.blockchainlab.hyperledger.indy.helpers.PoolHelper
-import com.luxoft.blockchainlab.hyperledger.indy.helpers.WalletHelper
+import com.luxoft.blockchainlab.hyperledger.indy.helpers.*
 import com.luxoft.blockchainlab.hyperledger.indy.ledger.IndyPoolLedgerUser
 import com.luxoft.blockchainlab.hyperledger.indy.models.DidConfig
 import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletUser
@@ -42,6 +39,7 @@ class IndyService(services: AppServiceHub) : SingletonSerializeAsToken() {
     private val userRole = ConfigHelper.getRole() ?: "" // TODO: why do we need this in config?
     private val did = ConfigHelper.getDid()
     private val seed = ConfigHelper.getSeed()
+    private val tailsPath = ConfigHelper.getTailsPath()
 
     val indyUser: SsiUser by lazy {
         val nodeName = services.myInfo.name().organisation
@@ -52,7 +50,7 @@ class IndyService(services: AppServiceHub) : SingletonSerializeAsToken() {
         val wallet = WalletHelper.openOrCreate(walletName, walletPassword)
         logger.debug { "Wallet created for $nodeName" }
 
-        val tailsPath = "tails"
+        val tailsPath = tailsPath ?: "tails"
         val didConfig = DidConfig(did, seed, null, null)
 
         val walletUser = if (did != null && wallet.getOwnIdentities().map { it.did }.contains(did))
@@ -78,5 +76,8 @@ class IndyService(services: AppServiceHub) : SingletonSerializeAsToken() {
 
         IndyUser.with(walletUser).with(ledgerUser).build()
     }
+
+    val tailsReader by lazy { TailsHelper.DefaultReader(indyUser.walletUser.getTailsPath()) }
+    val tailsWriter by lazy { TailsHelper.DefaultWriter(indyUser.walletUser.getTailsPath()) }
 
 }
