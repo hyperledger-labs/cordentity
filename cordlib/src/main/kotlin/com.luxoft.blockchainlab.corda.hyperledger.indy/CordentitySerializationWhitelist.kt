@@ -1,6 +1,8 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy
 
-import com.luxoft.blockchainlab.hyperledger.indy.*
+import com.luxoft.blockchainlab.hyperledger.indy.models.*
+import com.luxoft.blockchainlab.hyperledger.indy.utils.Filter
+import com.luxoft.blockchainlab.hyperledger.indy.utils.FilterProperty
 import net.corda.core.serialization.SerializationWhitelist
 
 
@@ -46,6 +48,13 @@ class CordentitySerializationWhitelist : SerializationWhitelist {
         IdentityDetails::class.java,
         RevocationRegistryDefinitionId::class.java,
         CredentialDefinitionId::class.java,
-        SchemaId::class.java
+        SchemaId::class.java,
+        ContainsSchemaId::class.java,
+        ContainsCredentialDefinitionId::class.java,
+        ContainsRevocationRegistryId::class.java,
+        Filter::class.java,
+        FilterProperty::class.java,
+        TailsRequest::class.java,
+        TailsResponse::class.java
     )
 }

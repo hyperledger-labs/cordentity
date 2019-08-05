@@ -74,21 +74,21 @@ For some networks you can find Genesis files in the [genesis directory](../genes
 
 ### Flows
 
-- [AssignPermissionsFlow](src/main/kotlin/com.luxoft.blockchainlab.corda.hyperledger.indy/flow/AssignPermissionsFlow.kt) - changes permissions of another Corda party
+- [AssignPermissionsFlow](src/main/kotlin/com.luxoft.blockchainlab.corda.hyperledger.indy/flow/AssignPermissionsFlowB2B.kt) - changes permissions of another Corda party
 
 - [CreateCredentialDefinitionFlow](src/main/kotlin/com.luxoft.blockchainlab.corda.hyperledger.indy/flow/CreateCredentialDefinitionFlow.kt) - creates a credential definition for schema and registers it
 
 - [CreateSchemaFlow](src/main/kotlin/com.luxoft.blockchainlab.corda.hyperledger.indy/flow/CreateSchemaFlow.kt) - creates an Indy scheme and registers it
 
-- [GetDidFlow](src/main/kotlin/com.luxoft.blockchainlab.corda.hyperledger.indy/flow/GetDidFlow.kt) -  requests DID of another Corda party
+- [GetDidFlow](src/main/kotlin/com.luxoft.blockchainlab.corda.hyperledger.indy/flow/GetDidFlowB2B.kt) -  requests DID of another Corda party
 
-- [IssueCredentialFlow](src/main/kotlin/com.luxoft.blockchainlab.corda.hyperledger.indy/flow/IssueCredentialFlow.kt) - issues an Indy credential based on a proposal
+- [IssueCredentialFlow](src/main/kotlin/com.luxoft.blockchainlab.corda.hyperledger.indy/flow/IssueCredentialFlowB2B.kt) - issues an Indy credential based on a proposal
 
-- [VerifyCredentialFlow](src/main/kotlin/com.luxoft.blockchainlab.corda.hyperledger.indy/flow/VerifyCredentialFlow.kt) - verifies a set of predicates
+- [VerifyCredentialFlow](src/main/kotlin/com.luxoft.blockchainlab.corda.hyperledger.indy/flow/VerifyCredentialFlowB2B.kt) - verifies a set of predicates
 
 ### Utility Flows
 
-- [CreatePairwiseFlow](src/main/kotlin/com.luxoft.blockchainlab.corda.hyperledger.indy/flow/CreatePairwiseFlow.kt) - initiates a bi-directional connection
+- [CreatePairwiseFlow](src/main/kotlin/com.luxoft.blockchainlab.corda.hyperledger.indy/flow/CreatePairwiseFlowB2B.kt) - initiates a bi-directional connection
 
 ### Services
 
@@ -107,8 +107,8 @@ At least one node must be a Trustee to be able to grant permissions to other nod
 
 ## Typical flow
 
-1. Add permissions to issue from TRUSTEE to every verified issuer in your system with [AssignPermissionsFlow](src/main/kotlin/com.luxoft.blockchainlab.corda.hyperledger.indy/flow/AssignPermissionsFlow.kt)
+1. Add permissions to issue from TRUSTEE to every verified issuer in your system with [AssignPermissionsFlow](src/main/kotlin/com.luxoft.blockchainlab.corda.hyperledger.indy/flow/AssignPermissionsFlowB2B.kt)
 2. Create some schemas and credential definitions by specific issuers with [CreateSchemaFlow](src/main/kotlin/com.luxoft.blockchainlab.corda.hyperledger.indy/flow/CreateSchemaFlow.kt) and [CreateCredentialDefinitionFlow](src/main/kotlin/com.luxoft.blockchainlab.corda.hyperledger.indy/flow/CreateCredentialDefinitionFlow.kt)
-3. Issue credential to some provers with [IssueCredentialFlow](src/main/kotlin/com.luxoft.blockchainlab.corda.hyperledger.indy/flow/IssueCredentialFlow.kt)
-4. Verify these credentials by some verifiers with [VerifyCredentialFlow](src/main/kotlin/com.luxoft.blockchainlab.corda.hyperledger.indy/flow/VerifyCredentialFlow.kt)
+3. Issue credential to some provers with [IssueCredentialFlow](src/main/kotlin/com.luxoft.blockchainlab.corda.hyperledger.indy/flow/IssueCredentialFlowB2B.kt)
+4. Verify these credentials by some verifiers with [VerifyCredentialFlow](src/main/kotlin/com.luxoft.blockchainlab.corda.hyperledger.indy/flow/VerifyCredentialFlowB2B.kt)
 5. Revoke outdated credentials by issuer with [RevokeCredentialFlow](src/main/kotlin/com.luxoft.blockchainlab.corda.hyperledger.indy/flow/RevokeCredentialFlow.kt)

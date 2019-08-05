@@ -61,33 +61,27 @@ using [CreateCredentialDefinitionFlow](cordapp/README.md#flows):
 Ministry verifies Alice's legal status and issues her a shopping [credential](cordapp/README.md#indy-terminology)
 using [IssueCredentialFlow](cordapp/README.md#flows):
 
-    val credentialProposal = """
-        {
-        "NAME":{"raw":"Alice", "encoded":"119191919"},
-        "BORN":{"raw":"2000",  "encoded":"2000"}
-        }
-        """
-
     ministry.services.startFlow(
-            IssueCredentialFlow.Issuer(
-                    UUID.randomUUID().toString(),
-                    credentialDefinitionId,
-                    credentialProposal,
-                    aliceX500)).resultFuture.get()
+            IssueCredentialFlowB2B.Issuer(aliceX500, credentialDefinitionId, null) {
+                   attributes["NAME"] = CredentialValue("Alice")
+                   attributes["BORN"] = CredentialValue("2000")
+            }
+    ).resultFuture.get()
 
 When Alice comes to grocery store, the store asks Alice to verify that she is legally allowed to buy drinks
 using [VerifyCredentialFlow](cordapp/README.md#flows):
 
-    // Alice.BORN >= currentYear - 18
-    val eighteenYearsAgo = LocalDateTime.now().minusYears(18).year
-    val legalAgePredicate = VerifyCredentialFlow.ProofPredicate(schemaId, credentialDefinitionId, ministryDID, "BORN", eighteenYearsAgo)
+       // Alice.BORN >= currentYear - 18
+        val eighteenYearsAgo = LocalDateTime.now().minusYears(18).year
 
-    val verified = store.services.startFlow(
-            VerifyCredentialFlow.Verifier(
-                    UUID.randomUUID().toString(),
-                    emptyList(),
-                    listOf(legalAgePredicate),
-                    aliceX500)).resultFuture.get()
+        // Use special proof request DSL
+        val proofRequest = proofRequest("legal age proof", "1.0") {
+            proveGreaterThan("BORN", eighteenYearsAgo)
+        }
+
+        val verified = store.services.startFlow(
+            VerifyCredentialFlowB2B.Verifier(aliceX500, proofRequest)
+        ).resultFuture.get()
 
 If the verification succeeds, the store can be sure that Alice's age is above 18.
 
@@ -124,7 +118,7 @@ On all machines that are going to run [IndyService](cordapp/README.md#services) 
     sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 68DB5E88
     sudo add-apt-repository "deb https://repo.sovrin.org/sdk/deb xenial stable"
     sudo apt-get update
-    sudo apt-get install -y libindy=1.7.0
+    sudo apt-get install -y libindy=1.8.2
     
 Please follow to the official [indy-sdk repo](https://github.com/hyperledger/indy-sdk#installing-the-sdk) 
 for installation instructions for Windows, iOS, Android and MacOS.
@@ -140,7 +134,7 @@ for installation instructions for Windows, iOS, Android and MacOS.
 
 ## External dependancies
 
-Cordapp requires installation of indy-sdk version 1.7.0.
+Cordapp requires installation of indy-sdk version 1.8.2.
 
 ## Build
 
@@ -149,7 +143,7 @@ To run the tests you need to install the `libindy` package:
     sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 68DB5E88
     sudo add-apt-repository "deb https://repo.sovrin.org/sdk/deb xenial stable"
     sudo apt-get update
-    sudo apt-get install -y libindy=1.7.0
+    sudo apt-get install -y libindy=1.8.2
     
 Make sure that `Docker` is installed:
 
@@ -170,7 +164,7 @@ Also re-creating the `indypool` docker container is needed to get a clean system
 
     gradle dockerCleanRun
 
-To manually start the `indy-pool` container on ports 9701-9708: 
+To manually start the `indy-pool` container on ports 9701-9708 (version 1.7.0 here is correct): 
 
     docker pull teamblockchain/indy-pool:1.7.0
     docker create -p 9701-9708:9701-9708 --name indypool --rm teamblockchain/indy-pool:1.7.0

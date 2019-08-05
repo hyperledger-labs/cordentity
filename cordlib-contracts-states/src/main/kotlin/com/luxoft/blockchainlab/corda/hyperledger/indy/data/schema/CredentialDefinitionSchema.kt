@@ -24,10 +24,8 @@ object CredentialDefinitionSchemaV1 : MappedSchema(
 
     ) : PersistentState() {
         constructor(credentialDef: IndyCredentialDefinition) : this(
-            credentialDef.credentialDefinitionId.toString(),
-            credentialDef.schemaId.toString(),
-            credentialDef.credentialDefinitionId.getRevocationRegistryDefinitionId(IndyUser.REVOCATION_TAG).toString(),
-            credentialDef.currentCredNumber
+            credentialDef.id.toString(),
+            credentialDef.schemaId.toString()
         )
     }
 }
