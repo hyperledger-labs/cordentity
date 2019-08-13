@@ -1,8 +1,10 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy.data.state
 
+import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialDefinitionContract
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.schema.CredentialDefinitionSchemaV1
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialDefinitionId
 import com.luxoft.blockchainlab.hyperledger.indy.models.SchemaId
+import net.corda.core.contracts.BelongsToContract
 import net.corda.core.contracts.LinearState
 import net.corda.core.contracts.StateAndRef
 import net.corda.core.contracts.UniqueIdentifier
@@ -24,9 +26,11 @@ import net.corda.core.schemas.QueryableState
  * @param id                                id of this credential definition
  * @param participants                      corda participants
  */
+@BelongsToContract(IndyCredentialDefinitionContract::class)
 data class IndyCredentialDefinition(
     val id: CredentialDefinitionId,
     val schemaId: SchemaId,
+    val enableRevocation: Boolean,
     override val participants: List<AbstractParty>
 ) : LinearState, QueryableState {
 

@@ -1,5 +1,10 @@
 apply plugin: 'net.corda.plugins.cordapp'
 
+cordapp {
+    targetPlatformVersion 4
+    minimumPlatformVersion 4
+}
+
 dependencies {
     cordaCompile "${corda_release_group}:corda-core:${corda_release_version}"
     cordaCompile "${corda_release_group}:corda-rpc:${corda_release_version}"
@@ -8,7 +13,10 @@ dependencies {
 
     testCompile "$corda_release_group:corda-node-driver:${corda_release_version}"
 
-    cordapp project(":cordentity-cordapp-contracts-states")
+    //TODO: there is bug which excludes cordentity-indy-utils from cordapp, because it is dependency of dependency cordapp
+    cordapp(project(":cordentity-cordapp-contracts-states")) {
+        transitive = false
+    }
     compile project(':cordentity-indy-utils')
 
     compile (project(':cordentity-cordlib')){

@@ -1,9 +1,11 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy.data.state
 
+import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialContract
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.schema.CredentialProofSchemaV1
 import com.luxoft.blockchainlab.hyperledger.indy.models.DataUsedInProofJson
 import com.luxoft.blockchainlab.hyperledger.indy.models.ProofInfo
 import com.luxoft.blockchainlab.hyperledger.indy.models.ProofRequest
+import net.corda.core.contracts.BelongsToContract
 import net.corda.core.contracts.LinearState
 import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.identity.AbstractParty
@@ -21,6 +23,7 @@ import net.corda.core.schemas.QueryableState
  * @param participants      list of corda participants
  * @param linearId          corda id
  */
+@BelongsToContract(IndyCredentialContract::class)
 open class IndyCredentialProof(
     val id: String,
     val proofReq: ProofRequest,

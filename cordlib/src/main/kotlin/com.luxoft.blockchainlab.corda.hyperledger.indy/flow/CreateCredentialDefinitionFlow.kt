@@ -2,15 +2,16 @@ package com.luxoft.blockchainlab.corda.hyperledger.indy.flow
 
 import co.paralleluniverse.fibers.Suspendable
 import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyCredentialDefinitionContract
-import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndySchemaContract
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredentialDefinition
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.getSchemaById
 import com.luxoft.blockchainlab.hyperledger.indy.IndySchemaNotFoundException
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialDefinition
 import com.luxoft.blockchainlab.hyperledger.indy.models.SchemaId
 import net.corda.core.contracts.Command
-import net.corda.core.contracts.StateAndContract
-import net.corda.core.flows.*
+import net.corda.core.flows.FlowException
+import net.corda.core.flows.FlowLogic
+import net.corda.core.flows.InitiatingFlow
+import net.corda.core.flows.StartableByRPC
 import net.corda.core.transactions.TransactionBuilder
 
 
@@ -46,30 +47,20 @@ object CreateCredentialDefinitionFlow {
                 val credentialDefinition = IndyCredentialDefinition(
                     credentialDefinitionId,
                     schemaId,
+                    enableRevocation,
                     listOf(ourIdentity)
                 )
-                val credentialDefinitionOut =
-                    StateAndContract(credentialDefinition, IndyCredentialDefinitionContract::class.java.name)
                 val credentialDefinitionCmdType = IndyCredentialDefinitionContract.Command.Create()
                 val credentialDefinitionCmd = Command(credentialDefinitionCmdType, signers)
 
-                // consume old schema state
                 val schemaIn = getSchemaById(schemaId)
                     ?: throw IndySchemaNotFoundException(schemaId, "Corda does't have proper schema in vault")
 
-                val schemaOut = StateAndContract(schemaIn.state.data, IndySchemaContract::class.java.name)
-                val schemaCmdType = IndySchemaContract.Command.Consume()
-                val schemaCmd = Command(schemaCmdType, signers)
-
                 // do stuff
                 val trxBuilder = TransactionBuilder(whoIsNotary())
-                    .withItems(
-                        schemaIn,
-                        credentialDefinitionOut,
-                        credentialDefinitionCmd,
-                        schemaOut,
-                        schemaCmd
-                    )
+                    .addOutputState(credentialDefinition)
+                    .addCommand(credentialDefinitionCmd)
+                    .addReferenceState(schemaIn.referenced())
 
                 trxBuilder.toWireTransaction(serviceHub)
                     .toLedgerTransaction(serviceHub)
@@ -77,7 +68,7 @@ object CreateCredentialDefinitionFlow {
 
                 val selfSignedTx = serviceHub.signInitialTransaction(trxBuilder, ourIdentity.owningKey)
 
-                subFlow(FinalityFlow(selfSignedTx))
+                finalizeTransaction(selfSignedTx)
 
                 return credentialDefinitionObj
 
