@@ -1,5 +1,12 @@
 apply plugin: 'net.corda.plugins.quasar-utils'
 
+task installQuasar(type: Copy) {
+    destinationDir rootProject.file("lib")
+    from(configurations.quasar) {
+        rename 'quasar-core(.*).jar', 'quasar.jar'
+    }
+}
+
 dependencies {
     implementation "${corda_release_group}:corda-core:${corda_release_version}"
     implementation "${corda_release_group}:corda-rpc:${corda_release_version}"

@@ -52,6 +52,18 @@ interface SsiUser {
     ): RevocationRegistryInfo
 
     /**
+     * Returns revocation registry info ([RevocationRegistryInfo]) for credential definition if there's one on ledger.
+     * Otherwise returns null
+     *
+     * @param credentialDefinitionId    credential definition id
+     *
+     * @return                          created
+     */
+    fun getRevocationRegistryDefinition(
+            credentialDefinitionId: CredentialDefinitionId
+    ): RevocationRegistryDefinition?
+
+    /**
      * Creates [CredentialOffer] using [WalletUser]
      *
      * @param credentialDefinitionId [CredentialDefinitionId]

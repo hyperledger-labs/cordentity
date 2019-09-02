@@ -1,8 +1,10 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy.data.state
 
+import com.luxoft.blockchainlab.corda.hyperledger.indy.contract.IndyRevocationRegistryContract
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.schema.RevocationRegistryDefinitionSchemaV1
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialDefinitionId
 import com.luxoft.blockchainlab.hyperledger.indy.models.RevocationRegistryDefinitionId
+import net.corda.core.contracts.BelongsToContract
 import net.corda.core.contracts.LinearState
 import net.corda.core.contracts.StateAndRef
 import net.corda.core.contracts.UniqueIdentifier
@@ -26,6 +28,7 @@ import net.corda.core.schemas.QueryableState
  * @param credentialsLimit [Int]
  * @param currentCredNumber [Int]
  */
+@BelongsToContract(IndyRevocationRegistryContract::class)
 data class IndyRevocationRegistryDefinition(
     val id: RevocationRegistryDefinitionId,
     val credentialDefinitionId: CredentialDefinitionId,

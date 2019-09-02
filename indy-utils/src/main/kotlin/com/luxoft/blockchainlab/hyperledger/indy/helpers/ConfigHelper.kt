@@ -1,7 +1,6 @@
 package com.luxoft.blockchainlab.hyperledger.indy.helpers
 
 import com.natpryce.konfig.*
-import java.nio.file.Path
 import java.nio.file.Paths
 
 /**
@@ -49,6 +48,8 @@ object ConfigHelper : IndyConfiguration {
     override fun getWalletPassword() = config.getOrNull(indyuser.walletPassword)
 
     override fun getPoolName() = config.getOrNull(indyuser.poolName)
+
+    override fun getTailsPath() = config.getOrNull(indyuser.tailsPath)
 }
 
 @Suppress("ClassName")
@@ -63,6 +64,7 @@ object indyuser : PropertyGroup() {
     val agentWSEndpoint by stringType
     val agentUser by stringType
     val agentPassword by stringType
+    val tailsPath by stringType
 }
 
 interface IndyConfiguration {
@@ -86,4 +88,6 @@ interface IndyConfiguration {
     fun getAgentUser(): String?
 
     fun getAgentPassword(): String?
+
+    fun getTailsPath(): String?
 }

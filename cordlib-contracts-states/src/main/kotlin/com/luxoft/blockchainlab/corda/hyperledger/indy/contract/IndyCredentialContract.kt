@@ -1,7 +1,9 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy.contract
 
+import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredential
+import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredentialDefinition
 import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyCredentialProof
-import com.luxoft.blockchainlab.hyperledger.indy.IndyUser
+import com.luxoft.blockchainlab.corda.hyperledger.indy.data.state.IndyRevocationRegistryDefinition
 import net.corda.core.contracts.CommandData
 import net.corda.core.contracts.Contract
 import net.corda.core.contracts.TypeOnlyCommandData
@@ -34,7 +36,10 @@ class IndyCredentialContract : Contract {
     }
 
     private fun revocation(tx: LedgerTransaction, signers: Set<PublicKey>) = requireThat {
-        // TODO: should contain 1 input state of type IndyCredential
+        val credential = tx.inputsOfType<IndyCredential>()
+
+        "Should contain only one IndyCredential state" using (credential.size == 1)
+        "Shouldn't contain any other state" using (tx.inputStates.size == 1 && tx.outputStates.isEmpty())
     }
 
     private fun verification(tx: LedgerTransaction, signers: Set<PublicKey>) =
@@ -50,8 +55,19 @@ class IndyCredentialContract : Contract {
         }
 
     private fun creation(tx: LedgerTransaction, signers: Set<PublicKey>) = requireThat {
-        // TODO: should contain 1 input and 1 output states of type IndyRevocationRegistryDefinition
-        // TODO: should contain 1 output state of type IndyCredential
+        val credential = tx.outputsOfType<IndyCredential>()
+        val credDef = tx.referenceInputsOfType<IndyCredentialDefinition>()
+
+        "Should contain exact one output IndyCredential" using (credential.size == 1)
+        "Should contain exact one referent IndyCredentialDefinition" using (credDef.size == 1)
+
+        if (credDef.first().enableRevocation) {
+            val revRegIn = tx.inputsOfType<IndyRevocationRegistryDefinition>()
+            val revRegOut = tx.outputsOfType<IndyRevocationRegistryDefinition>()
+
+            "Should contain one same input and output IndyRevocationRegistryDefinition state" using
+                    (revRegIn.size == 1 && revRegOut.size == 1 && revRegIn.first().id == revRegOut.first().id)
+        }
     }
 
     @CordaSerializable

@@ -1,11 +1,16 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy
 
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
+import mu.KotlinLogging
+import rx.Single
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Represents remote Indy Party
  */
 class IndyParty(private val webSocket: AgentWebSocketClient, val did: String, val endpoint: String, val verkey: String, val myDid : String) : IndyPartyConnection {
+
+    private val log = KotlinLogging.logger {}
 
     /**
      * Returns the connected Indy Party session DID
@@ -86,5 +91,46 @@ class IndyParty(private val webSocket: AgentWebSocketClient, val did: String, va
      * @return observable (Single<>) object emitting a single [ProofInfo] upon subscription
      */
     override fun receiveProof() = webSocket.receiveClassObject<ProofInfo>(this)
+
+    /**
+     * Returns observable ([Single]<>) object, emitting JSON-encocoded Tails file by the given tails hash.
+     *
+     * @param tailsHash string-encocoded Tails file
+     *
+     * @return observable ([Single]<>) object emitting [TailsResponse] object
+     */
+    override fun requestTails(tailsHash: String) : Single<TailsResponse> {
+        val result : Single<TailsResponse> = webSocket.receiveClassObject(this)
+        webSocket.sendClassObject(TailsRequest(tailsHash), this)
+        return result
+    }
+
+    private val requestHandlerRef: AtomicReference<(TailsRequest)->TailsResponse> =
+        AtomicReference<(TailsRequest)->TailsResponse> { TailsResponse(it.tailsHash, mapOf())}
+
+    private lateinit var tailRequestMessageHandler: (TailsRequest) -> Unit
+
+    init {
+        tailRequestMessageHandler = {
+            try {
+                val tailsResponse = requestHandlerRef.get().invoke(it)
+                webSocket.sendClassObject(tailsResponse, this)
+            } catch (e: Throwable) {
+                log.error(e) { "Error processing tails request" }
+            } finally {
+                webSocket.receiveClassObject<TailsRequest>(this).subscribe(tailRequestMessageHandler, {})
+            }
+        }
+    }
+
+    /**
+     * Sets handler for client's tails file requests
+     *
+     * @param handler a function producing [TailsResponse] from [TailsRequest]
+     */
+    override fun handleTailsRequestsWith(handler: (TailsRequest) -> TailsResponse) {
+        webSocket.receiveClassObject<TailsRequest>(this).subscribe(tailRequestMessageHandler, {})
+        requestHandlerRef.set(handler)
+    }
 }
 
