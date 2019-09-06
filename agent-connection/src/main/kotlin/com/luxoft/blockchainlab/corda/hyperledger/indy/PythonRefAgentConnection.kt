@@ -465,17 +465,18 @@ class PythonRefAgentConnection : AgentConnection {
             }
         }
     }
-    private fun subscribeOnRequestReceived() {
+    private fun subscribeOnRequestReceived(timeoutMs: Long) {
         /**
          * On an incoming connection request, the agent must send the "request_received"
          */
         var unsubscribe: ()->Unit = {}
         var sub2: Subscription? = null
         val subscription = webSocket.receiveMessageOfType<RequestReceivedMessage>(MESSAGE_TYPES.REQUEST_RECEIVED)
-                .timeout(operationTimeoutMs, TimeUnit.MILLISECONDS)
+                .timeout(timeoutMs, TimeUnit.MILLISECONDS)
                 .subscribe ({
             /**
-             * On the "request_received" message, reply with "send_response" with remote DID to any incoming connection request.
+             * On the "request_received" m
+             * essage, reply with "send_response" with remote DID to any incoming connection request.
              * At this stage it doesn't matter which party sent the connection request, because it's not possible to correlate
              * "request_received" message and the invite. For the purpose of PoC we reply with "send_response"
              * on each "request_received", no matter which party is on the other side.
@@ -484,7 +485,7 @@ class PythonRefAgentConnection : AgentConnection {
              * TODO: so that it's possible to correlate "request_received" which includes "request" and the invite
              */
             sub2 = webSocket.receiveMessageOfType<RequestResponseSentMessage>(MESSAGE_TYPES.RESPONSE_SENT, it.did)
-                    .timeout(operationTimeoutMs, TimeUnit.MILLISECONDS)
+                    .timeout(timeoutMs, TimeUnit.MILLISECONDS)
                     .subscribe ({
                 log.info { "Accepted connection request from ${it.did}" }
             }, { unsubscribe() })
@@ -505,7 +506,7 @@ class PythonRefAgentConnection : AgentConnection {
                      * Subscribe on "request_received" so to make sure the request is processed when/if it comes.
                      * It's nothing wrong if it doesn't come (for example, it's been processed earlier).
                      */
-                    subscribeOnRequestReceived()
+                    subscribeOnRequestReceived(timeoutMs)
                     val pubKey = getPubkeyFromInvite(invite)
                     /**
                      * Wait until the STATE has pairwise connection corresponding to the invite.
