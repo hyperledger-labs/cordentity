@@ -5,6 +5,7 @@ import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialOffer
 import com.luxoft.blockchainlab.hyperledger.indy.models.KeyCorrectnessProof
 import com.luxoft.blockchainlab.hyperledger.indy.models.TailsResponse
 import com.yunusoksuz.tcpproxy.Connection
+import mu.KotlinLogging
 import org.junit.Test
 import rx.Observable
 import rx.Single
@@ -19,6 +20,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketException
+import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 import kotlin.math.absoluteValue
 
@@ -49,6 +51,8 @@ class PythonRefAgentConnectionTest {
                             disconnect()
                         }, {
                             println("!!!Error accepting invite: $it")
+                            it.printStackTrace()
+                            disconnect()
                         })
                     }
                 }
@@ -67,7 +71,7 @@ class PythonRefAgentConnectionTest {
             if (!tailsDir.exists())
                 tailsDir.mkdirs()
             PythonRefAgentConnection().apply {
-                connect(agentUrl, "User$rand", "pass$rand").toBlocking().value()
+                connect(agentUrl, "User$rand", "pass$rand", timeoutMs = 120000).toBlocking().value()
                 val invitedPartiesCompleted = mutableListOf<Observable<Boolean>>()
                 invitedPartyAgents.forEach { agentUrl ->
                     val party = InvitedPartyProcess(agentUrl)
@@ -79,11 +83,16 @@ class PythonRefAgentConnectionTest {
                                 invitedParty.handleTailsRequestsWith {
                                     TailsHelper.DefaultReader(tailsDir.absolutePath).read(it)
                                 }
-                                invitedParty.receiveCredentialOffer().subscribe { credOffer ->
+                                invitedParty.receiveCredentialOffer().timeout(120, TimeUnit.SECONDS).subscribe ({ credOffer ->
                                     assertEquals(credOffer?.schemaIdRaw, party.proofSchemaId)
                                     observer.onNext(true)
                                     observer.onCompleted()
-                                }
+                                },{
+                                    println("Error while waiting for invited party: $it")
+                                    it.printStackTrace()
+                                    observer.onNext(false)
+                                    observer.onCompleted()
+                                })
                             }, {
                                 observer.onNext(false)
                                 println("Error while waiting for invited party: $it")
@@ -165,12 +174,14 @@ class PythonRefAgentConnectionTest {
             agentConnection.disconnect()
         }
     }
-    class ExtraClient (private val agentUrl: String) {
+    class ExtraClient (val agentUrl: String) {
+
         private lateinit var agentConnection: PythonRefAgentConnection
+        val username = "User-${Random().nextInt().absoluteValue}"
         fun connect(timeoutMs: Long = 10000) : Single<Unit>  {
             val rand = Random().nextInt()
             agentConnection = PythonRefAgentConnection()
-            return agentConnection.connect(agentUrl, "User$rand", "pass$rand", timeoutMs)
+            return agentConnection.connect(agentUrl, username, "pass$rand", timeoutMs)
         }
         fun disconnect() {
             agentConnection.disconnect()
@@ -304,18 +315,13 @@ class PythonRefAgentConnectionTest {
         assert(i.get() == 0)
     }
 
-    class ProxyProcess(private val proxiesList: List<Pair<Int, Int>>) {
-        private var proxyConnections: MutableList<ProxyConnection> = mutableListOf()
+    class RandomFailuresProcess(private val agentUrls: List<String>) {
         private var randomFailures: Thread? = null
         fun start() {
-            proxiesList.forEach { pair ->
-                val (input, output) = pair
-                proxyConnections.add(ProxyConnection(input, output).apply { connect() })
-            }
             randomFailures = Thread {
                 try {
                     while (!Thread.currentThread().isInterrupted) {
-                        Thread.sleep(Random().nextLong().absoluteValue % 8000)
+                        Thread.sleep(5000 + Random().nextLong().absoluteValue % 5000)
                         randomReset()
                     }
                 } catch (e: InterruptedException) {
@@ -323,39 +329,40 @@ class PythonRefAgentConnectionTest {
             }.apply { start() }
         }
         private fun randomReset() {
-            proxyConnections[Random().nextInt().absoluteValue % proxyConnections.size].apply {
-                disconnect()
-                Thread.sleep(500)
-                connect()
+
+            val logger = KotlinLogging.logger {}
+
+            ExtraClient(
+                agentUrls[Random().nextInt().absoluteValue % agentUrls.size]
+            ).apply {
+                try {
+//                    logger.error { "!!!Interrupting connection to $agentUrl as user ${this.username}" }
+//                    connect().subscribe({ disconnect() }, {
+//                        it.printStackTrace()
+//                        throw it
+//                    })
+                } catch (e: Exception) {
+                    logger.error { "!!!Failed interrupting connection to $agentUrl as user ${this.username} due to ${e.localizedMessage}" }
+                    e.printStackTrace()
+                }
             }
         }
         fun stop() {
             if (randomFailures?.isAlive == true)
                     randomFailures?.interrupt()
-            proxyConnections.forEach {
-                it.disconnect()
-            }
-            proxyConnections.removeAll { true }
         }
     }
 
     private val invitedPartyAgentsProxies = listOf(
-            "ws://127.0.0.1:8084/ws",
-            "ws://127.0.0.1:8086/ws",
-            "ws://127.0.0.1:8087/ws",
-            "ws://127.0.0.1:8088/ws",
-            "ws://127.0.0.1:8089/ws"
+            "ws://127.0.0.1:8094/ws",
+            "ws://127.0.0.1:8096/ws",
+            "ws://127.0.0.1:8097/ws",
+            "ws://127.0.0.1:8098/ws",
+            "ws://127.0.0.1:8099/ws"
     )
-    private val proxiesConfig = listOf(
-            Pair(8084, 8094),
-            Pair(8086, 8096),
-            Pair(8087, 8097),
-            Pair(8088, 8098),
-            Pair(8089, 8099)
-    )
-//    @Test
+    @Test
     fun `main load test with randomized proxy connection failures`() {
-        val proxies = ProxyProcess(proxiesConfig).apply { start() }
+        val proxies = RandomFailuresProcess(invitedPartyAgentsProxies).apply { start() }
         repeat(10) {
             val master = MasterProcess(masterAgent, invitedPartyAgentsProxies).apply { start() }
             if (!master.testOk)

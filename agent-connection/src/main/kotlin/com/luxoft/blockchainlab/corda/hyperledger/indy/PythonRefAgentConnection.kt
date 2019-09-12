@@ -56,45 +56,25 @@ class PythonRefAgentConnection : AgentConnection {
          * Check the agent's current state.
          * The agent will respond with the "state" message
          */
-        var unsubscribe: ()->Unit = {}
-        var sub2: Subscription? = null
-        val subscription = webSocket.receiveMessageOfType<State>(MESSAGE_TYPES.STATE_RESPONSE)
-                .timeout(operationTimeoutMs, TimeUnit.MILLISECONDS)
-                .subscribe({ stateResponse ->
-            try {
-                if (!checkUserLoggedIn(stateResponse, login)) {
-
-                    sub2 = webSocket.receiveMessageOfType<State>(MESSAGE_TYPES.STATE_RESPONSE)
-                            .timeout(operationTimeoutMs, TimeUnit.MILLISECONDS)
-                            .subscribe({ newState ->
-                        try {
-                            if (!checkUserLoggedIn(newState, login)) {
-                                log.error { "Unable to connect to Wallet $login" }
-                                throw AgentConnectionException("Error connecting to $url as $login")
-                            } else {
-                                observer.onNext(Unit)
-                            }
-                        } catch (e: Throwable) {
-                            observer.onError((e))
-                        }
-                    }, { e: Throwable -> observer.onError((e)); unsubscribe() })
-
-                    /**
-                     * If the agent is logged in by different user, send the "connect" request
-                     * to take over the connection
-                     */
-                    sendAsJson(WalletConnect(login, password))
-
-                } else {
-                    observer.onNext(Unit)
-                }
-            } catch (e: Throwable) {
-                observer.onError((e))
+        var checker: ((State)->Unit)? = null
+        val handler: (Throwable)->Unit = { observer.onError(it) }
+        checker = { stateResponse ->
+            if (!checkUserLoggedIn(stateResponse, login)) {
+                webSocket.receiveMessageOfType<State>(MESSAGE_TYPES.STATE_RESPONSE)
+                    .timeout(operationTimeoutMs, TimeUnit.MILLISECONDS)
+                    .subscribe( checker, handler)
+                /**
+                 * If the agent is logged in by different user, send the "connect" request
+                 * to take over the connection
+                 */
+                sendAsJson(WalletConnect(login, password))
+            } else {
+                observer.onNext(Unit)
             }
-        }, { e: Throwable -> observer.onError(e); unsubscribe() })
-
-        unsubscribe = { subscription.unsubscribe(); sub2?.unsubscribe() }
-
+        }
+        webSocket.receiveMessageOfType<State>(MESSAGE_TYPES.STATE_RESPONSE)
+            .timeout(operationTimeoutMs, TimeUnit.MILLISECONDS)
+            .subscribe(checker, handler)
         /**
          * Send the state request
          */
@@ -116,6 +96,7 @@ class PythonRefAgentConnection : AgentConnection {
                     log.error { "Will attempt to reconnect $login to $url in ${retryTimeoutMs}ms" }
                     Thread.sleep(retryTimeoutMs)
                     if (!stopReconnecting.compareAndSet(true, true)) {
+                        log.error { "Attempting to reconnect $login to $url..." }
                         Observable.create<Unit> { connectionObserver ->
                             try {
                                 if (!observer.isUnsubscribed) {
@@ -193,18 +174,18 @@ class PythonRefAgentConnection : AgentConnection {
         /**
          * reset event handlers
          */
-        onCloseSubscription.unsubscribe()
-        onReconnectSubscription.unsubscribe()
+        webSocket.onCloseUnsubscribeAll()
+        webSocket.onReconnectUnsubscribeAll()
+        //onCloseSubscription.unsubscribe()
+        //onReconnectSubscription.unsubscribe()
 
         if (getConnectionStatus() == AgentConnectionStatus.AGENT_CONNECTED) {
             webSocket.closeBlocking()
         }
-        if (isReconnecting.get()) {
-            /**
-             * break reconnection loop
-             */
-            stopReconnecting.compareAndSet(false, true)
-        }
+        /**
+         * break reconnection loop
+         */
+        stopReconnecting.compareAndSet(false, true)
         clear()
     }
 
@@ -222,13 +203,20 @@ class PythonRefAgentConnection : AgentConnection {
                 try {
                     webSocket = AgentWebSocketClient(URI(url), login)
                     webSocket.apply {
-                        onCloseSubscription = onSocketCloseSubscription().subscribe { isRemote ->
+                        onCloseAddObserver().subscribe { isRemote ->
                             connectionStatus = AgentConnectionStatus.AGENT_DISCONNECTED
                             doReconnect(false) // reconnect in non-blocking mode
                         }
-                        onReconnectSubscription = onClosedSocketOperation().subscribe { isBlocking ->
+                        onReconnectAddObserver().subscribe { isBlocking ->
                             doReconnect(isBlocking)
                         }
+//                        onCloseSubscription = onSocketCloseSubscription().subscribe { isRemote ->
+//                            connectionStatus = AgentConnectionStatus.AGENT_DISCONNECTED
+//                            doReconnect(false) // reconnect in non-blocking mode
+//                        }
+//                        onReconnectSubscription = onClosedSocketOperation().subscribe { isBlocking ->
+//                            doReconnect(isBlocking)
+//                        }
                         if(!connectBlocking())
                             throw AgentConnectionException(webSocket.reason ?: "Error connecting to $url")
                         else
@@ -435,12 +423,21 @@ class PythonRefAgentConnection : AgentConnection {
                 /**
                  * Subscribe for the response
                  */
-                val single = webSocket.receiveMessageOfType<ObjectNode>(MESSAGE_TYPES.STATE_RESPONSE).toBlocking().toFuture()
+                val single = webSocket.receiveMessageOfType<ObjectNode>(MESSAGE_TYPES.STATE_RESPONSE)
+                    .toObservable()
+                    .timeout(10000, TimeUnit.MILLISECONDS)
+                    .toBlocking()
                 /**
                  * After subscription send the state request
                  */
                 sendAsJson(StateRequest())
-                processStateResponse(single.get())
+                try {
+                    processStateResponse(single.single())
+                } catch (e: Exception) {
+                    log.error { "Will attempt to retry due to ${e.localizedMessage}" }
+                } catch (interrupted: InterruptedException) {
+                    log.error { "Interrupted while waiting for StateResponse: ${interrupted.localizedMessage}" }
+                }
                 /**
                  * Sleep to reduce polling the (local) agent
                  */
