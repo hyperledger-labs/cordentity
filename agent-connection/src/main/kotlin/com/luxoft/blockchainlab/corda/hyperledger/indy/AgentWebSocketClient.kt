@@ -181,7 +181,6 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
         val key = when (type) {
             MESSAGE_TYPES.STATE_RESPONSE,
             MESSAGE_TYPES.INVITE_GENERATED,
-            MESSAGE_TYPES.REQUEST_RECEIVED,
             MESSAGE_TYPES.MESSAGE_SENT,
             MESSAGE_TYPES.REQUEST_SENT ->
                 type
@@ -214,6 +213,9 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
                  */
                 "$type.${obj["did"].asText()}"
 
+            MESSAGE_TYPES.REQUEST_RECEIVED ->
+                "$type.${obj["connection_key"].asText()}"
+
             else -> null
         } ?: throw AgentConnectionException("Unexpected message type: $type")
 
@@ -227,7 +229,7 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
     }
 
     override fun onError(ex: Exception?) {
-        log.warn(ex) { "AgentConnection error" }
+        log.warn(ex) { "$socketName:AgentConnection error" }
     }
 
     /**
@@ -235,13 +237,17 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
      */
     fun sendAsJson(obj: Any) {
         val message = SerializationUtils.anyToJSON(obj)
-        log.info { "$socketName:SendMessage: $message" }
-        if (!isOpen)
+        if (!isOpen) {
             notifyOnReconnect(true) // notify in blocking mode
+            log.info { "Notified in blocking mode" }
+        }
         if (!isOpen) {
             dataStorage.cancelAll()
             throw AgentConnectionException("WebSocket failed to reconnect.")
-        } else send(message)
+        } else {
+            log.info { "$socketName:SendMessage: $message" }
+            send(message)
+        }
     }
 
     /**

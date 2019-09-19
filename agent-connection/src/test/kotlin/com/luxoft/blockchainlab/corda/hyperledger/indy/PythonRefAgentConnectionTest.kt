@@ -1,10 +1,10 @@
 package com.luxoft.blockchainlab.corda.hyperledger.indy
 
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.TailsHelper
+import com.luxoft.blockchainlab.hyperledger.indy.logger
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialOffer
 import com.luxoft.blockchainlab.hyperledger.indy.models.KeyCorrectnessProof
 import com.luxoft.blockchainlab.hyperledger.indy.models.TailsResponse
-import com.yunusoksuz.tcpproxy.Connection
 import mu.KotlinLogging
 import org.junit.Test
 import rx.Observable
@@ -21,6 +21,7 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketException
 import java.util.concurrent.TimeUnit
+import kotlin.Exception
 import kotlin.concurrent.thread
 import kotlin.math.absoluteValue
 
@@ -35,22 +36,23 @@ class PythonRefAgentConnectionTest {
         fun start(invitationString: String) {
             val rand = Random().nextInt()
             PythonRefAgentConnection().apply {
-                connect(agentUrl, "User$rand", "pass$rand").handle { _, ex ->
+                connect(agentUrl, "User-$rand", "pass-$rand").handle { _, ex ->
                     if (ex != null) {
                         println("Error connecting User-$rand to $agentUrl: ${ex.message!!}")
                     } else {
                         acceptInvite(invitationString).subscribe ({ master ->
+                            logger.info { "!!!Client User-$rand connected to ${master.partyDID()}" }
                             val tails = master.requestTails(tailsHash).toBlocking().value().tails[tailsHash]
                             if (tails?.toString(Charsets.UTF_8) != tailsHash)
                                 println("Tails file content doesn't match!!! hash $tailsHash, received $tails")
                             else {
                                 val offer = CredentialOffer(proofSchemaId, ":::1", KeyCorrectnessProof("", "", emptyList()), "")
                                 master.sendCredentialOffer(offer)
-                                println("Client User$rand completed successfully")
+                                println("Client User-$rand completed successfully")
                             }
                             disconnect()
                         }, {
-                            println("!!!Error accepting invite: $it")
+                            println("!!!Error accepting invite (User-$rand): $it")
                             it.printStackTrace()
                             disconnect()
                         })
@@ -80,6 +82,7 @@ class PythonRefAgentConnectionTest {
                     invitedPartiesCompleted.add(Observable.create { observer ->
                         generateInvite().subscribe ({invitation ->
                             waitForInvitedParty(invitation).subscribe ({ invitedParty ->
+                                logger.info { "!!!Remote user ${invitedParty.partyDID()} connected" }
                                 invitedParty.handleTailsRequestsWith {
                                     TailsHelper.DefaultReader(tailsDir.absolutePath).read(it)
                                 }
@@ -131,7 +134,7 @@ class PythonRefAgentConnectionTest {
             "ws://127.0.0.1:8098/ws",
             "ws://127.0.0.1:8099/ws"
             )
-    private val masterAgent = "ws://127.0.0.1:8095/ws"
+    private val masterAgent = "ws://127.0.0.1:8092/ws"
 
     @Test
     fun `externalTest`() = repeat(10) {
@@ -239,36 +242,89 @@ class PythonRefAgentConnectionTest {
     }
 
     class ProxyConnection(private val localPort: Int, private val remotePort: Int) {
+        companion object {
+            val logger = KotlinLogging.logger {}
+        }
+        class Proxy (private val input: Socket, private val out: Socket) : Runnable {
+            override fun run() {
+                logger.info { "New proxy: ${input.inetAddress.hostName}:${input.port} --> ${out.inetAddress.hostName}:${out.port}" }
+                val inputStream = input.getInputStream()
+                val outputStream = out.getOutputStream()
+                var readBytes = 0
+                val data = ByteArray(4096)
+                while (readBytes != -1 && !Thread.currentThread().isInterrupted) {
+                    try {
+                        readBytes = inputStream.read(data)
+                        if (readBytes > 0)
+                            outputStream.write(data, 0, readBytes)
+                    } catch (e: Exception) {
+//                        logger.error { "Exception in proxy: ${input.inetAddress.hostName}:${input.port} --> ${out.inetAddress.hostName}:${out.port}" }
+                        break
+                    }
+                }
+                var bytesRemaining = inputStream.available()
+                while (bytesRemaining > 0 && readBytes > 0) {
+                    readBytes = inputStream.read(data, 0, bytesRemaining % 4096)
+                    outputStream.write(data, 0, readBytes)
+                    bytesRemaining -= readBytes
+                }
+                if (Thread.currentThread().isInterrupted)
+                    logger.error { "!!!Proxy thread ${input.inetAddress.hostName}:${input.port} --> ${out.inetAddress.hostName}:${out.port} interrupted!!!" }
+                out.shutdownOutput()
+            }
+        }
+        class Conn(private val connection: Socket, private val ip: String, private val port: Int) : Runnable {
+            override fun run() {
+                logger.info { "New proxy destination: $ip:$port" }
+                val serverConnection = Socket(ip, port)
+                logger.info { "Creating proxy ${connection.inetAddress.hostName}:${connection.port} <-> ${serverConnection.inetAddress.hostName}:${serverConnection.port}" }
+                val forwardProxy = thread { Proxy(connection, serverConnection).run() }
+                val reverseProxy = thread { Proxy(serverConnection, connection).run() }
+                try {
+                    forwardProxy.join()
+                    reverseProxy.join()
+                } catch (e: Throwable) {
+                    logger.error { "!!!Proxy connection interrupted!!!" }
+                    forwardProxy.interrupt()
+                    reverseProxy.interrupt()
+                } finally {
+                    logger.info { "Proxy connection to $ip:$port terminated." }
+                }
+            }
+        }
         private lateinit var serverSocket: ServerSocket
         private lateinit var socket: Socket
         private lateinit var proxyThread: Thread
         private lateinit var listener: Thread
-        private lateinit var proxyConnection: Connection
+        private lateinit var proxyConnection: Conn
         fun connect() {
             serverSocket = ServerSocket(localPort)
             listener = thread {
                 while (!Thread.currentThread().isInterrupted) {
                     try {
                         socket = serverSocket.accept()
-                        proxyConnection = Connection(socket, "127.0.0.1", remotePort)
+                        proxyConnection = Conn(socket, "127.0.0.1", remotePort)
                         proxyThread = Thread(proxyConnection).apply { start() }
                     } catch (e: SocketException) {}
                 }
+                logger.error { "!!!Listener interrupted!!!" }
             }
+            Thread.sleep(100)
         }
         fun disconnect() {
             listener.interrupt()
             serverSocket.close()
-            if (!socket.isClosed)
-                socket.shutdownOutput()
-            val serverConnectionSocket = proxyConnection.javaClass.getDeclaredField("serverConnection").run {
-                isAccessible = true
-                get(proxyConnection)
-            } as Socket
-            if (!serverConnectionSocket.isClosed)
-                serverConnectionSocket.shutdownInput()
-            Thread.sleep(100)
+//            if (!socket.isClosed)
+//                socket.shutdownOutput()
+//            val serverConnectionSocket = proxyConnection.javaClass.getDeclaredField("serverConnection").run {
+//                isAccessible = true
+//                get(proxyConnection)
+//            } as Socket
+//            if (!serverConnectionSocket.isClosed)
+//                serverConnectionSocket.shutdownInput()
+//            Thread.sleep(100)
             proxyThread.interrupt()
+            proxyThread.join()
         }
     }
 
@@ -315,9 +371,14 @@ class PythonRefAgentConnectionTest {
         assert(i.get() == 0)
     }
 
-    class RandomFailuresProcess(private val agentUrls: List<String>) {
+    class RandomFailuresProcess(private val proxiesList: List<Pair<Int, Int>>) {
+        private var proxyConnections: MutableList<ProxyConnection> = mutableListOf()
         private var randomFailures: Thread? = null
         fun start() {
+            proxiesList.forEach { pair ->
+                val (input, output) = pair
+                proxyConnections.add(ProxyConnection(input, output).apply { connect() })
+            }
             randomFailures = Thread {
                 try {
                     while (!Thread.currentThread().isInterrupted) {
@@ -329,41 +390,41 @@ class PythonRefAgentConnectionTest {
             }.apply { start() }
         }
         private fun randomReset() {
-
-            val logger = KotlinLogging.logger {}
-
-            ExtraClient(
-                agentUrls[Random().nextInt().absoluteValue % agentUrls.size]
-            ).apply {
-                try {
-//                    logger.error { "!!!Interrupting connection to $agentUrl as user ${this.username}" }
-//                    connect().subscribe({ disconnect() }, {
-//                        it.printStackTrace()
-//                        throw it
-//                    })
-                } catch (e: Exception) {
-                    logger.error { "!!!Failed interrupting connection to $agentUrl as user ${this.username} due to ${e.localizedMessage}" }
-                    e.printStackTrace()
-                }
+//            proxyConnections[Random().nextInt().absoluteValue % proxyConnections.size].apply {
+            proxyConnections[0].apply {
+                disconnect()
+                Thread.sleep(500)
+                connect()
             }
         }
         fun stop() {
             if (randomFailures?.isAlive == true)
                     randomFailures?.interrupt()
+            proxyConnections.forEach {
+                it.disconnect()
+            }
+            proxyConnections.removeAll { true }
         }
     }
 
     private val invitedPartyAgentsProxies = listOf(
-            "ws://127.0.0.1:8094/ws",
-            "ws://127.0.0.1:8096/ws",
-            "ws://127.0.0.1:8097/ws",
-            "ws://127.0.0.1:8098/ws",
-            "ws://127.0.0.1:8099/ws"
+            "ws://127.0.0.1:8084/ws",
+            "ws://127.0.0.1:8086/ws",
+            "ws://127.0.0.1:8087/ws",
+            "ws://127.0.0.1:8088/ws",
+            "ws://127.0.0.1:8089/ws"
+    )
+    private val proxiesConfig = listOf(
+            Pair(8084, 8093),
+            Pair(8086, 8096),
+            Pair(8087, 8097),
+            Pair(8088, 8098),
+            Pair(8089, 8099)
     )
     @Test
     fun `main load test with randomized proxy connection failures`() {
-        val proxies = RandomFailuresProcess(invitedPartyAgentsProxies).apply { start() }
-        repeat(10) {
+        val proxies = RandomFailuresProcess(proxiesConfig).apply { start() }
+        repeat(200) {
             val master = MasterProcess(masterAgent, invitedPartyAgentsProxies).apply { start() }
             if (!master.testOk)
                 throw AgentConnectionException("Master process didn't complete Ok")
