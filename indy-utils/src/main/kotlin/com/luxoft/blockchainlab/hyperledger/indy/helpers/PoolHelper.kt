@@ -8,6 +8,7 @@ import org.hyperledger.indy.sdk.pool.PoolLedgerConfigExistsException
 import java.io.File
 import java.io.FileNotFoundException
 import java.util.concurrent.ExecutionException
+import java.util.concurrent.TimeUnit
 
 
 /**
@@ -67,7 +68,7 @@ object PoolHelper {
         if (!exists(poolName))
             throw FileNotFoundException("Pool files ${EnvironmentUtils.getIndyPoolPath(poolName)} don't exist")
 
-        return Pool.openPoolLedger(poolName, poolConfig.toJson()).get()
+        return Pool.openPoolLedger(poolName, poolConfig.toJson()).get(5, TimeUnit.SECONDS)
     }
 
     /**

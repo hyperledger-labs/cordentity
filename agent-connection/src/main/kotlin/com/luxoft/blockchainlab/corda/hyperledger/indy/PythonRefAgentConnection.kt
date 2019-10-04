@@ -57,7 +57,10 @@ class PythonRefAgentConnection : AgentConnection {
          * The agent will respond with the "state" message
          */
         var checker: ((State)->Unit)? = null
-        val handler: (Throwable)->Unit = { observer.onError(it) }
+        val handler: (Throwable)->Unit = {
+            log.error { "!!!Handshake failure: $it" }
+            observer.onError(it)
+        }
         checker = { stateResponse ->
             if (!checkUserLoggedIn(stateResponse, login)) {
                 webSocket.receiveMessageOfType<State>(MESSAGE_TYPES.STATE_RESPONSE)
@@ -319,7 +322,7 @@ class PythonRefAgentConnection : AgentConnection {
                 var sub2: Subscription? = null
                 var sub3: Subscription? = null
                 val subscription = webSocket.receiveMessageOfType<InviteReceivedMessage>(MESSAGE_TYPES.INVITE_RECEIVED, pubKey)
-                    .subscribeOn(Schedulers.computation())
+                    .subscribeOn(Schedulers.newThread())
                     .timeout(operationTimeoutMs, TimeUnit.MILLISECONDS)
                     .subscribe({ invRcv ->
                         /**
@@ -337,7 +340,6 @@ class PythonRefAgentConnection : AgentConnection {
                                  * Wait until connection_key appears in the STATE
                                  */
                                 sub3 = waitForPairwiseConnection(pubKey)
-                                        .subscribeOn(Schedulers.computation())
                                         .timeout(operationTimeoutMs, TimeUnit.MILLISECONDS)
                                         .subscribe({ pairwise ->
                                     val theirDid = pairwise["their_did"].asText()
@@ -488,13 +490,15 @@ class PythonRefAgentConnection : AgentConnection {
     private fun waitForPairwiseConnection(pubKey: String): Single<JsonNode> {
         return Single.create { observer ->
             try {
+                log.info { "!!!subscribed to pairwise $pubKey!!!" }
                 /**
                  * Put the observer in the queue and notify the worker to poll the agent state.
                  * When the worker finds the public key in the parsed state, it will notify the observer.
                  */
-                if (pollAgentWorker?.isAlive != true)
+                if (pollAgentWorker?.isAlive != true) {
+                    log.error { "!!!No worker to poll for status!!!" }
                     observer.onError(AgentConnectionException("!!!No worker to poll for status!!!"))
-                else
+                } else
                     toProcessPairwiseConnections.put(pubKey to observer)
             } catch (e: Throwable) {
                 observer.onError(e)
@@ -508,7 +512,7 @@ class PythonRefAgentConnection : AgentConnection {
         var unsubscribe: ()->Unit = {}
         var sub2: Subscription? = null
         val subscription = webSocket.receiveMessageOfType<RequestReceivedMessage>(MESSAGE_TYPES.REQUEST_RECEIVED, pubKey)
-                .subscribeOn(Schedulers.computation())
+                .subscribeOn(Schedulers.newThread())
                 .timeout(timeoutMs, TimeUnit.MILLISECONDS)
                 .subscribe ({
 
@@ -519,9 +523,6 @@ class PythonRefAgentConnection : AgentConnection {
              * At this stage it doesn't matter which party sent the connection request, because it's not possible to correlate
              * "request_received" message and the invite. For the purpose of PoC we reply with "send_response"
              * on each "request_received", no matter which party is on the other side.
-             *
-             * TODO: suggest an improvement in pythonic indy-agent that incorporates the invite's public key in the "request" message,
-             * TODO: so that it's possible to correlate "request_received" which includes "request" and the invite
              */
             sub2 = webSocket.receiveMessageOfType<RequestResponseSentMessage>(MESSAGE_TYPES.RESPONSE_SENT, it.did)
                     .subscribeOn(Schedulers.computation())
@@ -559,7 +560,9 @@ class PythonRefAgentConnection : AgentConnection {
                  * Wait until the STATE has pairwise connection corresponding to the invite.
                  */
                 var unsubscribe: ()->Unit = {}
-                val subscription = waitForPairwiseConnection(pubKey).timeout(timeoutMs, TimeUnit.MILLISECONDS).subscribe({ pairwise ->
+                val subscription = waitForPairwiseConnection(pubKey)
+                        .timeout(timeoutMs, TimeUnit.MILLISECONDS)
+                        .subscribe({ pairwise ->
                     val theirDid = pairwise["their_did"].asText()
                     val indyParty = IndyParty(webSocket, theirDid,
                         pairwise["metadata"]["their_endpoint"].asText(),
