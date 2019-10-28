@@ -176,6 +176,7 @@ fun ProofRequest.applyPayloadRandomly(payload: ProofRequestPayload) {
                     if (skip) return@filterLoop
 
                     when (it) {
+                        FilterProperty.Value -> it shouldBe value
                         FilterProperty.CredentialDefinitionId -> it shouldBe payload.credDefId.toString()
                         FilterProperty.SchemaId -> it shouldBe payload.schemaId.toString()
                         FilterProperty.IssuerDid -> it shouldBe payload.issuerDid
@@ -252,6 +253,7 @@ data class Filter(
 
     infix fun FilterProperty.shouldBe(value: String) {
         when (this) {
+            FilterProperty.Value -> attributes["attr::${attrName}::value"] = value
             FilterProperty.SchemaId -> schemaIdRaw = value
             FilterProperty.SchemaIssuerDid -> schemaIssuerDid = value
             FilterProperty.SchemaName -> schemaName = value
@@ -260,12 +262,8 @@ data class Filter(
             FilterProperty.CredentialDefinitionId -> credDefId = value
         }
     }
-
-    infix fun String.shouldBe(value: String) {
-        attributes["attr::${this@shouldBe}::value"] = value
-    }
 }
 
 enum class FilterProperty {
-    SchemaId, SchemaIssuerDid, SchemaName, SchemaVersion, IssuerDid, CredentialDefinitionId
+    SchemaId, SchemaIssuerDid, SchemaName, SchemaVersion, IssuerDid, CredentialDefinitionId, Value
 }

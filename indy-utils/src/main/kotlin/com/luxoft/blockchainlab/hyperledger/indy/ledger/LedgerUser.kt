@@ -172,7 +172,7 @@ interface LedgerUser {
      * @param interval [Interval] - time interval you are interested in
      * @param delayMs [Long]
      * @param retryTimes [Int]
-     *
+     * TODO: Why do we need timestamp?
      * @return ([Pair] of [Long] (timestamp) and [RevocationRegistryEntry]) or [null] if none exists on ledger
      */
     fun retrieveRevocationRegistryDelta(

@@ -1,6 +1,8 @@
 package com.luxoft.blockchainlab.hyperledger.indy.models
 
-import com.fasterxml.jackson.annotation.*
+import com.fasterxml.jackson.annotation.JsonIgnore
+import com.fasterxml.jackson.annotation.JsonInclude
+import com.fasterxml.jackson.annotation.JsonProperty
 import com.luxoft.blockchainlab.hyperledger.indy.utils.Filter
 
 /**
@@ -147,7 +149,7 @@ data class RequestedCredentials(
 data class RequestedAttributeInfo(
     @JsonProperty("cred_id") val credentialId: String,
     val revealed: Boolean = true,
-    @JsonInclude(JsonInclude.Include.NON_NULL) val timestamp: Long = Timestamp.now()
+    @JsonInclude(JsonInclude.Include.NON_NULL) val timestamp: Long? = null
 )
 
 data class RequestedPredicateInfo(
