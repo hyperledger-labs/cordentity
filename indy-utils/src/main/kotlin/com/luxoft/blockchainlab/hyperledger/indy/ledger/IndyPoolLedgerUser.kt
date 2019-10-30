@@ -302,7 +302,8 @@ class IndyPoolLedgerUser(val pool: Pool, override val did: String, val signProvi
                 .map { Pair(it.getRevocationRegistryIdObject()!!, it.timestamp!!) }
                 .distinct()
                 .forEach { (revRegId, timestamp) ->
-                    val response = retrieveRevocationRegistryDelta(revRegId, Interval(null, timestamp), delayMs, retryTimes)
+                    val response =
+                        retrieveRevocationRegistryDelta(revRegId, proofRequest.nonRevoked!!, delayMs, retryTimes)
                         ?: throw RuntimeException("Revocation registry for definition $revRegId at timestamp $timestamp doesn't exist in ledger")
 
                     val (_, revReg) = response

@@ -204,7 +204,7 @@ class IndyUser(
             val revocationRegistryDefinition = ledgerUser.retrieveRevocationRegistryDefinition(revRegId)
                 ?: throw IndyRevRegNotFoundException(revRegId, "Get revocation state has been failed")
 
-            val response = ledgerUser.retrieveRevocationRegistryDelta(revRegId, Interval(null, interval.to))
+            val response = ledgerUser.retrieveRevocationRegistryDelta(revRegId, interval)
                 ?: throw IndyRevDeltaNotFoundException(revRegId, "Interval is $interval")
             val (_, revRegDelta) = response
 
