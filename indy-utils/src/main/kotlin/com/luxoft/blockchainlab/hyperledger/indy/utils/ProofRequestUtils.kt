@@ -14,7 +14,7 @@ import kotlin.math.absoluteValue
  * Example:
  * [proofRequest] ("example", "1.0") {
  *  [ProofRequest.reveal]
- *  [ProofRequest.proveGreaterThan]
+ *  [ProofRequest.provePredicateThan]
  *  [ProofRequest.proveNonRevocation]
  * }
  *
@@ -64,7 +64,7 @@ fun ProofRequest.reveal(attrName: String, filterFiller: (Filter.() -> Unit)? = n
 /**
  * DSL entry to prove GE condition on some attribute
  * Example:
- * [proveGreaterThan] ("someAttr", 10) {
+ * [provePredicateThan] ("someAttr", 10) {
  *  [FilterProperty] [FilterProperty.shouldBe] [String]
  * }
  *
@@ -72,16 +72,21 @@ fun ProofRequest.reveal(attrName: String, filterFiller: (Filter.() -> Unit)? = n
  * @param greaterThan [Int] - value which should be less than [attrName]'s value
  * @param filterFiller - lambda with new [Filter] obj as a receiver (default = null)
  */
-fun ProofRequest.proveGreaterThan(attrName: String, greaterThan: Int, filterFiller: (Filter.() -> Unit)? = null) {
+fun ProofRequest.provePredicateThan(
+    attrName: String,
+    predicate: PredicateTypes,
+    than: Int,
+    filterFiller: (Filter.() -> Unit)? = null
+) {
     val predicateReference = if (filterFiller == null) {
-        CredentialPredicateReference(attrName, greaterThan)
+        CredentialPredicateReference(attrName, than, predicate.toString())
     } else {
         var filter: Filter? = Filter(attrName)
         filter!!.filterFiller()
         if (filter.isEmpty())
             filter = null
 
-        CredentialPredicateReference(attrName, greaterThan, restrictions = filter)
+        CredentialPredicateReference(attrName, than, predicate.toString(), restrictions = filter)
     }
 
     requestedPredicates[attrName] = predicateReference
@@ -154,7 +159,7 @@ fun ProofRequest.applyPayloadRandomly(payload: ProofRequestPayload) {
             val valueInt = value.toInt()
             val greaterThan = rng.nextInt().absoluteValue % valueInt
 
-            proveGreaterThan(key, greaterThan) {
+            provePredicateThan(key, PredicateTypes.GT, greaterThan) {
                 FilterProperty.values().forEach filterLoop@{
                     val skip = rng.nextBoolean()
                     if (skip) return@filterLoop
@@ -251,15 +256,17 @@ data class Filter(
     fun isEmpty() = schemaIdRaw == null && schemaIssuerDid == null && schemaName == null && schemaVersion == null
             && issuerDid == null && credDefId == null && attributes.isEmpty()
 
-    infix fun FilterProperty.shouldBe(value: String) {
+    infix fun FilterProperty.shouldBe(value: String?) {
         when (this) {
-            FilterProperty.Value -> attributes["attr::${attrName}::value"] = value
-            FilterProperty.SchemaId -> schemaIdRaw = value
-            FilterProperty.SchemaIssuerDid -> schemaIssuerDid = value
-            FilterProperty.SchemaName -> schemaName = value
-            FilterProperty.SchemaVersion -> schemaVersion = value
-            FilterProperty.IssuerDid -> issuerDid = value
-            FilterProperty.CredentialDefinitionId -> credDefId = value
+            FilterProperty.Value ->
+                if (value != null) attributes["attr::${attrName}::value"] = value
+                else attributes["attr::${this@shouldBe}::marker"] = "1"
+            FilterProperty.SchemaId -> schemaIdRaw = value!!
+            FilterProperty.SchemaIssuerDid -> schemaIssuerDid = value!!
+            FilterProperty.SchemaName -> schemaName = value!!
+            FilterProperty.SchemaVersion -> schemaVersion = value!!
+            FilterProperty.IssuerDid -> issuerDid = value!!
+            FilterProperty.CredentialDefinitionId -> credDefId = value!!
         }
     }
 }

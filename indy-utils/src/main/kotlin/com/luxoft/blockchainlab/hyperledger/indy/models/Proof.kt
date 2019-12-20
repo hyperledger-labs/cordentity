@@ -228,9 +228,20 @@ data class CredentialAttributeReference(
 data class CredentialPredicateReference(
     val name: String,
     val p_value: Int,
-    val p_type: String = ">=",
+    val p_type: String,
     val restrictions: Filter? = null
 )
+
+enum class PredicateTypes(private val value: String) {
+    GE(">="),
+    LE("<="),
+    GT(">"),
+    LT("<");
+
+    override fun toString(): String {
+        return value
+    }
+}
 
 /**
  * Represents proof

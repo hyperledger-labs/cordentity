@@ -4,6 +4,7 @@ import com.luxoft.blockchainlab.hyperledger.indy.helpers.WalletHelper
 import com.luxoft.blockchainlab.hyperledger.indy.ledger.IndyPoolLedgerUser
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialValue
 import com.luxoft.blockchainlab.hyperledger.indy.models.Interval
+import com.luxoft.blockchainlab.hyperledger.indy.models.PredicateTypes
 import com.luxoft.blockchainlab.hyperledger.indy.utils.*
 import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletUser
 import junit.framework.Assert.assertFalse
@@ -95,7 +96,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         val proofReq = proofRequest("proof_req", "0.1") {
             reveal("name") { FilterProperty.Value shouldBe "Alex" }
             reveal("sex")
-            proveGreaterThan("age", 18)
+            provePredicateThan("age", PredicateTypes.GE, 18)
             proveNonRevocation(Interval.allTime())
         }
 
@@ -111,7 +112,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         val proofReqAfterRevocation = proofRequest("proof_req", "0.2") {
             reveal("name") { FilterProperty.Value shouldBe "Alex" }
             reveal("sex")
-            proveGreaterThan("age", 18)
+            provePredicateThan("age", PredicateTypes.GE, 18)
             proveNonRevocation(Interval.allTime())
         }
 
@@ -141,7 +142,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
             val proofReq = proofRequest("proof_req", "0.$i") {
                 reveal("name") { FilterProperty.Value shouldBe "Alex" }
                 reveal("sex")
-                proveGreaterThan("age", 18)
+                provePredicateThan("age", PredicateTypes.GE, 18)
             }
 
             val proof = prover.createProofFromLedgerData(proofReq)
@@ -178,7 +179,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
                     FilterProperty.Value shouldBe "Alex$i"
                 }
                 reveal("sex")
-                proveGreaterThan("age", 18)
+                provePredicateThan("age", PredicateTypes.GE, 18)
                 proveNonRevocation(Interval.allTime())
             }
 
@@ -233,7 +234,7 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         val proofReq = proofRequest("proof_req", "0.1") {
             reveal("name") { FilterProperty.Value shouldBe "Alex" }
             reveal("sex")
-            proveGreaterThan("age", 18)
+            provePredicateThan("age", PredicateTypes.GE, 18)
         }
 
         val proof = prover.createProofFromLedgerData(proofReq)
@@ -271,8 +272,8 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         val proofReq = proofRequest("proof_req", "0.1") {
             reveal("name")
             reveal("status")
-            proveGreaterThan("period", 5)
-            proveGreaterThan("age", 18)
+            provePredicateThan("period", PredicateTypes.GE, 5)
+            provePredicateThan("age", PredicateTypes.GE, 18)
         }
 
         val proof = prover.createProofFromLedgerData(proofReq) {
@@ -319,8 +320,8 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         val proofReq = proofRequest("proof_req", "0.1") {
             reveal("name")
             reveal("status")
-            proveGreaterThan("period", 5)
-            proveGreaterThan("age", 18)
+            provePredicateThan("period", PredicateTypes.GE, 5)
+            provePredicateThan("age", PredicateTypes.GE, 18)
         }
 
         val proof = prover.createProofFromLedgerData(proofReq) {
