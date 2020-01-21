@@ -5,10 +5,8 @@ import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import mu.KotlinLogging
 import org.java_websocket.client.WebSocketClient
 import org.java_websocket.handshake.ServerHandshake
+import rx.*
 import rx.Observable
-import rx.Observer
-import rx.Scheduler
-import rx.Single
 import rx.schedulers.Schedulers
 import java.net.URI
 import java.util.*
@@ -19,6 +17,28 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
     }
 
     private val log = KotlinLogging.logger {}
+    var reason: String? = null
+
+    private lateinit var onCloseSubscriber: Subscriber<in Boolean>
+    private val onCloseEmitter = Observable.create<Boolean> { subscriber ->
+        onCloseSubscriber = subscriber
+    }
+    /**
+     * Observable that emits TRUE when socket is closed remotely, otherwise FALSE when the socket closed due to an error
+     */
+    fun onSocketCloseSubscription(): Observable<Boolean> = onCloseEmitter
+
+    private lateinit var onRestoreConnection: Subscriber<in Boolean>
+    private val onClosedSocketOperationEmitter = Observable.create<Boolean> { subscriber ->
+        onRestoreConnection = subscriber
+    }
+    /**
+     * Observable that emits TRUE when there's an operation on the closed socket which requires the connection to be
+     * restored immediately (in blocking mode), otherwise emits FALSE when there's an operation which doesn't require
+     * immediate reconnection (for example, socket read()) so that connection restore procedure would be scheduled or
+     * executed in non-blocking mode
+     */
+    fun onClosedSocketOperation(): Observable<Boolean> = onClosedSocketOperationEmitter
 
     override fun onOpen(handshakedata: ServerHandshake?) {
         log.info { "$socketName:AgentConnection opened: $handshakedata" }
@@ -26,6 +46,13 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
 
     override fun onClose(code: Int, reason: String?, remote: Boolean) {
         log.info { "$socketName:AgentConnection closed: $code,$reason,$remote" }
+        this.reason = reason
+        onCloseSubscriber.onNext(remote)
+        dataStorage.count()
+    }
+
+    override fun onClosing(code: Int, reason: String?, remote: Boolean) {
+        log.info { "$socketName:AgentConnection closing: $code,$reason,$remote" }
     }
 
     private val dataStorage = object {
@@ -38,13 +65,13 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
          * message routing map, indexed by subscription key (message-specific), double linked queue of observers
          * for each (message-specific) key
          */
-        private val subscribedObservers = HashMap<String, Queue<Observer<in String>>>()
+        private val subscribedObservers = HashMap<String, Queue<Subscriber<in String>>>()
 
         /**
          * Adds an observer to (FIFO) queue corresponding to the given key.
          * If the queue doesn't exist for the given key, it's been created.
          */
-        private fun addObserver(key: String, observer: Observer<in String>) =
+        private fun addObserver(key: String, observer: Subscriber<in String>) =
                 subscribedObservers.getOrPut(key) { LinkedList() }.add(observer)
 
         /**
@@ -69,21 +96,45 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
         fun getObserverOrAddMessage(key: String, message: String) = synchronized(this) {
             val observer = popObserver(key)
             if (observer == null) {
-                log.warn { "Unexpected message ($key,$message)" }
+                log.warn { "$socketName: Unexpected message ($key,$message)" }
                 storeMessage(key, message)
             }
             observer
         }
 
-        fun getMessageOrAddObserver(keyOrType: String, observer: Observer<in String>) = synchronized(this) {
+        fun getMessageOrAddObserver(keyOrType: String, observer: Subscriber<in String>) = synchronized(this) {
             val message = popMessage(keyOrType)
             if (message == null) {
                 /**
                  * if not found, subscribe on messages with the given key
                  */
+                if (isClosed)
+                    onRestoreConnection.onNext(false) // notify in non-blocking mode
+
                 addObserver(keyOrType, observer)
             }
             message
+        }
+
+        fun cancelAll() = synchronized(this) {
+            subscribedObservers.forEach { key, queue ->
+                while (!queue.isEmpty()) {
+                    queue.poll()?.apply {
+                        if (!this.isUnsubscribed)
+                            onError(AgentConnectionException("WebSocket closed while $socketName observing for $key."))
+                    }
+                }
+            }
+        }
+        fun count() = synchronized(this) {
+            subscribedObservers.forEach { key, queue ->
+                if (queue.size > 0)
+                    println("Observing queue size for key: $key is ${queue.size}")
+            }
+            receivedMessages.forEach { key, queue ->
+                if (queue.size > 0)
+                    println("Message queue size for key: $key is ${queue.size}")
+            }
         }
     }
 
@@ -144,7 +195,9 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
          * select the first message observer from the list, which must be non-empty,
          * remove the observer from the queue, emit the serialized message
          */
-        dataStorage.getObserverOrAddMessage(key, message)?.onNext(message)
+        dataStorage.getObserverOrAddMessage(key, message)?.also { observer ->
+            observer.onNext(message)
+        }
     }
 
     override fun onError(ex: Exception?) {
@@ -157,7 +210,12 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
     fun sendAsJson(obj: Any) {
         val message = SerializationUtils.anyToJSON(obj)
         log.info { "$socketName:SendMessage: $message" }
-        send(message)
+        if (!isOpen)
+            onRestoreConnection.onNext(true) // notify in blocking mode
+        if (!isOpen) {
+            dataStorage.cancelAll()
+            throw AgentConnectionException("WebSocket failed to reconnect.")
+        } else send(message)
     }
 
     /**
@@ -187,7 +245,10 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
                 popClassObject(className, from).subscribe({ objectJson ->
                     val classObject: T = SerializationUtils.jSONToAny(objectJson, className)
                     observer.onSuccess(classObject)
-                }, { e: Throwable -> observer.onError(e) })
+                }, {
+                    e: Throwable ->
+                    observer.onError(e)
+                })
             } catch (e: Throwable) {
                 observer.onError(e)
             }
@@ -196,14 +257,14 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
 
     inline fun <reified T : Any> receiveClassObject(from: IndyParty) = receiveClassObject(T::class.java, from)
 
-    fun sendClassObject(message: TypedBodyMessage, counterParty: IndyParty) = sendAsJson(SendMessage(counterParty.did, message))
+    fun sendClassObject(message: TypedBodyMessage, counterParty: IndyParty) = sendAsJson(SendMessage(counterParty.did, message, from = counterParty.myDid))
 
     inline fun <reified T : Any> sendClassObject(message: T, counterParty: IndyParty) = sendClassObject(TypedBodyMessage(message, T::class.java.canonicalName), counterParty)
 
     /**
      * Pops message by key, subscribes on such message, if the queue is empty
      */
-    private fun popMessage(keyOrType: String, observer: Observer<in String>) {
+    private fun popMessage(keyOrType: String, observer: Subscriber<in String>) {
         dataStorage.getMessageOrAddObserver(keyOrType, observer)?.also {
             observer.onNext(it)
         }
