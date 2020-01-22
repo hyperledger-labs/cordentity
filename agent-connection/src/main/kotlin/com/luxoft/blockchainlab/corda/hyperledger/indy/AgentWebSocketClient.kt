@@ -19,26 +19,52 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
     private val log = KotlinLogging.logger {}
     var reason: String? = null
 
-    private lateinit var onCloseSubscriber: Subscriber<in Boolean>
-    private val onCloseEmitter = Observable.create<Boolean> { subscriber ->
-        onCloseSubscriber = subscriber
-    }
+    private val onCloseObservers : MutableSet<Subscriber<in Boolean>> = mutableSetOf()
     /**
-     * Observable that emits TRUE when socket is closed remotely, otherwise FALSE when the socket closed due to an error
+     * Returns observable that emits TRUE when socket is closed remotely,
+     * otherwise FALSE when the socket closed due to an error
      */
-    fun onSocketCloseSubscription(): Observable<Boolean> = onCloseEmitter
+    fun onCloseAddObserver() : Observable<Boolean>  {
+        return Observable.create { observer ->
+            onCloseObservers.add(observer)
+        }
+    }
+    private fun notifyOnClose(value: Boolean) {
+        onCloseObservers.forEach {
+            it.onNext(value)
+        }
+    }
+    fun onCloseUnsubscribeAll() {
+        onCloseObservers.forEach {
+            it.onCompleted()
+            it.unsubscribe()
+        }
+        onCloseObservers.clear()
+    }
 
-    private lateinit var onRestoreConnection: Subscriber<in Boolean>
-    private val onClosedSocketOperationEmitter = Observable.create<Boolean> { subscriber ->
-        onRestoreConnection = subscriber
-    }
+    private val onReconnectObservers : MutableSet<Subscriber<in Boolean>> = mutableSetOf()
     /**
-     * Observable that emits TRUE when there's an operation on the closed socket which requires the connection to be
-     * restored immediately (in blocking mode), otherwise emits FALSE when there's an operation which doesn't require
-     * immediate reconnection (for example, socket read()) so that connection restore procedure would be scheduled or
-     * executed in non-blocking mode
+     * Returns observable that emits TRUE when there's an operation on the closed socket which requires the connection
+     * to be restored immediately (in blocking mode), otherwise emits FALSE when there's an operation which doesn't
+     * require immediate reconnection (for example, socket read()) so that connection restore procedure would be
+     * scheduled or executed in non-blocking mode
      */
-    fun onClosedSocketOperation(): Observable<Boolean> = onClosedSocketOperationEmitter
+    fun onReconnectAddObserver() : Observable<Boolean>  {
+        return Observable.create { observer ->
+            onReconnectObservers.add(observer)
+        }
+    }
+    private fun notifyOnReconnect(value: Boolean) {
+        onReconnectObservers.forEach {
+            it.onNext(value)
+        }
+    }
+    fun onReconnectUnsubscribeAll() {
+        onReconnectObservers.forEach {
+            it.unsubscribe()
+        }
+        onReconnectObservers.clear()
+    }
 
     override fun onOpen(handshakedata: ServerHandshake?) {
         log.info { "$socketName:AgentConnection opened: $handshakedata" }
@@ -47,7 +73,7 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
     override fun onClose(code: Int, reason: String?, remote: Boolean) {
         log.info { "$socketName:AgentConnection closed: $code,$reason,$remote" }
         this.reason = reason
-        onCloseSubscriber.onNext(remote)
+        notifyOnClose(remote)
         dataStorage.count()
     }
 
@@ -109,7 +135,7 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
                  * if not found, subscribe on messages with the given key
                  */
                 if (isClosed)
-                    onRestoreConnection.onNext(false) // notify in non-blocking mode
+                    notifyOnReconnect(false) // notify in non-blocking mode
 
                 addObserver(keyOrType, observer)
             }
@@ -155,7 +181,6 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
         val key = when (type) {
             MESSAGE_TYPES.STATE_RESPONSE,
             MESSAGE_TYPES.INVITE_GENERATED,
-            MESSAGE_TYPES.REQUEST_RECEIVED,
             MESSAGE_TYPES.MESSAGE_SENT,
             MESSAGE_TYPES.REQUEST_SENT ->
                 type
@@ -188,6 +213,9 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
                  */
                 "$type.${obj["did"].asText()}"
 
+            MESSAGE_TYPES.REQUEST_RECEIVED ->
+                "$type.${obj["connection_key"].asText()}"
+
             else -> null
         } ?: throw AgentConnectionException("Unexpected message type: $type")
 
@@ -201,7 +229,7 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
     }
 
     override fun onError(ex: Exception?) {
-        log.warn(ex) { "AgentConnection error" }
+        log.warn(ex) { "$socketName:AgentConnection error" }
     }
 
     /**
@@ -209,13 +237,17 @@ class AgentWebSocketClient(serverUri: URI, private val socketName: String) : Web
      */
     fun sendAsJson(obj: Any) {
         val message = SerializationUtils.anyToJSON(obj)
-        log.info { "$socketName:SendMessage: $message" }
-        if (!isOpen)
-            onRestoreConnection.onNext(true) // notify in blocking mode
+        if (!isOpen) {
+            notifyOnReconnect(true) // notify in blocking mode
+            log.info { "Notified in blocking mode" }
+        }
         if (!isOpen) {
             dataStorage.cancelAll()
             throw AgentConnectionException("WebSocket failed to reconnect.")
-        } else send(message)
+        } else {
+            log.info { "$socketName:SendMessage: $message" }
+            send(message)
+        }
     }
 
     /**
