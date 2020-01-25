@@ -11,19 +11,17 @@ import rx.Observable
 import rx.Single
 import rx.schedulers.Schedulers
 import java.io.File
-import java.lang.RuntimeException
-import kotlin.test.assertEquals
-import java.nio.file.Paths
-import java.util.*
-import java.util.concurrent.TimeoutException
-import java.util.concurrent.atomic.AtomicInteger
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketException
+import java.nio.file.Paths
+import java.util.*
 import java.util.concurrent.TimeUnit
-import kotlin.Exception
+import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 import kotlin.math.absoluteValue
+import kotlin.test.assertEquals
 
 class PythonRefAgentConnectionTest {
 
@@ -134,7 +132,7 @@ class PythonRefAgentConnectionTest {
             "ws://127.0.0.1:8098/ws",
             "ws://127.0.0.1:8099/ws"
             )
-    private val masterAgent = "ws://127.0.0.1:8092/ws"
+    private val masterAgent = "ws://127.0.0.1:8095/ws"
 
     @Test
     fun `externalTest`() = repeat(10) {
