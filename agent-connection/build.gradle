@@ -1,8 +1,12 @@
+plugins {
+    id "com.avast.gradle.docker-compose" version "0.9.4"
+}
 dependencies {
     implementation project(':cordentity-indy-utils')
     implementation "org.java-websocket:Java-WebSocket:1.3.9"
     implementation "net.iharder:base64:2.3.8"
     testImplementation 'org.slf4j:slf4j-simple:1.7.26'
+    testImplementation 'com.github.oksuz:tcp-proxy:cb678c1'
 }
 
 apply plugin: 'maven-publish'
@@ -14,3 +18,5 @@ publishing {
         }
     }
 }
+
+apply from: "$rootDir/agents-run.gradle"

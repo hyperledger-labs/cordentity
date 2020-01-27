@@ -128,9 +128,10 @@ interface AgentConnection {
      * @param url Indy Agent's endpoint URL
      * @param login endpoint's login
      * @param password endpoints's password
+     * @param timeoutMs connection timeout in milliseconds (30000 by default)
      * @return [Single]<Unit> emitting a Unit upon a successful handshake
      */
-    fun connect(url: String, login: String, password: String): Single<Unit>
+    fun connect(url: String, login: String, password: String, timeoutMs:Long = 60000): Single<Unit>
 
     /**
      * Disconnects from the Agent's endpoint

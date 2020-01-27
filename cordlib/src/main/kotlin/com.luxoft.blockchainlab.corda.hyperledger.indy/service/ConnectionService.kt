@@ -6,6 +6,7 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.AgentConnection
 import com.luxoft.blockchainlab.corda.hyperledger.indy.PythonRefAgentConnection
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.ConfigHelper
 import com.luxoft.blockchainlab.hyperledger.indy.models.*
+import mu.KotlinLogging
 import net.corda.core.flows.FlowLogic
 import net.corda.core.node.AppServiceHub
 import net.corda.core.node.services.CordaService
@@ -15,6 +16,8 @@ import rx.Single
 
 @CordaService
 class ConnectionService (services: AppServiceHub) : SingletonSerializeAsToken() {
+    private val logger = KotlinLogging.logger {}
+
     fun sendCredentialOffer(offer: CredentialOffer, partyDID: String) = getPartyConnection(partyDID).sendCredentialOffer(offer)
 
     fun receiveCredentialOffer(partyDID: String) = getPartyConnection(partyDID).receiveCredentialOffer()
@@ -53,7 +56,14 @@ class ConnectionService (services: AppServiceHub) : SingletonSerializeAsToken() 
             agentLogin ?: throw RuntimeException("Agent websocket endpoint specified but agent user name is missing")
             agentPassword ?: throw RuntimeException("Agent websocket endpoint specified but agent password is missing")
 
-            PythonRefAgentConnection().apply { connect(agentWsEndpoint, agentLogin, agentPassword).toBlocking().value() }
+            PythonRefAgentConnection().apply {
+                try {
+                    connect(agentWsEndpoint, agentLogin, agentPassword).toBlocking().value()
+                } catch (e: Exception) {
+                    logger.error { "CordaConnectionService failed to connect to indy-agent, CONNECT returned exception:\n${e.localizedMessage}" }
+                    throw e
+                }
+            }
         } else
             null
     }

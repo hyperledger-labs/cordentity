@@ -1,0 +1,11 @@
+dockerCompose.isRequiredBy(test)
+
+dockerCompose {
+    useComposeFiles = ["$rootDir/devops/agents-compose.yml"]
+    startedServices = ['agent1', 'agent2', 'agent3', 'agent4', 'agent5', 'agent6']
+    dockerExecutable = 'docker'
+}
+
+test.doLast {
+    composeDown
+}
