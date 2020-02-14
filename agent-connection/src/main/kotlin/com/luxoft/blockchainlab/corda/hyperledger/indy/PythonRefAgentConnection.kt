@@ -8,7 +8,6 @@ import mu.KotlinLogging
 import net.iharder.Base64
 import rx.*
 import rx.Observable
-import rx.schedulers.Schedulers
 import java.net.URI
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
@@ -35,6 +34,10 @@ import kotlin.concurrent.thread
  * multiple clients concurrently connect to a single Agent.
  */
 class PythonRefAgentConnection : AgentConnection {
+    companion object {
+        val scheduler: Scheduler = AgentWebSocketClient.scheduler
+    }
+
     private val log = KotlinLogging.logger {}
 
     private lateinit var url: String
@@ -99,7 +102,7 @@ class PythonRefAgentConnection : AgentConnection {
                 val connectionAttempt = Observable.create<Unit> { observer ->
                     log.error { "Will attempt to reconnect $login to $url in ${retryTimeoutMs}ms" }
                     Thread.sleep(retryTimeoutMs)
-                    if (!stopReconnecting.compareAndSet(true, true)) {
+                    if (!stopReconnecting.get()) {
                         log.error { "Attempting to reconnect $login to $url..." }
                         Observable.create<Unit> { connectionObserver ->
                             try {
@@ -114,38 +117,37 @@ class PythonRefAgentConnection : AgentConnection {
                             } catch (e: Throwable) {
                                 connectionObserver.onError(e)
                             }
-                        }.subscribeOn(Schedulers.newThread()).apply {
-                            timeout(operationTimeoutMs, TimeUnit.MILLISECONDS).subscribe({
-                                if (pollAgentWorker?.isAlive != true)
-                                    pollAgentWorker = createAgentWorker()
-                                observer.onNext(it)
+                        }.timeout(operationTimeoutMs, TimeUnit.MILLISECONDS).subscribe({
+                            if (pollAgentWorker?.isAlive != true)
+                                pollAgentWorker = createAgentWorker()
+                            observer.onNext(it)
+                            observer.unsubscribe()
+                        }, {
+                            if (!observer.isUnsubscribed) {
+                                observer.onError(it)
                                 observer.unsubscribe()
-                            }, {
-                                if (!observer.isUnsubscribed) {
-                                    observer.onError(it)
-                                    observer.unsubscribe()
-                                }
-                            })
-                        }
+                            }
+                        })
                     } else observer.onError(AgentConnectionException("Reconnection process stopped"))
-                }.subscribeOn(Schedulers.newThread())
-                val onSuccess: (Unit)->Unit = {
+                }.subscribeOn(scheduler)
+
+                fun onSuccess() {
                     reconnected.set(true)
                     log.info { "Reconnected to $url with login $login" }
                     isReconnecting.set(false)
                 }
-                var onError: ((Throwable)->Unit)? = null
-                onError = {
+
+                fun onError(it: Throwable) {
                     if (!stopReconnecting.compareAndSet(true, false)) {
                         if (retryTimeoutMs * 2 < this.operationTimeoutMs) retryTimeoutMs *= 2
                         log.error { "Connection attempt for $login failed with $it, increasing the reconnection timeout (${retryTimeoutMs}ms)" }
-                        connectionAttempt.subscribe({ onSuccess(Unit) }, { onError!!(it) })
+                        connectionAttempt.subscribe({ onSuccess() }, { onError(it) })
                     } else isReconnecting.set(false)
                 }
                 /**
                  * subscribe() must NOT be done on the calling thread
                  */
-                connectionAttempt.subscribe({ onSuccess(Unit) }, { onError!!(it)})
+                connectionAttempt.subscribe({ onSuccess() }, { onError(it) })
             }
             if (blockingMode) {
                 val single = Single.create<Boolean> {
@@ -233,11 +235,11 @@ class PythonRefAgentConnection : AgentConnection {
                 try {
                     webSocket = AgentWebSocketClient(URI(url), login)
                     webSocket.apply {
-                        onCloseAddObserver().subscribe { isRemote ->
+                        onCloseAddObserver().subscribeOn(scheduler).subscribe { isRemote ->
                             connectionStatus = AgentConnectionStatus.AGENT_DISCONNECTED
                             doReconnect(false) // reconnect in non-blocking mode
                         }
-                        onReconnectAddObserver().subscribe { isBlocking ->
+                        onReconnectAddObserver().subscribeOn(scheduler).subscribe { isBlocking ->
                             doReconnect(isBlocking)
                         }
                         if(!connectBlocking())
@@ -248,7 +250,7 @@ class PythonRefAgentConnection : AgentConnection {
                 } catch (e: Throwable) {
                     log.error { "Exception while connecting to $url: ${e.localizedMessage}" }
                 }
-            }.subscribeOn(Schedulers.newThread()).apply {
+            }.subscribeOn(scheduler).apply {
                 timeout(operationTimeoutMs, TimeUnit.MILLISECONDS).subscribe({
                     if (pollAgentWorker?.isAlive != true)
                         pollAgentWorker = createAgentWorker()
@@ -322,7 +324,7 @@ class PythonRefAgentConnection : AgentConnection {
                 var sub2: Subscription? = null
                 var sub3: Subscription? = null
                 val subscription = webSocket.receiveMessageOfType<InviteReceivedMessage>(MESSAGE_TYPES.INVITE_RECEIVED, pubKey)
-                    .subscribeOn(Schedulers.newThread())
+                    .subscribeOn(scheduler)
                     .timeout(operationTimeoutMs, TimeUnit.MILLISECONDS)
                     .subscribe({ invRcv ->
                         /**
@@ -333,7 +335,7 @@ class PythonRefAgentConnection : AgentConnection {
                          * message
                          */
                         sub2 = webSocket.receiveMessageOfType<ObjectNode>(MESSAGE_TYPES.RESPONSE_RECEIVED, pubKey)
-                            .subscribeOn(Schedulers.computation())
+                            .subscribeOn(scheduler)
                             .timeout(operationTimeoutMs, TimeUnit.MILLISECONDS)
                             .subscribe({
                                 /**
@@ -512,7 +514,7 @@ class PythonRefAgentConnection : AgentConnection {
         var unsubscribe: ()->Unit = {}
         var sub2: Subscription? = null
         val subscription = webSocket.receiveMessageOfType<RequestReceivedMessage>(MESSAGE_TYPES.REQUEST_RECEIVED, pubKey)
-                .subscribeOn(Schedulers.newThread())
+            .subscribeOn(scheduler)
                 .timeout(timeoutMs, TimeUnit.MILLISECONDS)
                 .subscribe ({
 
@@ -525,7 +527,7 @@ class PythonRefAgentConnection : AgentConnection {
              * on each "request_received", no matter which party is on the other side.
              */
             sub2 = webSocket.receiveMessageOfType<RequestResponseSentMessage>(MESSAGE_TYPES.RESPONSE_SENT, it.did)
-                    .subscribeOn(Schedulers.computation())
+                .subscribeOn(scheduler)
                     .timeout(timeoutMs, TimeUnit.MILLISECONDS)
                     .subscribe ({
                 log.info { "Accepted connection request from ${it.did}" }
