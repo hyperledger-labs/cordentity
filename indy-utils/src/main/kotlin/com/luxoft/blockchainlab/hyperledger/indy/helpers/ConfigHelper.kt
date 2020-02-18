@@ -1,7 +1,6 @@
 package com.luxoft.blockchainlab.hyperledger.indy.helpers
 
 import com.natpryce.konfig.*
-import java.nio.file.Path
 import java.nio.file.Paths
 
 /**

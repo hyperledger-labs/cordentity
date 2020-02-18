@@ -8,6 +8,8 @@ import org.hyperledger.indy.sdk.pool.PoolLedgerConfigExistsException
 import java.io.File
 import java.io.FileNotFoundException
 import java.util.concurrent.ExecutionException
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 
 /**
@@ -59,30 +61,32 @@ object PoolHelper {
     /**
      * Opens existing pool ledger with [poolName] and checks connection using [poolConfig]
      */
-    @Throws(FileNotFoundException::class, ExecutionException::class)
+    @Throws(FileNotFoundException::class, ExecutionException::class, TimeoutException::class)
     fun openExisting(
         poolName: String = DEFAULT_POOL_NAME,
-        poolConfig: OpenPoolLedgerJSONParameter = OpenPoolLedgerJSONParameter(null, null)
+        poolConfig: OpenPoolLedgerJSONParameter = OpenPoolLedgerJSONParameter(null, null),
+        timeout: Pair<Long, TimeUnit> = Pair(30, TimeUnit.SECONDS)
     ): Pool {
         if (!exists(poolName))
             throw FileNotFoundException("Pool files ${EnvironmentUtils.getIndyPoolPath(poolName)} don't exist")
 
-        return Pool.openPoolLedger(poolName, poolConfig.toJson()).get()
+        return Pool.openPoolLedger(poolName, poolConfig.toJson()).get(timeout.first, timeout.second)
     }
 
     /**
      * Opens existing pool ledger with [poolName] and checks connection using [poolConfig] or creates new pool ledger
      * with [genesisFile] and [poolName]
      */
-    @Throws(ExecutionException::class)
+    @Throws(ExecutionException::class, TimeoutException::class)
     fun openOrCreate(
         genesisFile: File,
         poolName: String = DEFAULT_POOL_NAME,
-        poolConfig: OpenPoolLedgerJSONParameter = OpenPoolLedgerJSONParameter(null, null)
+        poolConfig: OpenPoolLedgerJSONParameter = OpenPoolLedgerJSONParameter(null, null),
+        timeout: Pair<Long, TimeUnit> = Pair(30, TimeUnit.SECONDS)
     ): Pool {
         if (!exists(poolName))
             createNonExisting(genesisFile, poolName)
 
-        return openExisting(poolName, poolConfig)
+        return openExisting(poolName, poolConfig, timeout)
     }
 }

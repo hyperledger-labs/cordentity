@@ -1,0 +1,74 @@
+version: '3.6'
+services:
+  agent1:
+    image: teamblockchain/indy-agent-python:2a838e3
+    ports:
+      - "8094:8094"
+    container_name: agent94
+    environment:
+      - PORT=8094
+    env_file:
+      - ./Agent.env
+    networks:
+      - agents
+  agent2:
+    image: teamblockchain/indy-agent-python:2a838e3
+    ports:
+      - "8095:8095"
+    container_name: agent95
+    environment:
+      - PORT=8095
+    env_file:
+      - ./Agent.env
+    networks:
+    - agents
+  agent3:
+    image: teamblockchain/indy-agent-python:2a838e3
+    ports:
+      - "8096:8096"
+    container_name: agent96
+    environment:
+      - PORT=8096
+    env_file:
+      - ./Agent.env
+    networks:
+      - agents
+  agent4:
+    image: teamblockchain/indy-agent-python:2a838e3
+    ports:
+      - "8097:8097"
+    container_name: agent97
+    environment:
+      - PORT=8097
+    env_file:
+      - ./Agent.env
+    networks:
+      - agents
+  agent5:
+    image: teamblockchain/indy-agent-python:2a838e3
+    ports:
+      - "8098:8098"
+    container_name: agent98
+    environment:
+      - PORT=8098
+    env_file:
+      - ./Agent.env
+    networks:
+      - agents
+  agent6:
+    image: teamblockchain/indy-agent-python:2a838e3
+    ports:
+      - "8099:8099"
+    container_name: agent99
+    environment:
+      - PORT=8099
+    env_file:
+      - ./Agent.env
+    networks:
+      - agents
+networks:
+  agents:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.100.100.0/24

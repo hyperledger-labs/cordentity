@@ -118,10 +118,9 @@ class IndyParty(private val webSocket: AgentWebSocketClient, val did: String, va
             } catch (e: Throwable) {
                 log.error(e) { "Error processing tails request" }
             } finally {
-                webSocket.receiveClassObject<TailsRequest>(this).subscribe(tailRequestMessageHandler)
+                webSocket.receiveClassObject<TailsRequest>(this).subscribe(tailRequestMessageHandler, {})
             }
         }
-        webSocket.receiveClassObject<TailsRequest>(this).subscribe(tailRequestMessageHandler)
     }
 
     /**
@@ -129,6 +128,9 @@ class IndyParty(private val webSocket: AgentWebSocketClient, val did: String, va
      *
      * @param handler a function producing [TailsResponse] from [TailsRequest]
      */
-    override fun handleTailsRequestsWith(handler: (TailsRequest) -> TailsResponse) = requestHandlerRef.set(handler)
+    override fun handleTailsRequestsWith(handler: (TailsRequest) -> TailsResponse) {
+        webSocket.receiveClassObject<TailsRequest>(this).subscribe(tailRequestMessageHandler, {})
+        requestHandlerRef.set(handler)
+    }
 }
 
