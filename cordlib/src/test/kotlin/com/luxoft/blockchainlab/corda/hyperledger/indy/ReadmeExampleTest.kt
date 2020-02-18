@@ -6,14 +6,15 @@ import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.IssueCredentialF
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.b2b.VerifyCredentialFlowB2B
 import com.luxoft.blockchainlab.corda.hyperledger.indy.flow.name
 import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialValue
+import com.luxoft.blockchainlab.hyperledger.indy.models.PredicateTypes
 import com.luxoft.blockchainlab.hyperledger.indy.utils.proofRequest
-import com.luxoft.blockchainlab.hyperledger.indy.utils.proveGreaterThan
+import com.luxoft.blockchainlab.hyperledger.indy.utils.provePredicateThan
 import net.corda.core.identity.CordaX500Name
 import net.corda.testing.node.StartedMockNode
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Test
 import java.time.LocalDateTime
+import kotlin.test.assertTrue
 
 
 class ReadmeExampleTest : CordentityTestBase() {
@@ -24,7 +25,6 @@ class ReadmeExampleTest : CordentityTestBase() {
 
     @Before
     fun setup() {
-        trustee = createPartyNode(CordaX500Name("Trustee", "London", "GB"))
         issuer = createPartyNode(CordaX500Name("Issuer", "London", "GB"))
         alice = createPartyNode(CordaX500Name("Alice", "London", "GB"))
         bob = createPartyNode(CordaX500Name("Bob", "London", "GB"))
@@ -33,7 +33,6 @@ class ReadmeExampleTest : CordentityTestBase() {
     }
 
     @Test
-    @Ignore("The test not represents the logic it should")
     fun `grocery store example`() {
         val ministry: StartedMockNode = issuer
         val alice: StartedMockNode = alice
@@ -79,11 +78,14 @@ class ReadmeExampleTest : CordentityTestBase() {
         // When Alice comes to grocery store, the store asks Alice to verify that she is legally allowed to buy drinks:
 
         // Alice.BORN >= currentYear - 18
-        val eighteenYearsAgo = LocalDateTime.now().minusYears(18).year
+        val lessOrEqualThanYear = LocalDateTime.now().minusYears(18).year
+        val greaterThanYear = LocalDateTime.now().minusYears(100).year
 
         // Use special proof request DSL
         val proofRequest = proofRequest("legal age proof", "1.0") {
-            proveGreaterThan("BORN", eighteenYearsAgo)
+            provePredicateThan("BORN", PredicateTypes.LE, lessOrEqualThanYear)
+            //TODO: Make possible to do range constraints
+//            provePredicateThan("BORN", PredicateTypes.GT, greaterThanYear)
         }
 
         val verified = store.runFlow(
@@ -93,5 +95,6 @@ class ReadmeExampleTest : CordentityTestBase() {
         // If the verification succeeds, the store can be sure that Alice's age is above 18.
 
         println("You can buy drinks: $verified")
+        assertTrue(verified.second, "You can buy drinks")
     }
 }

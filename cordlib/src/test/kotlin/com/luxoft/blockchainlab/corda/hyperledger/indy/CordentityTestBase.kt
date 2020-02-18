@@ -74,7 +74,7 @@ open class CordentityTestBase : CordaTestBase() {
                 val valueInt = value.toInt()
                 val greaterThan = rng.nextInt().absoluteValue % valueInt
 
-                proveGreaterThan(key, greaterThan) {
+                provePredicateThan(key, PredicateTypes.GE, greaterThan) {
                     FilterProperty.values().forEach filterLoop@{
                         val skip = rng.nextBoolean()
                         if (skip) return@filterLoop

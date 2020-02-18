@@ -297,18 +297,22 @@ class IndyPoolLedgerUser(val pool: Pool, override val did: String, val signProvi
                 }
                 .associate { it.id to it }
 
-            val revRegDeltas = proof.proofData.identifiers
+            val revRegDeltas = mutableMapOf<RevocationRegistryDefinitionId, MutableMap<Long, RevocationRegistryEntry>>()
+            proof.proofData.identifiers
                 .map { Pair(it.getRevocationRegistryIdObject()!!, it.timestamp!!) }
                 .distinct()
-                .associate { (revRegId, timestamp) ->
-                    val response = retrieveRevocationRegistryDelta(revRegId, Interval(null, timestamp), delayMs, retryTimes)
+                .forEach { (revRegId, timestamp) ->
+                    val response =
+                        retrieveRevocationRegistryDelta(revRegId, proofRequest.nonRevoked!!, delayMs, retryTimes)
                         ?: throw RuntimeException("Revocation registry for definition $revRegId at timestamp $timestamp doesn't exist in ledger")
 
-                    val (tmstmp, revReg) = response
-                    val map = hashMapOf<Long, RevocationRegistryEntry>()
-                    map[tmstmp] = revReg
-
-                    revRegId to map
+                    val (_, revReg) = response
+                    val map = revRegDeltas.getOrDefault(revRegId, mutableMapOf())
+                    map.putIfAbsent(timestamp, revReg)?.also { current ->
+                        if (current != revReg)
+                            throw RuntimeException("Collusion of revocation states, this should not happen. At key($revReg) was:($current), tried to put($revReg)")
+                    }
+                    revRegDeltas[revRegId] = map
                 }
 
             Pair(SerializationUtils.anyToJSON(revRegDefs), SerializationUtils.anyToJSON(revRegDeltas))

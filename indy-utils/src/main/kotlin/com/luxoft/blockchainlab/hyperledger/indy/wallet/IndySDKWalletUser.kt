@@ -248,7 +248,7 @@ class IndySDKWalletUser private constructor(
 
         val allSchemaIds = mutableListOf<SchemaId>()
         val allCredentialDefinitionIds = mutableListOf<CredentialDefinitionId>()
-        val allRevStates = mutableListOf<RevocationState>()
+        val allRevStates = mutableSetOf<RevocationState>()
 
         val requestedAttributes = proofRequest.requestedAttributes.keys.associate { key ->
             val credential = SerializationUtils.jSONToAny<Array<CredentialForTheRequest>>(
@@ -260,14 +260,7 @@ class IndySDKWalletUser private constructor(
             allSchemaIds.add(SchemaId.fromString(credential.credInfo.schemaId))
             allCredentialDefinitionIds.add(CredentialDefinitionId.fromString(credential.credInfo.credDefId))
 
-            val revStateAlreadyDone = allRevStates.find { it.revocationRegistryIdRaw == credential.credInfo.revRegId }
-
-            // if we already pulled this rev state from ledger - just use it
-            if (revStateAlreadyDone != null)
-                return@associate key to RequestedAttributeInfo(
-                    credential.credInfo.referent,
-                    timestamp = revStateAlreadyDone.timestamp
-                )
+            val revStateAlreadyDone = allRevStates.any { it.revocationRegistryIdRaw == credential.credInfo.revRegId }
 
             if ((credential.credInfo.credRevId == null) xor (proofRequest.nonRevoked == null))
                 throw RuntimeException("If credential is issued using some revocation registry, it should be proved to be non-revoked")
@@ -282,7 +275,8 @@ class IndySDKWalletUser private constructor(
                 val revocationState = revocationStateProvider(
                     RevocationRegistryDefinitionId.fromString(credential.credInfo.revRegId),
                     credential.credInfo.credRevId,
-                    proofRequest.nonRevoked!!
+                    proofRequest.nonRevoked!!,
+                    revStateAlreadyDone
                 )
 
                 allRevStates.add(revocationState)
@@ -308,14 +302,7 @@ class IndySDKWalletUser private constructor(
             allSchemaIds.add(SchemaId.fromString(credential.credInfo.schemaId))
             allCredentialDefinitionIds.add(CredentialDefinitionId.fromString(credential.credInfo.credDefId))
 
-            val revStateAlreadyDone = allRevStates.find { it.revocationRegistryIdRaw == credential.credInfo.revRegId }
-
-            // if we already pulled this rev state from ledger - just use it
-            if (revStateAlreadyDone != null)
-                return@associate key to RequestedPredicateInfo(
-                    credential.credInfo.referent,
-                    revStateAlreadyDone.timestamp
-                )
+            val revStateAlreadyDone = allRevStates.any { it.revocationRegistryIdRaw == credential.credInfo.revRegId }
 
             // if everything is ok and rev state is needed - pull it from ledger
             val requestedPredicateInfo = if (
@@ -327,7 +314,8 @@ class IndySDKWalletUser private constructor(
                 val revocationState = revocationStateProvider(
                     RevocationRegistryDefinitionId.fromString(credential.credInfo.revRegId),
                     credential.credInfo.credRevId,
-                    proofRequest.nonRevoked!!
+                    proofRequest.nonRevoked!!,
+                    revStateAlreadyDone
                 )
 
                 allRevStates.add(revocationState)
@@ -352,13 +340,19 @@ class IndySDKWalletUser private constructor(
 
         val usedSchemas = allSchemas.associate { it.id to it }
         val usedCredentialDefs = allCredentialDefs.associate { it.id to it }
-        val usedRevocationStates = allRevStates
-            .associate {
-                val stateByTimestamp = hashMapOf<Long, RevocationState>()
-                stateByTimestamp[it.timestamp] = it
+        val usedRevocationStates = mutableMapOf<String, MutableMap<Long, RevocationState>>()
+        allRevStates.forEach {
+            val key = it.revocationRegistryIdRaw!!
+            val stateByTimestamp =
+                usedRevocationStates.getOrDefault(key, mutableMapOf())
+            stateByTimestamp.putIfAbsent(it.timestamp, it)
+                ?.also { current ->
+                    if (current != it)
+                        throw RuntimeException("Collusion of revocation states, this should not happen. At key($key) was:($current), tried to put($it)")
+                }
 
-                it.revocationRegistryIdRaw!! to stateByTimestamp
-            }
+            usedRevocationStates[key] = stateByTimestamp
+        }
 
         val requestedCredentialsJson = SerializationUtils.anyToJSON(requestedCredentials)
         val usedSchemasJson = SerializationUtils.anyToJSON(usedSchemas)
