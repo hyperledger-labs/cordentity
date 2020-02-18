@@ -5,15 +5,17 @@ import com.luxoft.blockchainlab.hyperledger.indy.utils.SerializationUtils
 import mu.KotlinLogging
 import org.java_websocket.client.WebSocketClient
 import org.java_websocket.handshake.ServerHandshake
-import rx.*
 import rx.Observable
+import rx.Scheduler
+import rx.Single
+import rx.Subscriber
 import rx.schedulers.Schedulers
 import java.net.URI
 import java.util.*
 
 class AgentWebSocketClient(serverUri: URI, private val socketName: String) : WebSocketClient(serverUri) {
     companion object {
-        val scheduler: Scheduler = Schedulers.computation()
+        val scheduler: Scheduler = Schedulers.io()
     }
 
     private val log = KotlinLogging.logger {}
