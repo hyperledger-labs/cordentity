@@ -227,7 +227,7 @@ data class CredentialAttributeReference(
 
 data class CredentialPredicateReference(
     val name: String,
-    val p_value: Int,
+    val p_value: Number,
     val p_type: String,
     val restrictions: Filter? = null
 )
