@@ -75,7 +75,7 @@ fun ProofRequest.reveal(attrName: String, filterFiller: (Filter.() -> Unit)? = n
 fun ProofRequest.provePredicateThan(
     attrName: String,
     predicate: PredicateTypes,
-    than: Int,
+    than: Number,
     filterFiller: (Filter.() -> Unit)? = null
 ) {
     val predicateReference = if (filterFiller == null) {
