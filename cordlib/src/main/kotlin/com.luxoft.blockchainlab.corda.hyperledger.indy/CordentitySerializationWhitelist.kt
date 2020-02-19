@@ -8,6 +8,7 @@ import net.corda.core.serialization.SerializationWhitelist
 
 class CordentitySerializationWhitelist : SerializationWhitelist {
     override val whitelist: List<Class<*>> = listOf(
+        Number::class.java,
         Interval::class.java,
         CredentialFieldReference::class.java,
         CredentialPredicate::class.java,
