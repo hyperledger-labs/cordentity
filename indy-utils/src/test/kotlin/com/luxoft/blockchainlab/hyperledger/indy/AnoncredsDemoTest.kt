@@ -2,13 +2,17 @@ package com.luxoft.blockchainlab.hyperledger.indy
 
 import com.luxoft.blockchainlab.hyperledger.indy.helpers.WalletHelper
 import com.luxoft.blockchainlab.hyperledger.indy.ledger.IndyPoolLedgerUser
-import com.luxoft.blockchainlab.hyperledger.indy.models.*
+import com.luxoft.blockchainlab.hyperledger.indy.models.CredentialValue
+import com.luxoft.blockchainlab.hyperledger.indy.models.Interval
+import com.luxoft.blockchainlab.hyperledger.indy.models.PredicateTypes
 import com.luxoft.blockchainlab.hyperledger.indy.utils.*
 import com.luxoft.blockchainlab.hyperledger.indy.wallet.IndySDKWalletUser
 import junit.framework.Assert.assertFalse
 import junit.framework.Assert.assertTrue
 import org.hyperledger.indy.sdk.wallet.Wallet
-import org.junit.*
+import org.junit.After
+import org.junit.Before
+import org.junit.Test
 
 
 class AnoncredsDemoTest : IndyIntegrationTest() {
@@ -90,9 +94,9 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         prover.checkLedgerAndReceiveCredential(credentialInfo, credReq, credOffer)
 
         val proofReq = proofRequest("proof_req", "0.1") {
-            reveal("name") { "name" shouldBe "Alex" }
+            reveal("name") { FilterProperty.Value shouldBe "Alex" }
             reveal("sex")
-            proveGreaterThan("age", 18)
+            provePredicateThan("age", PredicateTypes.GE, 18)
             proveNonRevocation(Interval.allTime())
         }
 
@@ -106,9 +110,9 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         )
 
         val proofReqAfterRevocation = proofRequest("proof_req", "0.2") {
-            reveal("name") { "name" shouldBe "Alex" }
+            reveal("name") { FilterProperty.Value shouldBe "Alex" }
             reveal("sex")
-            proveGreaterThan("age", 18)
+            provePredicateThan("age", PredicateTypes.GE, 18)
             proveNonRevocation(Interval.allTime())
         }
 
@@ -136,9 +140,9 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         // repeating this stuff for 3 times
         for (i in (0 until 3)) {
             val proofReq = proofRequest("proof_req", "0.$i") {
-                reveal("name") { "name" shouldBe "Alex" }
+                reveal("name") { FilterProperty.Value shouldBe "Alex" }
                 reveal("sex")
-                proveGreaterThan("age", 18)
+                provePredicateThan("age", PredicateTypes.GE, 18)
             }
 
             val proof = prover.createProofFromLedgerData(proofReq)
@@ -172,12 +176,10 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
             // verify first credential
             val proofReq1 = proofRequest("proof_req", "0.1") {
                 reveal("name") {
-                    "name" shouldBe "Alex$i"
+                    FilterProperty.Value shouldBe "Alex$i"
                 }
-                reveal("sex") {
-                    "name" shouldBe "Alex$i"
-                }
-                proveGreaterThan("age", 18) { "name" shouldBe "Alex$i" }
+                reveal("sex")
+                provePredicateThan("age", PredicateTypes.GE, 18)
                 proveNonRevocation(Interval.allTime())
             }
 
@@ -202,18 +204,16 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
 
         // verify second credential
         val proofReq2 = proofRequest("proof_req", "0.1") {
-            reveal("name") { "sex" shouldBe "female" }
-            reveal("age") { "sex" shouldBe "female" }
+            reveal("sex") { FilterProperty.Value shouldBe "female" }
+            reveal("name")
+            reveal("age")
             proveNonRevocation(Interval.allTime())
         }
 
-        val proof2 = prover.createProofFromLedgerData(proofReq2) {
-            attributes["age"] = wql {
-                "name" eq "Alice"
-            }
-        }
+        val proof2 = prover.createProofFromLedgerData(proofReq2)
 
-        assert(issuer1.verifyProofWithLedgerData(proofReq2, proof2)) { "Proof is not valid for Alice" }
+        val proofWithLedgerData = issuer1.verifyProofWithLedgerData(proofReq2, proof2)
+        assert(proofWithLedgerData) { "Proof is not valid for Alice" }
     }
 
     @Test
@@ -232,9 +232,9 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         prover.checkLedgerAndReceiveCredential(credentialInfo, credReq, credOffer)
 
         val proofReq = proofRequest("proof_req", "0.1") {
-            reveal("name") { "name" shouldBe "Alex" }
+            reveal("name") { FilterProperty.Value shouldBe "Alex" }
             reveal("sex")
-            proveGreaterThan("age", 18)
+            provePredicateThan("age", PredicateTypes.GE, 18)
         }
 
         val proof = prover.createProofFromLedgerData(proofReq)
@@ -272,8 +272,8 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         val proofReq = proofRequest("proof_req", "0.1") {
             reveal("name")
             reveal("status")
-            proveGreaterThan("period", 5)
-            proveGreaterThan("age", 18)
+            provePredicateThan("period", PredicateTypes.GE, 5)
+            provePredicateThan("age", PredicateTypes.GE, 18)
         }
 
         val proof = prover.createProofFromLedgerData(proofReq) {
@@ -320,8 +320,8 @@ class AnoncredsDemoTest : IndyIntegrationTest() {
         val proofReq = proofRequest("proof_req", "0.1") {
             reveal("name")
             reveal("status")
-            proveGreaterThan("period", 5)
-            proveGreaterThan("age", 18)
+            provePredicateThan("period", PredicateTypes.GE, 5)
+            provePredicateThan("age", PredicateTypes.GE, 18)
         }
 
         val proof = prover.createProofFromLedgerData(proofReq) {

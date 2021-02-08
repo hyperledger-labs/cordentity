@@ -95,7 +95,7 @@ data class DidConfig(
  *
  * @return [RevocationState]
  */
-typealias RevocationStateProvider = (revRegId: RevocationRegistryDefinitionId, credRevId: String, interval: Interval) -> RevocationState
+typealias RevocationStateProvider = (revRegId: RevocationRegistryDefinitionId, credRevId: String, interval: Interval, revRegDuplicate: Boolean) -> RevocationState
 
 /**
  * Lambda to provide schema for some id
