@@ -164,10 +164,10 @@ Also re-creating the `indypool` docker container is needed to get a clean system
 
     gradle dockerCleanRun
 
-To manually start the `indy-pool` container on ports 9701-9708 (version 1.7.0 here is correct): 
+To manually start the `indy-pool` container on ports 9701-9708 (version 1.15.0 here is correct): 
 
-    docker pull teamblockchain/indy-pool:1.7.0
-    docker create -p 9701-9708:9701-9708 --name indypool --rm teamblockchain/indy-pool:1.7.0
+    docker pull teamblockchain/indy-pool:1.15.0
+    docker create -p 9701-9708:9701-9708 --name indypool --rm teamblockchain/indy-pool:1.15.0
     docker start indypool
     
 ## Contributors
